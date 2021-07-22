@@ -8,6 +8,8 @@
 
 namespace humhub\modules\user\components;
 
+use humhub\components\UrlManager;
+use humhub\modules\space\models\Space;
 use yii\web\UrlRuleInterface;
 use yii\base\BaseObject;
 use humhub\modules\user\models\User as UserModel;
@@ -44,7 +46,7 @@ class UrlRule extends BaseObject implements UrlRuleInterface
                     $route = "";
                 }
 
-                $url = "u/" . urlencode($username) . "/" . $route;
+                $url = "u/" . urlencode(mb_strtolower($username)) . "/" . $route;
                 if (!empty($params) && ($query = http_build_query($params)) !== '') {
                     $url .= '?' . $query;
                 }
@@ -77,7 +79,7 @@ class UrlRule extends BaseObject implements UrlRuleInterface
             }
             $params = $request->get();
             $params['cguid'] = $user->guid;
-            return [$parts[2] , $params];
+            return [$parts[2], $params];
         }
 
         return false;
@@ -91,12 +93,20 @@ class UrlRule extends BaseObject implements UrlRuleInterface
      */
     public static function getUrlByUserGuid($guid)
     {
-        if (isset(static::$userUrlMap[$guid])) {
+        if (array_key_exists($guid, static::$userUrlMap)) {
             return static::$userUrlMap[$guid];
         }
 
-        $user = UserModel::findOne(['guid' => $guid]);
-        static::$userUrlMap[$guid] = ($user !== null) ? $user->username : null;
+        $user = null;
+        if (UrlManager::$cachedLastContainerRecord !== null && UrlManager::$cachedLastContainerRecord->guid === $guid) {
+            if (UrlManager::$cachedLastContainerRecord instanceof UserModel) {
+                $user = UrlManager::$cachedLastContainerRecord;
+            }
+        } else {
+            $user = UserModel::findOne(['guid' => $guid]);
+        }
+
+        static::$userUrlMap[$guid] = $user->username ?? null;
         return static::$userUrlMap[$guid];
     }
 

@@ -34,6 +34,7 @@ return array (
   'Deactivate' => 'Deaktivieren',
   'Deactivate maintenance mode and enable all users to access the platform again?' => 'Wartungsmodus deaktivieren und allen Benutzern den Zugriff auf die Plattform wieder ermöglichen?',
   'Default Expire Time (in seconds)' => 'Standardablaufzeit (in Sekunden)',
+  'Default Timezone' => 'Standard Zeitzone',
   'Default language' => 'Standardsprache',
   'Default pagination size (Entries per page)' => 'Standardseitengröße (Einträge pro Seite)',
   'Default stream content order' => 'Standardsortierung des Streams',

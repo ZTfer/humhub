@@ -36,6 +36,11 @@ class AuthController extends Controller
      * after the response is generated.
      */
     const EVENT_AFTER_LOGIN = 'afterLogin';
+    
+    /**
+     * @event Triggered after an successful login but before checking user status
+     */
+    const EVENT_BEFORE_CHECKING_USER_STATUS = 'beforeCheckingUserStatus';
 
     /**
      * @inheritdoc
@@ -158,17 +163,20 @@ class AuthController extends Controller
         }
 
         if (!$authClient instanceof ApprovalBypass && !Yii::$app->getModule('user')->settings->get('auth.anonymousRegistration')) {
+            Yii::warning('Could not register user automatically: Anonymous registration disabled. AuthClient: ' . get_class($authClient), 'user');
             Yii::$app->session->setFlash('error', Yii::t('UserModule.base', "You're not registered."));
             return $this->redirect(['/user/auth/login']);
         }
 
         // Check if E-Mail is given
         if (!isset($attributes['email']) && Yii::$app->getModule('user')->emailRequired) {
+            Yii::warning('Could not register user automatically: AuthClient ' . get_class($authClient) . ' provided no E-Mail attribute.', 'user');
             Yii::$app->session->setFlash('error', Yii::t('UserModule.base', 'Missing E-Mail Attribute from AuthClient.'));
             return $this->redirect(['/user/auth/login']);
         }
 
         if (!isset($attributes['id'])) {
+            Yii::warning('Could not register user automatically: AuthClient ' . get_class($authClient) . ' provided no ID attribute.', 'user');
             Yii::$app->session->setFlash('error', Yii::t('UserModule.base', 'Missing ID AuthClient Attribute from AuthClient.'));
             return $this->redirect(['/user/auth/login']);
         }
@@ -200,6 +208,7 @@ class AuthController extends Controller
     {
         $redirectUrl = ['/user/auth/login'];
         $success = false;
+        $this->trigger(static::EVENT_BEFORE_CHECKING_USER_STATUS, new UserEvent(['user' => $user]));
         if ($user->status == User::STATUS_ENABLED) {
             $duration = 0;
             if (
