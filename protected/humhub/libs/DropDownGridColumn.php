@@ -8,6 +8,7 @@
 
 namespace humhub\libs;
 
+use humhub\helpers\Html;
 use Yii;
 use yii\grid\DataColumn;
 use yii\web\JsExpression;
@@ -19,7 +20,6 @@ use yii\web\JsExpression;
  */
 class DropDownGridColumn extends DataColumn
 {
-
     /**
      * @var array list of attributes which should be aditionally submitted (e.g. id)
      */
@@ -76,6 +76,9 @@ class DropDownGridColumn extends DataColumn
         } else {
             $this->htmlOptions['class'] = 'editableCell form-control';
         }
+
+        // Fixes: https://github.com/yiisoft/yii2/issues/19534
+        $this->htmlOptions['strict'] = true;
 
         // We need to number the submit attributes because data attribute is not case sensitive
         $this->htmlOptions['data-submit-attributes'] = implode(', ', $this->submitAttributes);

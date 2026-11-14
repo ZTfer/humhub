@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'Panel eltávolítása',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => '<strong>Fiók</strong> menü',
   '<strong>Getting</strong> Started' => '<strong>Első</strong> lépések',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Bemutató:</strong> Adminiszráció (Modulok)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => 'Közösség bemutató <strong>indítása</strong>',
   'Cancel' => 'Mégsem',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => 'Nem maradsz le semmiről!<br><br>Ez a kis ikon értesít minden téged érintő tevékenységről és bejegyzésről.',
+  'Done' => 'Kész',
   'Drag a photo here or click to browse your files' => 'Húzz ide egy fotót vagy tallózz a fájljaid közül',
-  'End guide' => 'Bemutató befejezése',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Tudj meg mindent, amire szükséged van az oldal használatához. Nézd meg a következő bemutatókat:',
   'Hide my year of birth' => 'Születési évem elrejtése',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => 'Kedves <strong>%firstname%</strong>, köszönjük, hogy a(z) %community% oldalt használod.',
-  'Next »' => 'Előre »',
+  'Next &rarr;' => '',
   'Ok' => 'Rendben',
   'Save and close' => 'Ment és bezár',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'A fiók menü hozzáférést biztosít a privát beállításokhoz és lehetővé teszi a nyilvános profilok kezelését.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Vezetékneved',
   'Your mobile phone number' => 'Mobiltelefon számod',
   'Your phone number at work' => 'Munkahelyi telefonszámod',
-  'Your skills, knowledge and experience (comma seperated)' => 'Ismereteid, tudásod és tapasztalataid (vesszővel elválasztva)',
+  'Your skills, knowledge and experience' => 'Az Ön képességei, tudása és tapasztalata',
   'Your title or position' => 'Titulusod vagy pozíciód',
-  '« Prev' => '« Vissza',
-);
+  '{{current}} of {{total}}' => '',
+];

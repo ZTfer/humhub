@@ -2,9 +2,8 @@
 
 namespace humhub\modules\tour;
 
+use humhub\modules\user\models\User;
 use Yii;
-use humhub\modules\tour\widgets\Dashboard;
-
 
 /**
  * This module shows an introduction tour for new users
@@ -14,18 +13,57 @@ use humhub\modules\tour\widgets\Dashboard;
  */
 class Module extends \humhub\components\Module
 {
-
+    /**
+     * @inheritdoc
+     */
     public $isCoreModule = true;
 
-    public static function onDashboardSidebarInit($event)
+    /**
+     * Configuration files for each Tour
+     * Must return an array of valid params, see `\humhub\modules\tour\models\TourConfig::isValidConfig()`
+     *
+     * Example of a custom config file:
+     * [
+     *     '@tour/config/tour-interface.php', // default config
+     *     __DIR__ . '/custom-tour/tour-administration.php', // custom config in protected/config/custom-tour/tour-administration.php
+     * ],
+     *
+     * @since 1.18
+     */
+    public array $tourConfigFiles = [
+        '@tour/config/tour-interface.php',
+        '@tour/config/tour-spaces.php',
+        '@tour/config/tour-profile.php',
+        '@tour/config/tour-administration.php',
+    ];
+
+    /**
+     * @var array Driver.js extra options
+     * Will be merged with the view options
+     * See documentation: https://driverjs.com/docs
+     *
+     * @since 1.18
+     */
+    public array $driverJsOptions = [
+        'showProgress' => 'true',
+    ];
+
+    /**
+     * Check if the welcome tour window should be displayed automatically
+     *
+     * @param User|null $user
+     * @return bool
+     */
+    public function showWelcomeWindow(?User $user = null): bool
     {
-        if (Yii::$app->user->isGuest)
-            return;
-
-        $settings = Yii::$app->getModule('tour')->settings;
-        if ($settings->get('enable') == 1 && $settings->user()->get("hideTourPanel") != 1) {
-            $event->sender->addWidget(Dashboard::class, [], ['sortOrder' => 100]);
+        if ($user === null && !Yii::$app->user->isGuest) {
+            $user = Yii::$app->user->identity;
         }
-    }
 
+        return
+            $user instanceof User
+            && $this->settings->user($user)->get('showWelcome')
+            && !Yii::$app->getModule('installer')->settings->get('sampleData')
+            && !$this->settings->user($user)->get('welcome');
+    }
 }

@@ -10,14 +10,12 @@ use tests\codeception\_support\BasePage;
  */
 class DirectoryPage extends BasePage
 {
+    public $route = 'user/people';
 
-    public $route = 'directory/directory';
-    
     public function clickMembers()
     {
-        $this->actor->click('Members');
-        if($this->actor instanceof \AcceptanceTester) {
-            $this->actor->waitForText('Member directory', 30);
+        if ($this->actor instanceof \AcceptanceTester) {
+            $this->actor->waitForText('People', 30);
         }
     }
 

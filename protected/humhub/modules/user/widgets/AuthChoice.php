@@ -8,28 +8,32 @@
 
 namespace humhub\modules\user\widgets;
 
+use humhub\helpers\DeviceDetectorHelper;
+use humhub\helpers\Html;
+use humhub\modules\user\authclient\BaseFormClient;
+use humhub\modules\user\authclient\Collection;
 use Yii;
 use yii\authclient\ClientInterface;
-use yii\bootstrap\Html;
 
 class AuthChoice extends \yii\authclient\widgets\AuthChoice
 {
-
     /**
      * Used to retrieve the auth clients in a static way
-     * @var type
+     * @var string
      */
     private static $authclientCollection = 'authClientCollection';
 
     /**
-     * @var int number of clients to show without folding
+     * @var int maximum number of characters for a button to be considered "short" (to display 2 buttons per row)
      */
-    public $maxShowClients = 2;
+    public $maxCharForShortButton = 22;
 
     /**
-     * @var boolean show auth button colors
+     * @var bool show auth button colors
      */
     public $showButtonColors = false;
+
+    public $showOrDivider = false;
 
     /**
      * @inheritdoc
@@ -40,6 +44,11 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
      * @var ClientInterface[] auth providers list.
      */
     private $_clients;
+
+    /**
+     * @var string Output content from parent::init()
+     */
+    private string $_initOutput = '';
 
     /**
      * @param ClientInterface[] $clients auth providers
@@ -62,20 +71,59 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
     }
 
     /**
-     * Returns default auth clients list.
-     * @return ClientInterface[] auth clients list.
+     * Returns the number of clients which doesn't need login form
      */
-    public static function hasClients()
+    public static function getClientsCount(): int
     {
-        $authClients = self::filterClients(Yii::$app->get(self::$authclientCollection)->getClients());
+        $clients = Yii::$app->get(self::$authclientCollection)->getClients();
+        $filteredClients = self::filterClients($clients);
+        return (int)count($filteredClients);
+    }
 
-        return count($authClients) > 0;
+    /**
+     *  Returns the list of client URLs for all auth clients having the method `buildAuthUrl()`
+     *  (OAuth2, OAuth1 and OpenId clients), or a public `singleSignOnServiceUrl` property
+     *
+     * @since 1.19.0
+     */
+    public static function getClientUrls(): array
+    {
+        $urls = [];
+        $clients = Yii::$app->get(self::$authclientCollection)->getClients();
+
+        foreach ($clients as $client) {
+            if (method_exists($client, 'buildAuthUrl')) { // OAuth2, OAuth1 and OpenId clients
+                $url = $client->buildAuthUrl();
+            } elseif (property_exists($client, 'singleSignOnServiceUrl') && !empty($client->singleSignOnServiceUrl)) {
+                // e.g. SAML, which redirects to a fixed IdP URL rather than building one on the fly
+                $url = $client->singleSignOnServiceUrl;
+            } else {
+                continue;
+            }
+
+            // Remove URL params
+            $parts = parse_url((string) $url);
+            if (empty($parts['host'])) {
+                continue;
+            }
+
+            $urls[] = $parts['scheme'] . '://' . $parts['host']
+                . (isset($parts['port']) ? ':' . $parts['port'] : '')
+                . ($parts['path'] ?? '');
+        }
+
+        return array_unique($urls);
+    }
+
+    public static function hasClients(): bool
+    {
+        return static::getClientsCount() > 0;
     }
 
     /**
      * Filters out clients which need login form
-     * @param type $clients
-     * @return \humhub\modules\user\authclient\BaseFormAuth
+     * @param $clients
+     * @return BaseFormClient[]
      */
     private static function filterClients($clients)
     {
@@ -83,7 +131,7 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
         foreach ($clients as $client) {
 
             // Don't show clients which need login form
-            if (!$client instanceof \humhub\modules\user\authclient\BaseFormAuth) {
+            if (!$client instanceof BaseFormClient) {
                 $result[] = $client;
             }
         }
@@ -97,9 +145,7 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
     {
         $params = $_GET;
         unset($params[$this->clientIdGetParamName]);
-        $baseAuthUrl = array_merge(['/user/auth/external'], $params);
-
-        return $baseAuthUrl;
+        return array_merge(['/user/auth/external'], $params);
     }
 
     /**
@@ -107,11 +153,24 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
      */
     public function init()
     {
-        if(count($this->getClients()) == 0) {
-            return;
-        } else {
-            return parent::init();
+        if (count($this->getClients()) > 0) {
+            // Capture output content from `parent::init()` in order to don't run it directly here before call
+            // the method `beforeRun()`, because if it returns `false`, then this widget must be not rendered,
+            // we must start to render content only in the method `run()` which is called when `beforeRun() === true`
+            ob_start();
+            parent::init();
+            $this->_initOutput = ob_get_clean();
         }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function beforeRun()
+    {
+        return parent::beforeRun()
+            && count($this->getClients()) > 0
+            && !(DeviceDetectorHelper::isIosApp() && Yii::$app->params['humhub']['disableAuthChoicesIos']);
     }
 
     /**
@@ -119,11 +178,7 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
      */
     public function run()
     {
-        if(count($this->getClients()) == 0) {
-            return;
-        } else {
-            return parent::run();
-        }
+        return $this->_initOutput . parent::run();
     }
 
     /**
@@ -134,37 +189,22 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
         $clients = $this->getClients();
         $clientCount = count($clients);
 
-        if ($clientCount == 0) {
-            return;
-        }
+        $this->view->registerCssFile(Yii::$app->assetManager->getPublishedUrl('@humhub/resources') . '/resources/user/authChoice.css');
 
-        $this->view->registerCssFile('@web-static/resources/user/authChoice.css');
-        $this->view->registerJsFile('@web-static/resources/user/authChoice.js');
+        $result = Html::beginTag('div', ['class' => 'authChoice d-flex flex-wrap gap-3']);
 
-        echo Html::beginTag('div', ['class' => 'authChoice']);
-
-        $i = 0;
-        $extraCssClass = 'btn-sxm';
-
+        $clients = array_values($clients); // Reindex array keys
         foreach ($clients as $client) {
-            $i++;
-            if ($i == $this->maxShowClients + 1) {
-                // Add more button
-                echo Html::a('<i class="fa fa-angle-double-down" aria-hidden="true"></i>', '#', ['class' => 'btn btn-default pull-right btn-sxm', 'id' => 'btnAuthChoiceMore']);
-
-                // Div contains more auth clients
-                echo Html::beginTag('div', ['class' => 'authChoiceMore']);
-                $extraCssClass = 'btn-sm'; // further buttons small
-            }
-            $this->clientLink($client, null, ['class' => $extraCssClass]);
-            echo "&nbsp;";
+            $result .= $this->clientLink($client);
         }
 
-        if ($i > $this->maxShowClients) {
-            echo Html::endTag('div');
+        $result .= Html::endTag('div');
+
+        if ($this->showOrDivider) {
+            $result .= Html::tag('div', Html::tag('hr') . Html::tag('div', Yii::t('UserModule.base', 'or')), ['class' => 'or-container']);
         }
-        echo Html::endTag('div');
-        echo Html::tag('div', Html::tag('hr') . Html::tag('div', Yii::t('UserModule.base', 'or')), ['class' => 'or-container']);
+
+        return $result;
     }
 
     /**
@@ -176,30 +216,23 @@ class AuthChoice extends \yii\authclient\widgets\AuthChoice
 
         if (isset($viewOptions['widget'])) {
             parent::clientLink($client, $text, $htmlOptions);
-            return;
+            return '';
         }
 
-        if (isset($viewOptions['buttonBackgroundColor'])) {
-            $textColor = (isset($viewOptions['buttonColor'])) ? $viewOptions['buttonColor'] : '#FFF';
+        $style = '';
+        if (isset($viewOptions['buttonBackgroundColor']) && $this->showButtonColors) {
+            $textColor = $viewOptions['buttonColor'] ?? '#FFF';
             $btnStyle = Html::cssStyleFromArray(['color' => $textColor . '!important', 'background-color' => $viewOptions['buttonBackgroundColor'] . '!important']);
             $btnClasses = '.btn-ac-' . $client->getName() . ', .btn-ac-' . $client->getName() . ':hover, .btn-ac-' . $client->getName() . ':active, .btn-ac-' . $client->getName() . ':visited';
-
-            if ($this->showButtonColors) {
-                echo Html::style($btnClasses . ' {' . $btnStyle . '}');
-            }
+            $style = Html::style($btnClasses . ' {' . $btnStyle . '}');
         }
 
-        if (!isset($htmlOptions['class'])) {
-            $htmlOption['class'] = '';
-        }
-        $htmlOptions['class'] .= ' ' . 'btn btn-default btn-ac-' . $client->getName();
+        Html::addCssClass($htmlOptions, ['btn', 'btn-light', 'btn-ac-' . $client->getName()]);
         $htmlOptions['data-pjax-prevent'] = '';
 
         $icon = (isset($viewOptions['cssIcon'])) ? '<i class="' . $viewOptions['cssIcon'] . '" aria-hidden="true"></i>' : '';
-        echo parent::clientLink($client, $icon . $client->getTitle(), $htmlOptions);
 
-        return;
-        parent::clientLink($client, $text, $htmlOptions);
+        return $style . parent::clientLink($client, $icon . $client->getTitle(), $htmlOptions);
     }
 
 }

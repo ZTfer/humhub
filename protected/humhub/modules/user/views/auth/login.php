@@ -1,136 +1,89 @@
 <?php
 
-use humhub\libs\Html;
-use humhub\modules\user\models\forms\Login;
-use humhub\modules\user\models\Invite;
-use yii\captcha\Captcha;
-use \yii\helpers\Url;
-use yii\widgets\ActiveForm;
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\user\models\forms\LoginIdentity;
 use humhub\modules\user\widgets\AuthChoice;
+use humhub\widgets\bootstrap\Alert;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+use humhub\widgets\LanguageChooser;
 use humhub\widgets\SiteLogo;
+use yii\helpers\Url;
 
-$this->pageTitle = Yii::t('UserModule.auth', 'Login');
+$this->pageTitle = Yii::t('UserModule.auth', 'Sign In');
 
-/* @var $canRegister boolean */
-/* @var $model Login */
-/* @var $invite Invite */
-/* @var $info string */
+/* @var $this View */
+/* @var $model LoginIdentity */
+/* @var $signUpAllowed bool */
+/* @var $showLoginForm bool */
+
 ?>
 
-<div class="container" style="text-align: center;">
-    <?= SiteLogo::widget(['place' => 'login']); ?>
+<div id="user-auth-login" class="container container-login">
+    <?= SiteLogo::widget(['place' => SiteLogo::PLACE_LOGIN]) ?>
     <br>
 
-    <div class="panel panel-default animated bounceIn" id="login-form"
-         style="max-width: 300px; margin: 0 auto 20px; text-align: left;">
-
-        <div class="panel-heading"><?= Yii::t('UserModule.auth', '<strong>Please</strong> sign in'); ?></div>
-
-        <div class="panel-body">
-
+    <div class="panel panel-default mb-4 animated bounceIn" id="login-form">
+        <div class="panel-heading">
+            <strong class="fw-bolder"><?= Yii::t('UserModule.auth', 'Sign In') ?></strong>
+        </div>
+        <div class="panel-body pt-0">
             <?php if (Yii::$app->session->hasFlash('error')): ?>
-                <div class="alert alert-danger" role="alert">
-                    <?= Yii::$app->session->getFlash('error') ?>
-                </div>
+                <?= Alert::danger(Yii::$app->session->getFlash('error'))->closeButton(false) ?>
             <?php endif; ?>
 
-            <?php if (AuthChoice::hasClients()): ?>
-                <?= AuthChoice::widget([]) ?>
-            <?php else: ?>
-                <?php if ($canRegister) : ?>
-                    <p><?= Yii::t('UserModule.auth', "If you're already a member, please login with your username/email and password."); ?></p>
-                <?php else: ?>
-                    <p><?= Yii::t('UserModule.auth', "Please login with your username/email and password."); ?></p>
-                <?php endif; ?>
+            <?php if ($showLoginForm): ?>
+                <p class="mb-2"><?= $model->getAttributeLabel('username') ?></p>
+                <?php $form = ActiveForm::begin(['id' => 'account-login-form', 'enableClientValidation' => false]) ?>
+                    <?= $form->field($model, 'username')->textInput([
+                        'id' => 'login_username',
+                        'placeholder' => $model->getAttributeLabel('username'),
+                        'aria-label' => $model->getAttributeLabel('username'),
+                        'autocomplete' => 'username',
+                        'autofocus' => true,
+                    ])->label(false) ?>
+
+                    <?= Html::submitButton(
+                        Yii::t('UserModule.auth', 'Continue'),
+                        ['id' => 'continue-button', 'data-ui-loader' => '', 'class' => 'btn btn-large btn-primary w-100'],
+                    ) ?>
+
+                    <?php if ($signUpAllowed): ?>
+                        <?= Button::light(Yii::t('UserModule.auth', 'Sign Up'))
+                            ->link(Url::to(['/user/auth/register']))
+                            ->cssClass('w-100 mt-2')
+                            ->id('register-button')
+                            ->pjax(false) ?>
+                    <?php endif; ?>
+                <?php ActiveForm::end() ?>
             <?php endif; ?>
-
-            <?php $form = ActiveForm::begin(['id' => 'account-login-form', 'enableClientValidation' => false]); ?>
-                <?= $form->field($model, 'username')->textInput(['id' => 'login_username', 'placeholder' => $model->getAttributeLabel('username'), 'aria-label' => $model->getAttributeLabel('username')])->label(false); ?>
-                <?= $form->field($model, 'password')
-                    ->passwordInput(['id' => 'login_password', 'placeholder' => $model->getAttributeLabel('password'), 'aria-label' => $model->getAttributeLabel('password')])
-                    ->label(false); ?>
-                <?= $form->field($model, 'rememberMe')->checkbox(); ?>
-
-                <hr>
-                <div class="row">
-                    <div class="col-md-4">
-                        <?= Html::submitButton(Yii::t('UserModule.auth', 'Sign in'), ['id' => 'login-button', 'data-ui-loader' => "", 'class' => 'btn btn-large btn-primary']); ?>
-                    </div>
-                    <div class="col-md-8 text-right">
-                        <small>
-                            <a id="password-recovery-link" href="<?= Url::toRoute('/user/password-recovery'); ?>"
-                               data-pjax-prevent><br><?= Yii::t('UserModule.auth', 'Forgot your password?') ?></a>
-                        </small>
-                    </div>
-                </div>
-            <?php ActiveForm::end(); ?>
         </div>
     </div>
 
-    <br>
-
-    <?php if ($canRegister) : ?>
-        <div id="register-form"
-             class="panel panel-default animated bounceInLeft"
-             style="max-width: 300px; margin: 0 auto 20px; text-align: left;">
-
-            <div class="panel-heading"><?= Yii::t('UserModule.auth', '<strong>Sign</strong> up') ?></div>
-
+    <?php if (AuthChoice::hasClients()): ?>
+        <div class="panel panel-default mb-4 animated bounceIn" id="auth-choice-panel">
             <div class="panel-body">
-
-                <p><?= Yii::t('UserModule.auth', "Don't have an account? Join the network by entering your e-mail address."); ?></p>
-
-                <?php $form = ActiveForm::begin(['id' => 'invite-form']); ?>
-                <?= $form->field($invite, 'email')->input('email', ['id' => 'register-email', 'placeholder' => $invite->getAttributeLabel('email'), 'aria-label' => $invite->getAttributeLabel('email')])->label(false); ?>
-                <?php if ($invite->showCaptureInRegisterForm()) : ?>
-                    <div id="registration-form-captcha" style="display: none;">
-                        <div><?= Yii::t('UserModule.auth', 'Please enter the letters from the image.'); ?></div>
-
-                        <?= $form->field($invite, 'captcha')->widget(Captcha::class, [
-                            'captchaAction' => 'auth/captcha',
-                        ])->label(false); ?>
-                    </div>
+                <?php if ($showLoginForm): ?>
+                    <p class="text-center mb-2">
+                        <?= Yii::t('UserModule.auth', 'Or continue with') ?>
+                    </p>
                 <?php endif; ?>
-                <hr>
-                <?= Html::submitButton(Yii::t('UserModule.auth', 'Register'), ['class' => 'btn btn-primary', 'data-ui-loader' => '']); ?>
-
-                <?php ActiveForm::end(); ?>
+                <?= AuthChoice::widget() ?>
             </div>
         </div>
-
     <?php endif; ?>
 
-    <?= humhub\widgets\LanguageChooser::widget(); ?>
+    <?= LanguageChooser::widget(['vertical' => true]) ?>
 </div>
 
 <script <?= Html::nonce() ?>>
     $(function () {
-        // set cursor to login field
         $('#login_username').focus();
     });
 
-    // Shake panel after wrong validation
     <?php if ($model->hasErrors()) { ?>
-    $('#login-form').removeClass('bounceIn');
-    $('#login-form').addClass('shake');
-    $('#register-form').removeClass('bounceInLeft');
+    $('#login-form').removeClass('bounceIn').addClass('shake');
     $('#app-title').removeClass('fadeIn');
     <?php } ?>
-
-    // Shake panel after wrong validation
-    <?php if ($invite->hasErrors()) { ?>
-    $('#register-form').removeClass('bounceInLeft');
-    $('#register-form').addClass('shake');
-    $('#login-form').removeClass('bounceIn');
-    $('#app-title').removeClass('fadeIn');
-    <?php } ?>
-
-    <?php if ($invite->showCaptureInRegisterForm()) { ?>
-    $('#register-email').on('focus', function () {
-        $('#registration-form-captcha').fadeIn(500);
-    });
-    <?php } ?>
-
 </script>
-
-

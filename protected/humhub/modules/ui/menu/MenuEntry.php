@@ -8,10 +8,9 @@
 
 namespace humhub\modules\ui\menu;
 
+use humhub\helpers\Html;
 use humhub\modules\ui\menu\widgets\Menu;
-use Yii;
 use yii\base\BaseObject;
-use yii\bootstrap\Html;
 
 /**
  * Class MenuEntry
@@ -79,7 +78,7 @@ abstract class MenuEntry extends BaseObject
     }
 
     /**
-     * @return boolean is active
+     * @return bool is active
      */
     public function getIsActive()
     {
@@ -95,7 +94,7 @@ abstract class MenuEntry extends BaseObject
     }
 
     /**
-     * @param $state boolean
+     * @param $state bool
      * @return static
      */
     public function setIsActive($state)
@@ -103,49 +102,6 @@ abstract class MenuEntry extends BaseObject
         $this->isActive = $state;
         return $this;
     }
-
-    /**
-     * Activates this MenuEntry in case the given moduleId, controllerId and actionId matches the current request.
-     * @param string $moduleId controller module id
-     * @param array|string $controllerIds controller id
-     * @param array|string $actionIds action id
-     * @return static
-     */
-    public function setIsActiveState($moduleId, $controllerIds = [], $actionIds = [])
-    {
-        $this->isActive = static::isActiveState($moduleId, $controllerIds, $actionIds);
-        return $this;
-    }
-
-    public static function isActiveState($moduleId = null, $controllerIds = [], $actionIds = [])
-    {
-        if ($moduleId && (!Yii::$app->controller->module || Yii::$app->controller->module->id !== $moduleId)) {
-            return false;
-        }
-
-        if (empty($controllerIds) && empty($actionIds)) {
-            return true;
-        }
-
-        if ($controllerIds && !is_array($controllerIds)) {
-            $controllerIds = [$controllerIds];
-        }
-
-        if (!empty($controllerIds) && !in_array(Yii::$app->controller->id, $controllerIds)) {
-            return false;
-        }
-
-        if ($actionIds && !is_array($actionIds)) {
-            $actionIds = [$actionIds];
-        }
-
-        if (!empty($actionIds) && !in_array(Yii::$app->controller->action->id, $actionIds)) {
-            return false;
-        }
-
-        return true;
-    }
-
 
     /**
      * @param $id string the id
@@ -266,6 +222,6 @@ abstract class MenuEntry extends BaseObject
      */
     public function getEntryClass()
     {
-        return get_class($this);
+        return static::class;
     }
 }

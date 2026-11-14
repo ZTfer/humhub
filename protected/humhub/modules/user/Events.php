@@ -2,13 +2,23 @@
 
 namespace humhub\modules\user;
 
+use Exception;
+use humhub\components\behaviors\PolymorphicRelation;
+use humhub\components\Event;
+use humhub\components\gates\GateInitEvent;
+use humhub\helpers\ControllerHelper;
+use humhub\modules\user\components\MaintenanceModeGate;
+use humhub\modules\user\components\MustChangePasswordGate;
+use humhub\modules\content\components\ContentActiveRecord;
 use humhub\modules\content\models\ContentContainer;
-use humhub\modules\user\models\User;
-use humhub\modules\user\models\Password;
-use humhub\modules\user\models\Profile;
+use humhub\modules\ui\menu\MenuLink;
+use humhub\modules\user\models\Follow;
 use humhub\modules\user\models\GroupUser;
 use humhub\modules\user\models\Mentioning;
-use humhub\modules\user\models\Follow;
+use humhub\modules\user\models\Password;
+use humhub\modules\user\models\Profile;
+use humhub\modules\user\models\User;
+use humhub\modules\user\permissions\PeopleAccess;
 use Yii;
 use yii\base\BaseObject;
 
@@ -19,17 +29,15 @@ use yii\base\BaseObject;
  */
 class Events extends BaseObject
 {
-
     /**
-     * On rebuild of the search index, rebuild all user records
+     * Registers the user gates of this module (see docs/develop/user-gates.md).
      *
-     * @param \yii\base\Event $event
+     * @since 1.19
      */
-    public static function onSearchRebuild($event)
+    public static function onGateInit(GateInitEvent $event): void
     {
-        foreach (User::find()->visible()->each() as $user) {
-            Yii::$app->search->add($user);
-        }
+        $event->manager->register(new MaintenanceModeGate());
+        $event->manager->register(new MustChangePasswordGate());
     }
 
     /**
@@ -39,8 +47,11 @@ class Events extends BaseObject
      */
     public static function onContentDelete($event)
     {
-        Mentioning::deleteAll(['object_model' => $event->sender->className(), 'object_id' => $event->sender->getPrimaryKey()]);
-        Follow::deleteAll(['object_model' => $event->sender->className(), 'object_id' => $event->sender->getPrimaryKey()]);
+        /* @var ContentActiveRecord $content */
+        $content = $event->sender;
+
+        Mentioning::deleteAll(['object_model' => PolymorphicRelation::getObjectModel($content), 'object_id' => $content->getPrimaryKey()]);
+        Follow::deleteAll(['object_model' => PolymorphicRelation::getObjectModel($content), 'object_id' => $content->getPrimaryKey()]);
     }
 
     /**
@@ -99,6 +110,7 @@ class Events extends BaseObject
             if ($mentioning->user == null) {
                 if ($integrityController->showFix('Deleting mentioning ' . $mentioning->id . ' of non existing user!')) {
                     $mentioning->delete();
+                    continue;
                 }
             }
             if ($mentioning->getPolymorphicRelation() == null) {
@@ -110,20 +122,21 @@ class Events extends BaseObject
 
         $integrityController->showTestHeadline('User Module - Follow (' . Follow::find()->count() . ' entries)');
         foreach (Follow::find()->joinWith(['user'])->each() as $follow) {
-            if ($follow->user == null) {
-                if ($integrityController->showFix('Deleting follow ' . $follow->id . ' of non existing user!')) {
+            if ($follow->user === null) {
+                if ($integrityController->showFix('Deleting follow ' . $follow->id . ' of non existing user #' . $follow->user_id . '!')) {
                     $follow->delete();
+                    continue;
                 }
             }
 
             try {
-                if ($follow->getTarget() == null) {
-                    if ($integrityController->showFix('Deleting follow ' . $follow->id . ' of non target!')) {
+                if ($follow->getTarget() === null) {
+                    if ($integrityController->showFix('Deleting follow ' . $follow->id . ' of non target ' . $follow->object_model . ' #' . $follow->object_id . '!')) {
                         $follow->delete();
                     }
                 }
-            } catch (\Exception $e) {
-                if ($integrityController->showFix('Deleting follow ' . $follow->id . ' of non target!')) {
+            } catch (Exception) {
+                if ($integrityController->showFix('Deleting follow ' . $follow->id . ' of non target ' . $follow->object_model . ' #' . $follow->object_id . '!')) {
                     $follow->delete();
                 }
             }
@@ -150,8 +163,32 @@ class Events extends BaseObject
      */
     public static function onHourlyCron($event)
     {
-        Yii::$app->queue->push(new jobs\SyncUsers());
         Yii::$app->queue->push(new jobs\DeleteExpiredSessions());
+    }
+
+    /**
+     * On build of the TopMenu
+     *
+     * @param Event $event
+     */
+    public static function onTopMenuInit($event)
+    {
+        if (Yii::$app->user->isGuest) {
+            return;
+        }
+
+        if (!Yii::$app->user->can(PeopleAccess::class)) {
+            return;
+        }
+
+        $event->sender->addEntry(new MenuLink([
+            'id' => 'people',
+            'icon' => 'users',
+            'label' => Yii::t('UserModule.base', 'People'),
+            'url' => ['/user/people'],
+            'sortOrder' => 200,
+            'isActive' => ControllerHelper::isActivePath('user', 'people'),
+        ]));
     }
 
 }

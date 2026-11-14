@@ -2,10 +2,9 @@
 
 namespace humhub\modules\space\widgets;
 
+use humhub\modules\content\widgets\ContentContainerPickerField;
 use humhub\modules\space\models\Space;
-use humhub\modules\ui\form\widgets\BasePicker;
 use Yii;
-use yii\helpers\Html;
 
 /**
  * Mutliselect input field for selecting space guids.
@@ -14,20 +13,19 @@ use yii\helpers\Html;
  * @since 1.2
  * @author buddha
  */
-class SpacePickerField extends BasePicker
+class SpacePickerField extends ContentContainerPickerField
 {
-    /**
-     * @inheritdoc
-     * Min guids string value of Space model equal 2
-     */
-    public $minInput = 2;
-
+    public $itemClass = Space::class;
     /**
      * @inheritdoc
      */
     public $defaultRoute = '/space/browse/search-json';
-    public $itemClass = Space::class;
-    public $itemKey = 'guid';
+
+    /**
+     * @inheritdoc
+     * Min guids string value
+     */
+    public $minInput = 2;
 
     /**
      * @inheritdoc
@@ -50,17 +48,11 @@ class SpacePickerField extends BasePicker
     /**
      * @inheritdoc
      */
-    protected function getItemText($item)
-    {
-        return $item->getDisplayName();
-    }
-
-    /**
-     * @inheritdoc
-     */
     protected function getItemImage($item)
     {
-        return Image::widget(['space' => $item, 'width' => 24]);
+        return Image::widget([
+            'space' => $item,
+            'width' => 24,
+        ]);
     }
-
 }

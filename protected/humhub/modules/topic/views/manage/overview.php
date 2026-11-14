@@ -6,45 +6,62 @@
  *
  */
 
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\content\components\ContentContainerActiveRecord;
 use humhub\modules\space\models\Space;
 use humhub\modules\space\modules\manage\widgets\DefaultMenu;
-use humhub\widgets\Button;
-use humhub\widgets\GridView;
-use humhub\widgets\ModalButton;
-use yii\bootstrap\ActiveForm;
+use humhub\modules\topic\models\forms\TopicSettingsForm;
+use humhub\modules\topic\models\Topic;
 use humhub\modules\user\models\User;
 use humhub\modules\user\widgets\AccountSettingsMenu;
-use yii\helpers\Html;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+use humhub\widgets\GridView;
+use humhub\widgets\modal\ModalButton;
+use yii\data\ActiveDataProvider;
+use yii\grid\ActionColumn;
 
-/* @var $this \humhub\modules\ui\view\components\View */
-/* @var $dataProvider \yii\data\ActiveDataProvider */
-/* @var $contentContainer \humhub\modules\content\components\ContentContainerActiveRecord */
-/* @var $addModel \humhub\modules\topic\models\Topic */
-
+/* @var $this View */
+/* @var $dataProvider ActiveDataProvider */
+/* @var $contentContainer ContentContainerActiveRecord */
+/* @var $addModel Topic */
+/* @var $topicSettings TopicSettingsForm */
+/* @var $title string */
 ?>
 
 
 <div class="panel panel-default">
-    <div class="panel-heading"><?= Yii::t('TopicModule.base', '<strong>Topic</strong> Overview'); ?></div>
+    <div class="panel-heading"><?= $title ?></div>
 
-    <?php if ($contentContainer instanceof Space) : ?>
-        <?= DefaultMenu::widget(['space' => $contentContainer]); ?>
-    <?php elseif ($contentContainer instanceof User) : ?>
-        <?= AccountSettingsMenu::widget() ?>
-    <?php endif; ?>
+    <?php if ($contentContainer instanceof Space) {
+        echo DefaultMenu::widget(['space' => $contentContainer]);
+    } elseif ($contentContainer instanceof User) {
+        echo AccountSettingsMenu::widget();
+    } ?>
 
     <div class="panel-body">
-
-        <?php $form = ActiveForm::begin(); ?>
-        <div class="form-group">
-            <div class="input-group">
-                <?= Html::activeTextInput($addModel, 'name', ['style' => 'height:36px', 'class' => 'form-control', 'placeholder' => Yii::t('TopicModule.base', 'Add Topic')]) ?>
-                <span class="input-group-btn">
-                    <?= Button::defaultType()->icon('add')->loader()->submit() ?>
-                </span>
+        <?php if (Topic::isAllowedToCreate($contentContainer)) : ?>
+            <?php $form = ActiveForm::begin(); ?>
+            <p><?= Yii::t('TopicModule.base', 'Add topics that you will use in your posts. Topics can be personal interests or general terms. When posting, you can select them by choosing "Topics" and it will be easier for other users to find your posts related to that topic.') ?></p>
+            <div class="mb-3">
+                <div class="input-group">
+                    <?= Html::activeTextInput($addModel, 'name', ['class' => 'form-control', 'placeholder' => Yii::t('TopicModule.base', 'Add Topic')]) ?>
+                    <?= Button::light()
+                        ->icon('add')
+                        ->options(['aria-label' => Yii::t('TopicModule.base', 'Add Topic')])
+                        ->submit() ?>
+                </div>
             </div>
-        </div>
-        <?php ActiveForm::end(); ?>
+            <?php ActiveForm::end(); ?>
+
+            <?php if ($contentContainer instanceof Space) : ?>
+                <?php $form = ActiveForm::begin() ?>
+                    <?= $form->field($topicSettings, 'pickerVisibility')
+                        ->dropDownList($topicSettings->getPickerVisibilityOptions(), ['data-action-change' => 'ui.form.submit']) ?>
+                <?php ActiveForm::end() ?>
+            <?php endif; ?>
+        <?php endif; ?>
 
         <?= GridView::widget([
             'dataProvider' => $dataProvider,
@@ -54,27 +71,34 @@ use yii\helpers\Html;
                 'sort_order',
                 [
                     'header' => Yii::t('base', 'Actions'),
-                    'class' => 'yii\grid\ActionColumn',
-                    'options' => ['width' => '80px'],
+                    'class' => ActionColumn::class,
+                    'options' => ['width' => '100px'],
                     'buttons' => [
-                        'update' => function ($url, $model) use ($contentContainer) {
-                            /* @var $model \humhub\modules\topic\models\Topic */
-                            return ModalButton::primary()->load($contentContainer->createUrl('edit', ['id' => $model->id]))->icon('edit')->xs()->loader(false);
-                        },
-                        'view' => function ($url, $model) use ($contentContainer) {
-                            /* @var $model \humhub\modules\topic\models\Topic */
-                            return Button::primary()->link($model->getUrl())->icon('fa-filter')->xs()->loader(false);
-                        },
-                        'delete' => function ($url, $model) use ($contentContainer) {
-                            /* @var $model \humhub\modules\topic\models\Topic */
-                            return Button::danger()->icon('delete')->action('topic.removeOverviewTopic', $contentContainer->createUrl('delete', ['id' => $model->id]))->confirm(
+                        'update' => fn($url, Topic $model) => ModalButton::primary()
+                            ->load($contentContainer->createUrl('edit', ['id' => $model->id]))
+                            ->icon('edit')
+                            ->options(['aria-label' => Yii::t('base', 'Edit')])
+                            ->sm()
+                            ->loader(false),
+                        'view' => fn($url, Topic $model) => Button::primary()
+                            ->link($model->getUrl())
+                            ->icon('filter')
+                            ->options(['aria-label' => Yii::t('base', 'View')])
+                            ->sm()
+                            ->loader(false),
+                        'delete' => fn($url, Topic $model) => Button::danger()
+                            ->icon('delete')
+                            ->options(['aria-label' => Yii::t('base', 'Delete')])
+                            ->action('topic.removeOverviewTopic', $contentContainer->createUrl('delete', ['id' => $model->id]))
+                            ->confirm(
                                 Yii::t('TopicModule.base', '<strong>Confirm</strong> topic deletion'),
                                 Yii::t('TopicModule.base', 'Do you really want to delete this topic?'),
-                                Yii::t('base', 'Delete'))->xs()->loader(false);
-                        },
+                                Yii::t('base', 'Delete'),
+                            )
+                            ->sm()
+                            ->loader(false),
                     ],
                 ],
-            ]]);
-        ?>
+            ]]) ?>
     </div>
 </div>

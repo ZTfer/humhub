@@ -2,6 +2,10 @@ humhub.module('admin', function (module, require, $) {
     var client = require('client');
     var modal = require('ui.modal');
     var additions = require('ui.additions');
+    var status = require('ui.status');
+    var i18n = require('i18n');
+
+    module.requiredI18nCategories = ['AdminModule.settings', 'AdminModule.user', 'UserModule.account', 'base'];
 
     /**
      * Action will delete the current page logo.
@@ -14,9 +18,9 @@ humhub.module('admin', function (module, require, $) {
         evt.finish();
 
         var options = {
-            'header': module.text('confirm.deleteLogo.header'),
-            'body': module.text('confirm.deleteLogo.body'),
-            'confirmText': module.text('confirm.deleteLogo.confirm')
+            'header': i18n.t('AdminModule.settings', '<strong>Confirm</strong> image deletion'),
+            'body': i18n.t('UserModule.account', 'Do you really want to delete your logo image?'),
+            'confirmText': i18n.t('AdminModule.settings', 'Delete')
         };
 
         modal.confirm(options).then(function ($confirmed) {
@@ -65,9 +69,9 @@ humhub.module('admin', function (module, require, $) {
         evt.finish();
 
         var options = {
-            'header': module.text('confirm.deleteIcon.header'),
-            'body': module.text('confirm.deleteIcon.body'),
-            'confirmText': module.text('confirm.deleteIcon.confirm')
+            'header': i18n.t('AdminModule.settings', '<strong>Confirm</strong> icon deletion'),
+            'body': i18n.t('UserModule.account', 'Do you really want to delete your icon image?'),
+            'confirmText': i18n.t('AdminModule.settings', 'Delete')
         };
 
         modal.confirm(options).then(function ($confirmed) {
@@ -104,6 +108,80 @@ humhub.module('admin', function (module, require, $) {
         }
     };
 
+    var deleteLoginBg = function (evt) {
+        evt.finish();
+
+        var options = {
+            'header': i18n.t('AdminModule.settings', '<strong>Confirm</strong> image deletion'),
+            'body': i18n.t('UserModule.account', 'Do you really want to delete your login background image?'),
+            'confirmText': i18n.t('AdminModule.settings', 'Delete')
+        };
+
+        modal.confirm(options).then(function ($confirmed) {
+            if ($confirmed) {
+                _confirmDeleteLoginBg(evt);
+            }
+        });
+    };
+
+    var _confirmDeleteLoginBg = function (evt) {
+        client.post(evt).then(function () {
+            $('#deleteLoginBg').fadeOut();
+            $('#loginBg-image').attr('src', '').hide();
+            additions.switchButtons($('#img-loginBg'), ('#text-loginBg'));
+        });
+    };
+
+    var deleteMailHeader = function (evt) {
+        evt.finish();
+
+        var options = {
+            'header': i18n.t('AdminModule.settings', '<strong>Confirm</strong> image deletion'),
+            'body': i18n.t('UserModule.account', 'Do you really want to delete your mail header image?'),
+            'confirmText': i18n.t('AdminModule.settings', 'Delete')
+        };
+
+        modal.confirm(options).then(function ($confirmed) {
+            if ($confirmed) {
+                _confirmDeleteMailHeader(evt);
+            }
+        });
+    };
+
+    var _confirmDeleteMailHeader = function (evt) {
+        client.post(evt).then(function () {
+            $('#deleteMailHeader').fadeOut();
+            $('#mailHeader-image').attr('src', '').hide();
+            additions.switchButtons($('#img-mailHeader'), ('#text-mailHeader'));
+        });
+    };
+
+    var changeLoginBg = function (evt) {
+        var input = evt.$trigger[0];
+        if (input.files && input.files.length) {
+            var reader = new FileReader();
+
+            reader.onload = function (e) {
+                $('#loginBg-image').attr('src', e.target.result).show();
+            };
+
+            reader.readAsDataURL(input.files[0]);
+        }
+    };
+
+    var changeMailHeader = function (evt) {
+        var input = evt.$trigger[0];
+        if (input.files && input.files.length) {
+            var reader = new FileReader();
+
+            reader.onload = function (e) {
+                $('#mailHeader-image').attr('src', e.target.result).show();
+            };
+
+            reader.readAsDataURL(input.files[0]);
+        }
+    };
+
     var init = function () {
         if ($('#admin-logo-file-upload').length) {
             // Forward file to chooser.
@@ -120,28 +198,47 @@ humhub.module('admin', function (module, require, $) {
                 $('#admin-icon-file-upload').trigger('click');
             });
         }
-    };
 
-    var changeMaintenanceMode = function (evt) {
-        evt.$trigger.prop('checked', !evt.$trigger.prop('checked'));
-        // Switch modal window text to another mode
-        evt.$trigger.data('action-confirm', module.text('maintenanceMode.question.' + (evt.$trigger.prop('checked') ? 'disable' : 'enable')));
-        evt.$trigger.data('action-confirm-text', module.text('maintenanceMode.button.' + (evt.$trigger.prop('checked') ? 'disable' : 'enable')));
-        // Disable/Enable maintenance mode info input:
-        $('input[name="BasicSettingsForm[maintenanceModeInfo]"]').prop('disabled', !evt.$trigger.prop('checked'));
+        if ($('#admin-loginBg-file-upload').length) {
+            // Forward file to chooser.
+            $('#admin-loginBg-upload-button').on('click', function (evt) {
+                evt.preventDefault();
+                $('#admin-loginBg-file-upload').trigger('click');
+            });
+        }
+
+        if ($('#admin-mailHeader-file-upload').length) {
+            // Forward file to chooser.
+            $('#admin-mailHeader-upload-button').on('click', function (evt) {
+                evt.preventDefault();
+                $('#admin-mailHeader-file-upload').trigger('click');
+            });
+        }
     };
 
     var changeIndividualProfilePermissions = function (evt) {
         evt.finish();
         evt.$trigger.prop('checked', !evt.$trigger.prop('checked'));
-        evt.$trigger.data('action-confirm', module.text('enableProfilePermissions.question.' + (evt.$trigger.prop('checked') ? 'disable' : 'enable')));
-        evt.$trigger.data('action-confirm-text', module.text('enableProfilePermissions.button.' + (evt.$trigger.prop('checked') ? 'disable' : 'enable')));
+        evt.$trigger.data('action-confirm', evt.$trigger.prop('checked')
+            ? i18n.t('AdminModule.user', 'Deactivate individual profile permissions?') + '<br><br><div class="alert alert-danger">' + i18n.t('AdminModule.user', '<strong>Warning:</strong> All individual profile permission settings are reset to the default values!') + '</div>'
+            : i18n.t('AdminModule.user', 'Allow users to set individual permissions for their own profile?'));
+        evt.$trigger.data('action-confirm-text', evt.$trigger.prop('checked')
+            ? i18n.t('AdminModule.user', 'Disable')
+            : i18n.t('AdminModule.user', 'Allow'));
         $.ajax({
             url: evt.$trigger.data('action-url'),
             type: "POST",
             data: {isEnabled: evt.$trigger.prop('checked')},
         }).done(function (data) {
             module.log.success('success.saved');
+        });
+    };
+
+    var moduleSetAsDefault = function (event) {
+        modal.footerLoader(event);
+        client.submit(event).then(function (response) {
+            modal.global.setDialog(response.data);
+            status.success(i18n.t('base', 'Saved'));
         });
     };
 
@@ -152,7 +249,11 @@ humhub.module('admin', function (module, require, $) {
         changeLogo: changeLogo,
         deletePageIcon: deletePageIcon,
         changeIcon: changeIcon,
-        changeMaintenanceMode: changeMaintenanceMode,
+        deleteLoginBg: deleteLoginBg,
+        deleteMailHeader: deleteMailHeader,
+        changeLoginBg: changeLoginBg,
+        changeMailHeader: changeMailHeader,
         changeIndividualProfilePermissions: changeIndividualProfilePermissions,
+        moduleSetAsDefault: moduleSetAsDefault,
     });
 });

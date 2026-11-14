@@ -9,36 +9,72 @@
 namespace humhub\modules\content\components;
 
 use humhub\components\ActiveRecord;
+use humhub\components\assets\AssetImage;
 use humhub\libs\BasePermission;
-use humhub\libs\ProfileBannerImage;
 use humhub\libs\ProfileImage;
+use humhub\modules\content\events\ContentContainerImageEvent;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\models\ContentContainer;
+use humhub\modules\content\models\ContentContainerBlockedUsers;
+use humhub\modules\content\models\ContentContainerTagRelation;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
+use humhub\modules\user\Module as UserModule;
 use Yii;
+use yii\db\ActiveQuery;
 use yii\helpers\Url;
+use yii\web\IdentityInterface;
 
 /**
  * ContentContainerActiveRecord for ContentContainer Models e.g. Space or User.
  *
- * Required Methods:
- *      - getProfileImage()
- *
- * @property integer $id
- * @property integer $visibility
+ * @property int $id
+ * @property int $visibility
  * @property string $guid
- * @property integer $contentcontainer_id
+ * @property string $created_at
+ * @property int $created_by
+ * @property string $updated_at
+ * @property int $updated_by
+ * @property int $contentcontainer_id
+ * @property ContentContainer $contentContainerRecord
  * @property ContentContainerPermissionManager $permissionManager
  * @property ContentContainerSettingsManager $settings
- * @property ContentContainerModuleManager $moduleManager
- * @property ContentContainerActiveRecord $contentContainerRecord
+ * @property-read string[] $blockedUserGuids
+ * @property-read int[] $blockedUserIds
+ * @property-read int $defaultContentVisibility
+ * @property-read string $displayName
+ * @property-read string|mixed $displayNameSub
+ * @property-read ContentContainerModuleManager $moduleManager
+ * @property-read ProfileImage $profileImage @deprecated since v1.19
+ * @property-read AssetImage $image
+ * @property-read AssetImage $bannerImage
+ * @property-read string[] $tags
+ * @property-read string $wallOut
  *
  * @since 1.0
- * @author Luke
+ * @noinspection PropertiesInspection
  */
 abstract class ContentContainerActiveRecord extends ActiveRecord
 {
+    /**
+     * @event ContentContainerImageEvent triggered when the profile image ({@see getImage()}) of the
+     * container is initialized. This happens once per record instance, on first access; the result is
+     * cached afterwards. A handler may modify `$event->image` (e.g. set another `defaultFile`) or
+     * replace it with a different {@see AssetImage} — `$event->config` holds the configuration the
+     * image was created with.
+     * @since 1.19
+     */
+    public const EVENT_INIT_PROFILE_IMAGE = 'initProfileImage';
+
+    /**
+     * @event ContentContainerImageEvent triggered when the banner image ({@see getBannerImage()}) of the
+     * container is initialized. This happens once per record instance, on first access; the result is
+     * cached afterwards. A handler may modify `$event->image` (e.g. set another `defaultFile`) or
+     * replace it with a different {@see AssetImage} — `$event->config` holds the configuration the
+     * image was created with.
+     * @since 1.19
+     */
+    public const EVENT_INIT_BANNER_IMAGE = 'initBannerImage';
 
     /**
      * @var ContentContainerPermissionManager
@@ -48,13 +84,15 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
     /**
      * @var ContentContainerModuleManager
      */
-    protected $moduleManager = null;
+    private $_moduleManager = null;
 
+    private ?AssetImage $_image = null;
+    private ?AssetImage $_bannerImage = null;
     /**
      * The behavior which will be attached to the base controller.
      *
      * @since 1.3
-     * @see \humhub\modules\content\components\ContentContainerController
+     * @see ContentContainerController
      * @var string class name of additional the controller behavior
      */
     public $controllerBehavior = null;
@@ -65,40 +103,105 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
     public $defaultRoute = '/';
 
     /**
+     * @var array Related Tags which should be updated after save
+     */
+    public $tagsField;
+
+    /**
+     * @var array Related Blcoked Users IDs which should be updated after save
+     */
+    public $blockedUsersField;
+
+    /**
+     * @deprecated since 1.19
+     * @var string
+     */
+    public $profileImageClass = ProfileImage::class;
+
+    /**
      * Returns the display name of content container
      *
-     * @since 0.11.0
      * @return string
+     * @since 0.11.0
      */
-    public abstract function getDisplayName();
+    abstract public function getDisplayName(): string;
 
     /**
      * Returns a descriptive sub title of this container used in the frontend.
      *
-     * @since 1.4
      * @return mixed
+     * @since 1.4
      */
-    public abstract function getDisplayNameSub();
+    abstract public function getDisplayNameSub(): string;
+
+    public function getImage(): AssetImage
+    {
+        if ($this->_image === null) {
+            $this->_image = $this->triggerInitImageEvent(self::EVENT_INIT_PROFILE_IMAGE, [
+                'file' => '/profile_image/' . $this->guid . '.jpg',
+                'defaultOptions' => [
+                    'width' => 150,
+                    'height' => 150,
+                ],
+                'masterOptions' => [
+                    'maxWidth' => 1920,
+                    'maxHeight' => 1080,
+                ],
+                'defaultFile' => ($this instanceof Space)
+                    ? '@humhub/resources/img/default_space.jpg'
+                    : '@humhub/resources/img/default_user.jpg',
+            ]);
+        }
+        return $this->_image;
+    }
+
+    public function getBannerImage(): AssetImage
+    {
+        if ($this->_bannerImage === null) {
+            $this->_bannerImage = $this->triggerInitImageEvent(self::EVENT_INIT_BANNER_IMAGE, [
+                'file' => '/profile_image/banner/' . $this->guid . '.jpg',
+                'defaultOptions' => [
+                    'width' => 1134,
+                    'height' => 192,
+                ],
+                'masterOptions' => [
+                    'maxWidth' => 1920,
+                    'maxHeight' => 1080,
+                ],
+                'defaultFile' => '@humhub/resources/img/default_banner.jpg',
+            ]);
+        }
+        return $this->_bannerImage;
+    }
 
     /**
-     * Returns the Profile Image Object for this Content Base
+     * Triggers the given init-image event ({@see EVENT_INIT_PROFILE_IMAGE} or
+     * {@see EVENT_INIT_BANNER_IMAGE}), letting modules customize or replace the container's
+     * {@see AssetImage}, and returns the resulting image.
      *
+     * @since 1.19
+     */
+    private function triggerInitImageEvent(string $eventName, array $config): AssetImage
+    {
+        $event = new ContentContainerImageEvent([
+            'image' => new AssetImage($config),
+            'config' => $config,
+        ]);
+        $this->trigger($eventName, $event);
+
+        return $event->image;
+    }
+
+    /**
      * @return ProfileImage
+     * @note use getImage() instead
+     * @deprecated v1.19
      */
     public function getProfileImage()
     {
-        return new ProfileImage($this);
+        return new $this->profileImageClass($this);
     }
 
-    /**
-     * Returns the Profile Banner Image Object for this Content Base
-     *
-     * @return ProfileBannerImage
-     */
-    public function getProfileBannerImage()
-    {
-        return new ProfileBannerImage($this);
-    }
 
     /**
      * Should be overwritten by implementation
@@ -115,11 +218,11 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      *
      * @param string $route
      * @param array $params
-     * @param boolean|string $scheme
+     * @param bool|string $scheme
      */
     public function createUrl($route = null, $params = [], $scheme = false)
     {
-        array_unshift($params, ($route !== null) ? $route : $this->defaultRoute);
+        array_unshift($params, $route ?? $this->defaultRoute);
         $params['contentContainer'] = $this;
 
         return Url::to($params, $scheme);
@@ -129,22 +232,11 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      * Checks if the user is allowed to access private content in this container
      *
      * @param User $user
-     * @return boolean can access private content
+     * @return bool can access private content
      */
-    public function canAccessPrivateContent(User $user = null)
+    public function canAccessPrivateContent(?User $user = null)
     {
         return false;
-    }
-
-    /**
-     * Returns the wall output for this content container.
-     * This is e.g. used in search results.
-     *
-     * @return string
-     */
-    public function getWallOut()
-    {
-        return "Default Wall Output for Class " . get_class($this);
     }
 
     /**
@@ -165,7 +257,7 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      * @return bool
      * @since 1.7
      */
-    public function is(ContentContainerActiveRecord $container = null)
+    public function is(?ContentContainerActiveRecord $container = null)
     {
         if (!$container || !($container instanceof self)) {
             return false;
@@ -175,15 +267,20 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
     }
 
     /**
+     * @return ContentContainerSettingsManager
+     */
+    abstract public function getSettings(): ContentContainerSettingsManager;
+
+    /**
      * @inheritdoc
      */
     public function afterSave($insert, $changedAttributes)
     {
         if ($insert) {
-            $contentContainer = new ContentContainer;
+            $contentContainer = new ContentContainer();
             $contentContainer->guid = $this->guid;
-            $contentContainer->class = static::class;
-            $contentContainer->pk = $this->getPrimaryKey();
+            $contentContainer->setPolymorphicRelation($this);
+
             if ($this instanceof User) {
                 $contentContainer->owner_user_id = $this->id;
             } elseif ($this->hasAttribute('created_by')) {
@@ -191,9 +288,18 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
             }
 
             $contentContainer->save();
+            $this->populateRelation('contentContainerRecord', $contentContainer);
 
             $this->contentcontainer_id = $contentContainer->id;
             $this->update(false, ['contentcontainer_id']);
+        }
+
+        if ($this->isAttributeSafe('tagsField') && $this->tagsField !== null) {
+            ContentContainerTagRelation::updateByContainer($this, $this->tagsField);
+        }
+
+        if ($this->isAttributeSafe('blockedUsersField') && $this->blockedUsersField !== null) {
+            ContentContainerBlockedUsers::updateByContainer($this, $this->blockedUsersField);
         }
 
         parent::afterSave($insert, $changedAttributes);
@@ -204,10 +310,8 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      */
     public function afterDelete()
     {
-        ContentContainer::deleteAll([
-            'pk' => $this->getPrimaryKey(),
-            'class' => static::class
-        ]);
+        $contentContainer = ContentContainer::findOne(['id' => $this->contentcontainer_id]);
+        $contentContainer->delete();
 
         parent::afterDelete();
     }
@@ -215,8 +319,8 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
     /**
      * Returns the related ContentContainer model (e.g. Space or User)
      *
+     * @return ActiveQuery
      * @see ContentContainer
-     * @return ContentContainer
      */
     public function getContentContainerRecord()
     {
@@ -225,7 +329,7 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
         }
 
         return $this->hasOne(ContentContainer::class, ['pk' => 'id'])
-            ->andOnCondition(['class' => $this->className()]);
+            ->andOnCondition(['class' => static::class]);
     }
 
     /**
@@ -241,8 +345,8 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      * Note: This method is used to verify ContentContainerPermissions and not GroupPermissions.
      *
      * @param string|string[]|BasePermission $permission
+     * @return bool
      * @see PermissionManager::can()
-     * @return boolean
      * @since 1.2
      */
     public function can($permission, $params = [], $allowCaching = true)
@@ -254,15 +358,15 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      * Returns a ContentContainerPermissionManager instance for this ContentContainerActiveRecord as permission object
      * and the given user (or current user if not given) as permission subject.
      *
-     * @param User $user
+     * @param User|IdentityInterface $user
      * @return ContentContainerPermissionManager
      */
-    public function getPermissionManager(User $user = null)
+    public function getPermissionManager(?User $user = null)
     {
         if ($user && !$user->is(Yii::$app->user->getIdentity())) {
             return new ContentContainerPermissionManager([
                 'contentContainer' => $this,
-                'subject' => $user
+                'subject' => $user,
             ]);
         }
 
@@ -271,25 +375,25 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
         }
 
         return $this->permissionManager = new ContentContainerPermissionManager([
-            'contentContainer' => $this
+            'contentContainer' => $this,
         ]);
     }
 
     /**
      * Returns a ModuleManager
      *
+     * @return ContentContainerModuleManager
      * @since 1.3
-     * @param User $user
-     * @return ModuleManager
      */
-    public function getModuleManager()
+    public function getModuleManager(): ?ContentContainerModuleManager
     {
-
-        if ($this->moduleManager !== null) {
-            return $this->moduleManager;
+        if ($this->_moduleManager !== null) {
+            return $this->_moduleManager;
         }
 
-        return $this->moduleManager = new ContentContainerModuleManager(['contentContainer' => $this]);
+        return $this->_moduleManager = new ContentContainerModuleManager([
+            'contentContainer' => $this,
+        ]);
     }
 
     /**
@@ -298,7 +402,7 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
      * @param User|null $user
      * @return string
      */
-    public function getUserGroup(User $user = null)
+    public function getUserGroup(?User $user = null)
     {
         return "";
     }
@@ -313,7 +417,7 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
 
     /**
      * Returns weather or not the contentcontainer is archived. (Default false).
-     * @return boolean
+     * @return bool
      * @since 1.2
      */
     public function isArchived()
@@ -341,4 +445,172 @@ abstract class ContentContainerActiveRecord extends ActiveRecord
         return $this->visibility == $visibility;
     }
 
+    /**
+     * Checks if the Content Container has Tags
+     *
+     * @return bool has tags set
+     */
+    public function hasTags()
+    {
+        return count($this->getTags()) > 0;
+    }
+
+    /**
+     * Returns an array with related Tags
+     *
+     * @return string[] a list of tag names
+     */
+    public function getTags(): array
+    {
+        $tags = ($this->contentContainerRecord instanceof ContentContainer) && is_string(
+            $this->contentContainerRecord->tags_cached,
+        )
+            ? trim($this->contentContainerRecord->tags_cached)
+            : '';
+        return $tags === '' ? [] : preg_split('/\s*,\s*/', $tags);
+    }
+
+    /**
+     * Returns an array with GUIDs of the blocked users
+     *
+     * @return string[] a list of user GUIDs
+     */
+    public function getBlockedUserGuids(): array
+    {
+        return $this->allowBlockUsers() ? ContentContainerBlockedUsers::getGuidsByContainer($this) : [];
+    }
+
+    /**
+     * Returns an array with IDs of the blocked user
+     *
+     * @return int[] a list of user IDs
+     */
+    public function getBlockedUserIds(): array
+    {
+        if (!$this->allowBlockUsers()) {
+            return [];
+        }
+
+        $blockedUsers = $this->getSettings()->get(ContentContainerBlockedUsers::BLOCKED_USERS_SETTING);
+        return empty($blockedUsers) ? [] : explode(',', (string)$blockedUsers);
+    }
+
+    /**
+     * Check if current container is blocked for the User
+     *
+     * @param User|null $user
+     * @return bool
+     */
+    public function isBlockedForUser(?User $user = null): bool
+    {
+        if (!$this->allowBlockUsers()) {
+            return false;
+        }
+
+        if ($user === null) {
+            if (Yii::$app->user->isGuest) {
+                return false;
+            }
+
+            $user = Yii::$app->user->getIdentity();
+        }
+
+        return in_array($user->id, $this->getBlockedUserIds());
+    }
+
+    /**
+     * Check the blocking users is allowed by users module
+     *
+     * @return bool
+     */
+    public function allowBlockUsers(): bool
+    {
+        /* @var UserModule $userModule */
+        $userModule = Yii::$app->getModule('user');
+
+        return $userModule->allowBlockUsers();
+    }
+
+    /**
+     * Block this container for the given or current User
+     *
+     * @param User|null $user
+     * @return bool
+     */
+    public function blockForUser(?User $user = null): bool
+    {
+        if (!$this->allowBlockUsers()) {
+            return false;
+        }
+
+        if ($user === null) {
+            if (Yii::$app->user->isGuest) {
+                return false;
+            }
+            $user = Yii::$app->user->getIdentity();
+        }
+
+        if ($user->isBlockedForUser($this)) {
+            return true;
+        }
+
+        $newBlockedUserRelation = new ContentContainerBlockedUsers();
+        $newBlockedUserRelation->contentcontainer_id = $user->contentcontainer_id;
+        $newBlockedUserRelation->user_id = $this->id;
+        if (!$newBlockedUserRelation->save()) {
+            return false;
+        }
+
+        $blockedUserIds = $user->getBlockedUserIds();
+        $blockedUserIds[] = $this->id;
+
+        ContentContainerBlockedUsers::refreshCachedUserIds($user, $blockedUserIds);
+
+        return true;
+    }
+
+    /**
+     * Block the current container for the User
+     *
+     * @param User|null $user
+     * @return bool
+     */
+    public function unblockForUser(?User $user = null): bool
+    {
+        if (!$this->allowBlockUsers()) {
+            return false;
+        }
+
+        if ($user === null) {
+            if (Yii::$app->user->isGuest) {
+                return false;
+            }
+            $user = Yii::$app->user->getIdentity();
+        }
+
+        if (!$user->isBlockedForUser($this)) {
+            return true;
+        }
+
+        $blockedUserRelation = ContentContainerBlockedUsers::findOne([
+            'contentcontainer_id' => $user->contentcontainer_id,
+            'user_id' => $this->id,
+        ]);
+
+        if (!$blockedUserRelation) {
+            return true;
+        }
+
+        if (!$blockedUserRelation->delete()) {
+            return false;
+        }
+
+        $blockedUserIds = $user->getBlockedUserIds();
+        if (($deletedIndex = array_search($this->id, $blockedUserIds)) !== false) {
+            unset($blockedUserIds[$deletedIndex]);
+            ContentContainerBlockedUsers::refreshCachedUserIds($user, $blockedUserIds);
+        }
+
+        return true;
+    }
 }

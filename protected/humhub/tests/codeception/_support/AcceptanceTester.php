@@ -1,8 +1,8 @@
 <?php
 
+use Facebook\WebDriver\WebDriverKeys;
 use tests\codeception\_pages\LoginPage;
 use yii\helpers\Url;
-use \Facebook\WebDriver\WebDriverKeys;
 
 /**
  * Inherited Methods
@@ -27,12 +27,12 @@ class AcceptanceTester extends BaseTester
 
     public function amAdmin($logout = false)
     {
-        $this->amUser('Admin', 'test', $logout);
+        $this->amUser('Admin', 'admin&humhub@PASS%worD!', $logout);
     }
 
     public function amSpaceAdmin($logout = false, $spaceId = 2)
     {
-        switch($spaceId) {
+        switch ($spaceId) {
             case 1:
             case 3:
                 $this->amAdmin($logout);
@@ -48,17 +48,17 @@ class AcceptanceTester extends BaseTester
 
     public function amUser1($logout = false)
     {
-        $this->amUser('User1', '123qwe', $logout);
+        $this->amUser('User1', 'user^humhub@PASS%worD!', $logout);
     }
 
     public function amUser2($logout = false)
     {
-        $this->amUser('User2', '123qwe', $logout);
+        $this->amUser('User2', 'user^humhub@PASS%worD!', $logout);
     }
 
     public function amUser3($logout = false)
     {
-        $this->amUser('User3', '123qwe', $logout);
+        $this->amUser('User3', 'user^humhub@PASS%worD!', $logout);
     }
 
     public function amOnSpace1($path = '/space/space', $params = [])
@@ -83,11 +83,11 @@ class AcceptanceTester extends BaseTester
 
     public function amOnSpace($guid, $path = '/space/space', $params = [])
     {
-        if(!$path) {
+        if (!$path) {
             $path = '/space/space';
         }
 
-        if(is_int($guid)) {
+        if (is_int($guid)) {
             $guid = $this->getFixtureSpaceGuid(--$guid);
         }
 
@@ -97,29 +97,35 @@ class AcceptanceTester extends BaseTester
         $this->amOnRoute($params);
     }
 
-    public function dontSeeInDropDown($selector, $text) {
+    public function dontSeeInDropDown($selector, $text)
+    {
         $this->click($selector);
         $this->wait(1);
         $this->dontSee($text, $selector);
         $this->click($selector);
     }
 
-    public function seeInDropDown($selector, $text) {
+    public function seeInDropDown($selector, $text)
+    {
         $this->click($selector);
         $this->wait(1);
         $this->see($text, $selector);
         $this->click($selector);
     }
 
-    public function allowGuestAccess() {
+    public function allowGuestAccess()
+    {
         $this->amOnRoute(['/admin/authentication']);
         $this->jsClick('#authenticationsettingsform-allowguestaccess');
+        $this->scrollToBottom();
+        $this->wait(1);
         $this->click('button.btn-primary', '#authentication-settings-form');
         $this->wait(1);
         $this->guestAccessAllowed = true;
     }
 
-    public function amOnRoute($route) {
+    public function amOnRoute($route)
+    {
         $this->amOnPage(Url::to($route));
     }
 
@@ -128,14 +134,14 @@ class AcceptanceTester extends BaseTester
         $this->amOnSpace($guid, '/topic/manage');
         $this->waitForText('Topic Overview');
 
-        if(is_string($topics)) {
+        if (is_string($topics)) {
             $topics = [$topics];
         }
 
         foreach ($topics as $topic) {
             $this->fillField('#topic-name', $topic);
-            $this->click('.input-group-btn .btn-default');
-            $this->waitForText($topic, null,'.layout-content-container .table-hover');
+            $this->click('.input-group .btn-light');
+            $this->waitForText($topic, 10, '.layout-content-container .table-hover');
         }
     }
 
@@ -147,8 +153,8 @@ class AcceptanceTester extends BaseTester
         $this->executeJS("$('#contentForm_message').trigger('focusout');");
         $this->wait(1);
 
-        if($topics) {
-            $this->click('.dropdown-toggle', '.contentForm_options');
+        if ($topics) {
+            $this->click('.dropdown-toggle', '.contentForm_options .nav-pills');
             $this->wait(1);
             $this->click('Topics', '.contentForm_options');
             $this->waitForElementVisible('#postTopicContainer');
@@ -228,7 +234,7 @@ class AcceptanceTester extends BaseTester
         }
 
         $user = ($user != null) ? $user : 'User1';
-        $password = ($password != null) ? $password : '123qwe';
+        $password = ($password != null) ? $password : 'user^humhub@PASS%worD!';
         $this->login($user, $password);
         $this->waitForElementVisible('#wallStream', 30);
     }
@@ -242,7 +248,7 @@ class AcceptanceTester extends BaseTester
     {
         $this->wait(2);
         $this->jsClick('[data-menu-id="account-logout"]');
-        if(!$this->guestAccessAllowed) {
+        if (!$this->guestAccessAllowed) {
             $this->waitForElementVisible('#login-form');
         } else {
             $this->waitForText('Sign in / up');
@@ -253,9 +259,9 @@ class AcceptanceTester extends BaseTester
     public function enableModule($guid, $moduleId)
     {
         $this->amOnSpace($guid, '/space/manage/module');
-        $this->seeElement('.enable-module-'.$moduleId);
-        $this->click('.enable-module-'.$moduleId);
-        $this->waitForElement('.disable-module-'.$moduleId);
+        $this->seeElement('.enable-module-' . $moduleId);
+        $this->jsClick('.enable-module-' . $moduleId);
+        $this->waitForElement('.disable-module-' . $moduleId);
         $this->amOnSpace($guid);
     }
 
@@ -263,7 +269,7 @@ class AcceptanceTester extends BaseTester
     public function clickAccountDropDown()
     {
         $this->jsClick('#account-dropdown-link');
-        $this->waitForElementVisible('.account.open');
+        $this->waitForElementVisible('.account > .dropdown-menu.show');
     }
 
     public function amOnDirectory()
@@ -278,17 +284,17 @@ class AcceptanceTester extends BaseTester
 
     public function amOnUser1Profile()
     {
-        $this->amOnPage('index-test.php?r=user/profile&uguid=01e50e0d-82cd-41fc-8b0c-552392f5839d');
+        $this->amOnPage('/u/user1/user/profile/home');
     }
 
     public function amOnUser2Profile()
     {
-        $this->amOnPage('index-test.php?r=user/profile&uguid=01e50e0d-82cd-41fc-8b0c-552392f5839e');
+        $this->amOnPage('/u/user2/user/profile/home');
     }
 
     public function amOnUser3Profile()
     {
-        $this->amOnPage('index-test.php?r=user/profile&uguid=01e50e0d-82cd-41fc-8b0c-552392f5839a');
+        $this->amOnPage('/u/user3/user/profile/home');
     }
 
     public function seeInNotifications($text, $click = false)
@@ -297,8 +303,8 @@ class AcceptanceTester extends BaseTester
         $this->waitForText('Notifications', 5, '.notifications');
         $this->waitForText($text, 5, '.notifications');
 
-        if($click) {
-            $this->click($text,'.notifications');
+        if ($click) {
+            $this->click($text, '.notifications');
             $this->wait(2);
         } else {
             $this->click('.notifications .fa-bell');
@@ -321,7 +327,7 @@ class AcceptanceTester extends BaseTester
 
     public function selectFromPicker($selector, $search)
     {
-        if(is_array($search)) {
+        if (is_array($search)) {
             foreach ($search as $searchItem) {
                 $this->selectFromPicker($selector, $searchItem);
                 $this->wait(1);
@@ -329,14 +335,9 @@ class AcceptanceTester extends BaseTester
         } else {
             $select2Input = $selector . ' ~ span input';
             $this->fillField($select2Input, $search);
-            $this->waitForElementVisible('.select2-container--open');
-            $this->waitForElementVisible('.select2-results__option.select2-results__option--highlighted');
-            $this->see($search, '.select2-container--open');
-            $this->wait(1);
+            $this->waitForText($search, 10, '.select2-results__option.select2-results__option--highlighted .picker-text');
             $this->pressKey($select2Input, WebDriverKeys::ENTER);
         }
-
-
     }
 
     public function dontSeeInNotifications($text)

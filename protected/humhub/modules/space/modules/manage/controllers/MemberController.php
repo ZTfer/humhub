@@ -9,6 +9,7 @@
 namespace humhub\modules\space\modules\manage\controllers;
 
 use humhub\modules\content\components\ContentContainerControllerAccess;
+use humhub\modules\space\modules\manage\jobs\RemoveAllMembersFromSpaceJob;
 use Yii;
 use yii\web\HttpException;
 use humhub\modules\space\models\Space;
@@ -29,12 +30,20 @@ class MemberController extends Controller
     /**
      * @inheritdoc
      */
-    protected function getAccessRules() {
+    protected function getAccessRules()
+    {
         return [
             ['login'],
             [ContentContainerControllerAccess::RULE_USER_GROUP_ONLY => [Space::USERGROUP_ADMIN], 'actions' => [
-                'index', 'pending-invitations', 'pending-approvals', 'reject-applicant', 'approve-applicant', 'remove']],
-            [ContentContainerControllerAccess::RULE_USER_GROUP_ONLY => [Space::USERGROUP_OWNER], 'actions' => ['change-owner']]
+                'index',
+                'pending-invitations',
+                'pending-approvals',
+                'reject-applicant',
+                'approve-applicant',
+                'remove',
+                'remove-all',
+            ]],
+            [ContentContainerControllerAccess::RULE_USER_GROUP_ONLY => [Space::USERGROUP_OWNER], 'actions' => ['change-owner']],
         ];
     }
 
@@ -52,10 +61,18 @@ class MemberController extends Controller
         // User Group Change
         if (Yii::$app->request->post('dropDownColumnSubmit')) {
             Yii::$app->response->format = 'json';
-            $membership = Membership::findOne(['space_id' => $space->id, 'user_id' => Yii::$app->request->post('user_id')]);
+            $membership = Membership::findMembership($space->id, Yii::$app->request->post('user_id'));
             if ($membership === null) {
                 throw new HttpException(404, 'Could not find membership!');
             }
+
+            // The owner role follows the space creator and is only changeable via change-owner.
+            if ($space->isSpaceOwner($membership->user_id)) {
+                throw new HttpException(403, 'The role of the space owner cannot be changed!');
+            }
+
+            // Restrict this endpoint to the role itself, see Membership::scenarios().
+            $membership->scenario = Membership::SCENARIO_EDIT_ROLE;
 
             if ($membership->load(Yii::$app->request->post()) && $membership->save()) {
 
@@ -71,9 +88,9 @@ class MemberController extends Controller
         }
 
         return $this->render('index', [
-                    'dataProvider' => $dataProvider,
-                    'searchModel' => $searchModel,
-                    'space' => $space
+            'dataProvider' => $dataProvider,
+            'searchModel' => $searchModel,
+            'space' => $space,
         ]);
     }
 
@@ -89,9 +106,9 @@ class MemberController extends Controller
         $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
 
         return $this->render('pending-invitations', [
-                    'dataProvider' => $dataProvider,
-                    'searchModel' => $searchModel,
-                    'space' => $space
+            'dataProvider' => $dataProvider,
+            'searchModel' => $searchModel,
+            'space' => $space,
         ]);
     }
 
@@ -107,9 +124,9 @@ class MemberController extends Controller
         $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
 
         return $this->render('pending-approvals', [
-                    'dataProvider' => $dataProvider,
-                    'searchModel' => $searchModel,
-                    'space' => $space
+            'dataProvider' => $dataProvider,
+            'searchModel' => $searchModel,
+            'space' => $space,
         ]);
     }
 
@@ -182,7 +199,7 @@ class MemberController extends Controller
 
         $model = new ChangeOwnerForm([
             'space' => $space,
-            'ownerId' => $space->getSpaceOwner()->id
+            'ownerId' => $space->getSpaceOwner()->id,
         ]);
 
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
@@ -191,9 +208,23 @@ class MemberController extends Controller
         }
 
         return $this->render('change-owner', [
-                    'space' => $space,
-                    'model' => $model
+            'space' => $space,
+            'model' => $model,
         ]);
     }
 
+    /**
+     * @return void
+     */
+    public function actionRemoveAll()
+    {
+        $this->forcePostRequest();
+
+        $space = $this->getSpace();
+        Yii::$app->queue->push(new RemoveAllMembersFromSpaceJob([
+            'spaceId' => $space->id,
+        ]));
+        $this->view->success(Yii::t('SpaceModule.manage', 'Removal of members queued'));
+        $this->redirect($space->createUrl('index'));
+    }
 }

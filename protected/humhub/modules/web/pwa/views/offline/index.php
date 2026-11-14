@@ -1,25 +1,32 @@
 <?php
+/**
+ * @link https://www.humhub.org/
+ * @copyright Copyright (c) HumHub GmbH & Co. KG
+ * @license https://www.humhub.com/licences
+ */
 
-use humhub\libs\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
 
+/* @var View $this */
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= Yii::t('WebModule.pwa', 'Unable to connect to {site}', ['{site}' => Html::encode(Yii::$app->name)]); ?></title>
     <style type="text/css">
         body {
-            background: <?= Yii::$app->view->theme->variable('primary') ?>;
-            color: #ffffff;
+            background: <?= $this->theme->variable('primary') ?>;
+            color: <?= $this->theme->variable('text-color-contrast', '#fff') ?>;
             font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
             font-weight: 300;
         }
 
         body a {
-            color: #ffffff;
+            color: <?= $this->theme->variable('text-color-contrast', '#fff') ?>;
         }
 
         #content {
@@ -42,7 +49,7 @@ use humhub\libs\Html;
     <span class="smilie">:-(</span>
     <h1><?= Yii::t('WebModule.pwa', 'Hm...'); ?></h1>
     <h2><?= Yii::t('WebModule.pwa', 'Unable to connect to {site}', ['{site}' => Html::encode(Yii::$app->name)]); ?></h2>
-    <p><?= Yii::t('WebModule.pwa', 'Please check your internet connection and <a href="?">refresh</a> this page once your are online again!'); ?></p>
+    <p><?= Yii::t('WebModule.pwa', 'Please check your internet connection and <a href="?">refresh</a> this page once you are online again!'); ?></p>
 </div>
 </body>
 </html>

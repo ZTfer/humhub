@@ -1,59 +1,57 @@
 <?php
 
+use humhub\helpers\Html;
+use humhub\modules\space\models\Space;
+use humhub\modules\space\widgets\Image;
 use humhub\widgets\AjaxLinkPager;
-use humhub\widgets\ModalDialog;
-use humhub\libs\Html;
+use humhub\widgets\modal\Modal;
+use humhub\widgets\modal\ModalButton;
+use yii\data\Pagination;
 
-/* @var $spaces \humhub\modules\space\models\Space[] */
+/* @var $title string */
+/* @var $spaces Space[] */
+/* @var $pagination Pagination */
 ?>
 
 
-<?php ModalDialog::begin(['header' => $title]) ?>
+<?php Modal::beginDialog([
+    'title' => $title,
+    'footer' => ModalButton::cancel(Yii::t('base', 'Close')),
+    'bodyOptions' => ['style' => 'margin: 0 calc(var(--hh-modal-content-padding) * -1); padding: var(--bs-modal-padding) 0;'], // Body fullwidth
+]) ?>
 
     <?php if (count($spaces) === 0) : ?>
-        <div class="modal-body">
-            <p><?= Yii::t('SpaceModule.base', 'No spaces found.'); ?></p>
-        </div>
+        <p><?= Yii::t('SpaceModule.base', 'No spaces found.'); ?></p>
     <?php endif; ?>
 
-    <div id="spacelist-content">
+    <div id="spacelist-content" class="hh-list">
+        <!-- BEGIN: Results -->
+        <?php foreach ($spaces as $space) : ?>
+            <a href="<?= $space->getUrl() ?>" data-modal-close="1" class="d-flex">
+                <div class="flex-shrink-0 me-2">
+                    <?= Image::widget([
+                        'space' => $space,
+                        'width' => 50,
+                    ]) ?>
+                </div>
 
-        <ul class="media-list">
-            <!-- BEGIN: Results -->
-            <?php foreach ($spaces as $space) : ?>
-                <li>
-                    <a href="<?= $space->getUrl(); ?>" data-modal-close="1">
+                <div class="flex-grow-1">
+                    <h4 class="mt-0"><?= Html::encode($space->name) ?></h4>
+                    <h5><?= Html::encode($space->description) ?></h5>
+                </div>
+            </a>
 
-                        <div class="media">
-                            <img class="media-object img-rounded pull-left"
-                                 src="<?= $space->getProfileImage()->getUrl(); ?>" width="50"
-                                 height="50" style="width: 50px; height: 50px;">
-
-                            <div class="media-body">
-                                <h4 class="media-heading"><?= Html::encode($space->name); ?></h4>
-                                <h5><?= Html::encode($space->description); ?></h5>
-                            </div>
-                        </div>
-                    </a>
-                </li>
-
-            <?php endforeach; ?>
-            <!-- END: Results -->
-
-        </ul>
-
-        <div class="pagination-container">
-            <?= AjaxLinkPager::widget(['pagination' => $pagination]); ?>
-        </div>
-
+        <?php endforeach; ?>
+        <!-- END: Results -->
     </div>
-    <script <?= Html::nonce() ?>>
 
+    <div class="pagination-container">
+        <?= AjaxLinkPager::widget(['pagination' => $pagination]) ?>
+    </div>
+
+    <script <?= Html::nonce() ?>>
         // scroll to top of list
         $(".modal-body").animate({scrollTop: 0}, 200);
-
     </script>
-<?php ModalDialog::end() ?>
 
-
-
+<?php Modal::endDialog() ?>

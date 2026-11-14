@@ -33,9 +33,24 @@ class Module extends \humhub\components\Module
 
     /**
      * @since 1.8
-     * @var boolean Disable Service Worker and PWA Support
+     * @var bool Disable Service Worker and PWA Support
      */
     public $enableServiceWorker = true;
+
+    /**
+     * @var bool sends a Content-Security-Policy-Report-Only header with the policy of [[cspReportOnly]],
+     * to see which resources a stricter policy would block before enforcing it
+     * @since 1.19.1
+     */
+    public $enableCspReportOnly = false;
+
+    /**
+     * @var string policy of the Content-Security-Policy-Report-Only header, sent when [[enableCspReportOnly]] is set.
+     * `{{ nonce }}` is replaced with the script nonce of the session, `{{ reporting }}` with the
+     * `report-uri` and `report-to` directives pointing to the report endpoint.
+     * @since 1.19.1
+     */
+    public $cspReportOnly = "script-src {{ nonce }} 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; {{ reporting }}";
 
     /**
      * @inheritdoc
@@ -44,7 +59,7 @@ class Module extends \humhub\components\Module
         'pwa-manifest' => ManifestController::class,
         'pwa-offline' => OfflineController::class,
         'pwa-service-worker' => ServiceWorkerController::class,
-        'security-report' => ReportController::class
+        'security-report' => ReportController::class,
     ];
 
     /**

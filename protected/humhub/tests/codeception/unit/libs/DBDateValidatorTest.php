@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -6,7 +7,6 @@
  */
 
 namespace humhub\tests\codeception\unit\libs;
-
 
 use Yii;
 use humhub\libs\DbDateValidator;
@@ -23,9 +23,9 @@ class DBDateValidatorTest extends HumHubDbTestCase
     {
         parent::_before();
         Yii::$app->timeZone = 'Europe/Berlin';
-        Yii::$app->language = 'en-US';
+        Yii::$app->setLanguage('en-US');
         $this->becomeUser('admin');
-         Yii::$app->user->identity->setAttribute('time_zone', 'Europe/London');
+        Yii::$app->user->identity->setAttribute('time_zone', 'Europe/London');
     }
 
     public function testInitValues()
@@ -39,7 +39,7 @@ class DBDateValidatorTest extends HumHubDbTestCase
     public function testInDBFormatDateOnly()
     {
         // No time translation, since no time value given
-        Yii::$app->language = 'sv';
+        Yii::$app->setLanguage('sv');
         Yii::$app->timeZone = 'Europe/London'; // Set user tz back to app tz
         $model = new DateValidatorTestModel(['date' => '2019-12-20', 'time' => '12PM']);
         $validator = new DbDateValidator(['timeAttribute' => 'time']);
@@ -61,7 +61,7 @@ class DBDateValidatorTest extends HumHubDbTestCase
     public function testParseDateWithoutTimeValueFormatDe()
     {
         // No time translation, since no time value given
-        Yii::$app->language = 'de';
+        Yii::$app->setLanguage('de');
         $model = new DateValidatorTestModel(['date' => '01.12.19']);
         $validator = new DbDateValidator();
         $this->assertEquals('de', $validator->locale);
@@ -84,7 +84,7 @@ class DBDateValidatorTest extends HumHubDbTestCase
     public function testParseDateWithTimeValueFormatDE()
     {
         // Translate from Cairo (UTC +2) to Berlin (UTC + 1)
-        Yii::$app->language = 'de';
+        Yii::$app->setLanguage('de');
         $model = new DateValidatorTestModel(['date' => '01.12.19', 'time' => '12:00']);
         $validator = new DbDateValidator(['timeAttribute' => 'time', 'timeZone' => 'Africa/Cairo']);
         $validator->validateAttribute($model, 'date');

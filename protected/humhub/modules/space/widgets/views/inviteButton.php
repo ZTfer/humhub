@@ -1,5 +1,7 @@
 <?php
-use humhub\widgets\ModalButton;
+
+use humhub\widgets\modal\ModalButton;
+
 ?>
 
 <?= ModalButton::primary(Yii::t('SpaceModule.base', 'Invite'))

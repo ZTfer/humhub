@@ -8,9 +8,17 @@
 
 namespace humhub\commands;
 
+use humhub\components\console\WithoutModuleAutoload;
+use humhub\components\InstallationState;
 use humhub\components\Module;
+use humhub\helpers\DatabaseHelper;
+use humhub\models\ModuleEnabled;
+use humhub\services\ModuleDiscoveryService;
 use Yii;
+use yii\console\controllers\BaseMigrateController;
 use yii\console\Exception;
+use yii\db\Migration;
+use yii\db\MigrationInterface;
 use yii\web\Application;
 
 /**
@@ -49,10 +57,13 @@ use yii\web\Application;
  * yii migrate/down
  * ~~~
  *
+ *
+ * @property-read string[] $newMigrations
+ * @property-read string[] $migrationPaths
  */
+#[WithoutModuleAutoload]
 class MigrateController extends \yii\console\controllers\MigrateController
 {
-
     /**
      * @var string the directory storing the migration classes. This can be either
      * a path alias or a directory.
@@ -60,9 +71,25 @@ class MigrateController extends \yii\console\controllers\MigrateController
     public $migrationPath = '@humhub/migrations';
 
     /**
-     * @var boolean also include migration paths of all enabled modules
+     * Whether to include migration paths of all enabled modules (1=yes, 0=no).
+     *
+     * Use 0/1 on the CLI — Yii2 coerces CLI values via settype(), so the string
+     * "false" becomes bool true. Both --includeModuleMigrations=0 and
+     * --includeModuleMigrations=false map to falsy with an int property.
+     *
+     * @var int
      */
-    public $includeModuleMigrations = false;
+    public int $includeModuleMigrations = 1;
+
+    /**
+     * When set, only migrations for the specified module are applied.
+     * Mutually exclusive with --includeModuleMigrations=false.
+     *
+     * Example: yii migrate/up --moduleId=calendar
+     *
+     * @var string|null
+     */
+    public ?string $moduleId = null;
 
     /**
      * When includeModuleMigrations is enabled, this maps migrations to the
@@ -70,15 +97,46 @@ class MigrateController extends \yii\console\controllers\MigrateController
      *
      * @var array
      */
-    protected $migrationPathMap = [];
+    protected array $migrationPathMap = [];
+
+    /**
+     * Stores the last executed migration.
+     *
+     * @var Migration|null
+     */
+    private ?Migration $lastMigration = null;
+
+
+    /**
+     * @inerhitdoc
+     */
+    public function beforeAction($action): bool
+    {
+        // Make sure to define a default table storage engine
+        $db = Yii::$app->db;
+
+        try {
+            $db->open();
+        } catch (\Throwable $ex) {
+            DatabaseHelper::handleConnectionErrors($ex);
+        }
+
+        if (in_array($db->getDriverName(), ['mysql', 'mysqli'], true)) {
+            $db->pdo->exec('SET default_storage_engine=' . Yii::$app->params['databaseDefaultStorageEngine']);
+        }
+
+        Yii::$app->cache->flush();
+        return parent::beforeAction($action);
+    }
+
 
     /**
      * @inheritdoc
      */
-    public function options($actionID)
+    public function options($actionID): array
     {
-        if ($actionID == 'up') {
-            return array_merge(parent::options($actionID), ['includeModuleMigrations']);
+        if ($actionID === 'up') {
+            return array_merge(parent::options($actionID), ['includeModuleMigrations', 'moduleId']);
         }
 
         return parent::options($actionID);
@@ -86,20 +144,18 @@ class MigrateController extends \yii\console\controllers\MigrateController
 
     /**
      * Returns the migrations that are not applied.
-     * @return array list of new migrations
+     *
+     * @return string[] list of new migrations
      */
-    protected function getNewMigrations()
+    protected function getNewMigrations(): array
     {
-        if (!$this->includeModuleMigrations) {
-            return parent::getNewMigrations();
-        }
-
         $this->migrationPathMap = [];
         $migrations = [];
         foreach ($this->getMigrationPaths() as $migrationPath) {
             $this->migrationPath = $migrationPath;
-            $migrations = array_merge($migrations, parent::getNewMigrations());
-            $this->migrationPathMap[$migrationPath] = $migrations;
+            $newMigrations = parent::getNewMigrations();
+            $migrations = array_unique(array_merge($migrations, $newMigrations));
+            $this->migrationPathMap[$migrationPath] = $newMigrations;
         }
 
         sort($migrations);
@@ -109,30 +165,37 @@ class MigrateController extends \yii\console\controllers\MigrateController
 
     /**
      * Creates a new migration instance.
+     *
      * @param string $class the migration class name
-     * @return \yii\db\MigrationInterface the migration instance
+     *
+     * @return MigrationInterface the migration instance
      */
-    protected function createMigration($class)
+    protected function createMigration($class): MigrationInterface
     {
-        if ($this->includeModuleMigrations) {
-            $this->migrationPath = $this->getMigrationPath($class);
-        }
+        $this->migrationPath = $this->getMigrationPath($class);
 
-        return parent::createMigration($class);
+        /**
+         * Storing the last executed migration
+         *
+         * @see BaseMigrateController::migrateUp()
+         * @see BaseMigrateController::migrateDown()
+         * */
+        return $this->lastMigration = parent::createMigration($class);
     }
 
     /**
      * Returns the migration path of a given migration.
      * A map containing the path=>migration will be created by getNewMigrations method.
      *
-     * @param type $migration
-     * @return type
-     * @throws \yii\console\Exception
+     * @param string $migration
+     *
+     * @return string
+     * @throws Exception
      */
-    public function getMigrationPath($migration)
+    public function getMigrationPath(string $migration): string
     {
         foreach ($this->migrationPathMap as $path => $migrations) {
-            if (in_array($migration, $migrations)) {
+            if (in_array($migration, $migrations, true)) {
                 return $path;
             }
         }
@@ -141,68 +204,123 @@ class MigrateController extends \yii\console\controllers\MigrateController
     }
 
     /**
-     * Returns the migration paths of all enabled modules
+     * Returns the migration paths of all enabled modules.
      *
-     * @return array
+     * @return string[]
      */
-    protected function getMigrationPaths()
+    protected function getMigrationPaths(): array
     {
+        // Single-module mode: run migrations only for one specific module.
+        // Intended to be called after core migrations have already run (e.g. from module/update-all).
+        if ($this->moduleId !== null) {
+            // Module is normally registered at bootstrap. Fall back to manual registration if
+            // it was skipped (e.g. its config.php threw during the initial bootstrap scan).
+            $module = Yii::$app->moduleManager->getModule($this->moduleId, false);
+            if ($module !== null) {
+                $migrationsPath = $module->getBasePath() . DIRECTORY_SEPARATOR . 'migrations';
+                return is_dir($migrationsPath) ? [$this->moduleId => $migrationsPath] : [];
+            }
+
+            $basePath = ModuleDiscoveryService::findModuleBasePath($this->moduleId);
+            if ($basePath === null) {
+                return [];
+            }
+
+            try {
+                Yii::$app->moduleManager->register($basePath);
+            } catch (\Throwable $e) {
+                Yii::error('Cannot load module config for "' . $this->moduleId . '": ' . $e->getMessage());
+                return [];
+            }
+
+            $migrationsPath = $basePath . DIRECTORY_SEPARATOR . 'migrations';
+            return is_dir($migrationsPath) ? [$this->moduleId => $migrationsPath] : [];
+        }
+
+        // Base path + core module migrations are always included.
+        // Third-party modules are only added when includeModuleMigrations is set — with
+        // #[WithoutModuleAutoload] they are not registered at bootstrap to avoid stale
+        // configs executing against a newer core during upgrades.
         $migrationPaths = ['base' => $this->migrationPath];
+
+        if ($this->includeModuleMigrations) {
+            // Only enabled (and core) modules: a module that is merely present in the
+            // modules directory but never enabled must not have its migrations applied — its
+            // tables are created when it is enabled (see Module::enable()). Reading the
+            // enabled ids straight from the database keeps this working under
+            // #[WithoutModuleAutoload], where modules are not bootstrapped.
+            $enabledModuleIds = Yii::$app->installationState->hasState(InstallationState::STATE_DATABASE_CREATED)
+                ? ModuleEnabled::getEnabledIds()
+                : [];
+
+            foreach (ModuleDiscoveryService::locateModuleConfigs() as $basePath => $config) {
+                $migrationsPath = $basePath . DIRECTORY_SEPARATOR . 'migrations';
+                if (!is_dir($migrationsPath)) {
+                    continue;
+                }
+
+                $moduleId = $config['id'] ?? null;
+                if ($moduleId === null) {
+                    continue;
+                }
+
+                if (empty($config['isCoreModule']) && !in_array($moduleId, $enabledModuleIds, true)) {
+                    continue;
+                }
+
+                // Fully register the module so its migrations run with the same context as
+                // in the web application: namespace aliases from config.php (the module id
+                // may differ from the namespace, e.g. "auth-keycloak" vs.
+                // humhub\modules\authKeycloak) and a module instance via Yii::$app->getModule()
+                // for settings access. In the web application (and for core modules) the
+                // module is already registered at bootstrap — hasModule() makes this a no-op
+                // there and avoids duplicate event handler registration.
+                if (!Yii::$app->moduleManager->hasModule($moduleId)) {
+                    try {
+                        Yii::$app->moduleManager->register($basePath, $config);
+                    } catch (\Throwable $e) {
+                        // Typically a stale module still referencing core classes removed by
+                        // this upgrade. Its migrations run when the module itself is updated.
+                        Yii::warning(
+                            'Skipping migrations of module "' . $moduleId . '" — module could not be registered: ' . $e->getMessage(),
+                            'migration',
+                        );
+                        continue;
+                    }
+                }
+
+                $migrationPaths[$moduleId] = $migrationsPath;
+            }
+        }
+
+        // Core modules are always registered at bootstrap even with #[WithoutModuleAutoload].
+        // Use reflection to find their migration directories.
         foreach (Yii::$app->getModules() as $id => $config) {
+            if (isset($migrationPaths[$id])) {
+                continue;
+            }
+
             $class = null;
             if (is_array($config) && isset($config['class'])) {
                 $class = $config['class'];
             } elseif ($config instanceof Module) {
-                $class = get_class($config);
+                $class = $config::class;
             }
 
             if ($class !== null) {
-                $reflector = new \ReflectionClass($class);
-                $path = dirname($reflector->getFileName()) . '/migrations';
-                if (is_dir($path)) {
-                    $migrationPaths[$id] = $path;
+                try {
+                    $reflector = new \ReflectionClass($class);
+                    $path = dirname($reflector->getFileName()) . '/migrations';
+                    if (is_dir($path)) {
+                        $migrationPaths[$id] = $path;
+                    }
+                } catch (\Throwable) {
+                    // module class not loadable — skip
                 }
             }
         }
 
         return $migrationPaths;
-    }
-
-    /**
-     * Executes all pending migrations
-     *
-     * @return string output
-     */
-    public static function webMigrateAll()
-    {
-        ob_start();
-        $controller = new self('migrate', Yii::$app);
-        $controller->db = Yii::$app->db;
-        $controller->interactive = false;
-        $controller->includeModuleMigrations = true;
-        $controller->color = false;
-        $controller->runAction('up');
-
-        return ob_get_clean();
-    }
-
-    /**
-     * Executes migrations in a specific folder
-     *
-     * @param string $migrationPath
-     * @return string output
-     */
-    public static function webMigrateUp($migrationPath)
-    {
-        ob_start();
-        $controller = new self('migrate', Yii::$app);
-        $controller->db = Yii::$app->db;
-        $controller->interactive = false;
-        $controller->migrationPath = $migrationPath;
-        $controller->color = false;
-        $controller->runAction('up');
-
-        return ob_get_clean();
     }
 
     /**
@@ -212,9 +330,10 @@ class MigrateController extends \yii\console\controllers\MigrateController
     {
         if (Yii::$app instanceof Application) {
             print $string;
-        } else {
-            return parent::stdout($string);
+            return strlen($string);
         }
+
+        return parent::stdout($string);
     }
 
     /**
@@ -224,8 +343,17 @@ class MigrateController extends \yii\console\controllers\MigrateController
     {
         if (Yii::$app instanceof Application) {
             print $string;
-        } else {
-            return parent::stderr($string);
+            return strlen($string);
         }
+
+        return parent::stderr($string);
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getLastMigration()
+    {
+        return $this->lastMigration;
     }
 }

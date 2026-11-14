@@ -2,36 +2,65 @@
 
 namespace tests\codeception\unit\modules\comment\components;
 
+use humhub\models\RecordMap;
+use humhub\modules\activity\models\Activity;
+use humhub\modules\comment\notifications\NewComment;
+use humhub\modules\comment\services\CommentListService;
+use humhub\modules\notification\models\Notification;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
 use Codeception\Specify;
 use humhub\modules\post\models\Post;
 use humhub\modules\comment\models\Comment;
+use humhub\modules\space\models\Space;
 
 class CommentTest extends HumHubDbTestCase
 {
-
     use Specify;
 
     public function testCreateComment()
     {
+        // Post 11 is a private Post in Space 2 (id 2), followed by Admin (id 1).
+        // Admin needs to be a member of Space 2 to actually be allowed to view the
+        // private Post, otherwise the notification must not be sent to him.
+        Space::findOne(['id' => 2])->addMember(1, 1, true);
+
         $this->becomeUser('User2');
-        
+
         $comment = new Comment([
             'message' => 'User2 comment!',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]);
 
         $comment->save();
 
-        $this->assertMailSent(1, 'Comment Notification Mail sent');
-        $this->assertEqualsLastEmailSubject('Sara Tester commented post "User 2 Space 2 Post Private" in space Space 2');
+        $this->assertMailSent(1);
+        $this->assertEqualsLastEmailSubject('Sara Tester commented post "User 2 Space 2 Post Private" in Space Space 2');
         $this->assertNotEmpty($comment->id);
-        $this->assertNotEmpty($comment->content->getPolymorphicRelation()->getFollowers(null, true, true));
-        
-        $this->assertNotNull(\humhub\modules\activity\models\Activity::findOne(['object_model' => Comment::class, 'object_id' => $comment->id]));
-        $this->assertNotNull(\humhub\modules\notification\models\Notification::findOne(['source_class' => Comment::class, 'source_pk' => $comment->id]));
+        $this->assertNotEmpty($comment->content->getPolymorphicRelation()->getFollowersWithNotificationQuery());
+
+        $this->assertNotNull(Activity::findOne(['content_addon_record_id' => RecordMap::getId($comment)]));
+        $this->assertNotNull(Notification::findOne(['source_class' => Comment::class, 'source_pk' => $comment->id]));
+    }
+
+    public function testHiddenFollowerIsNotifiedOfNewComment()
+    {
+        Space::findOne(['id' => 2])->addMember(1, 1, true);
+
+        // The profile visibility is relative to the commenter (User2 is not an admin),
+        // it must not prevent the follower from being notified
+        User::updateAll(['visibility' => User::VISIBILITY_HIDDEN], ['id' => 1]);
+
+        $this->becomeUser('User2');
+
+        $comment = new Comment([
+            'message' => 'User2 comment!',
+            'content_id' => 11,
+        ]);
+        $comment->save();
+
+        $this->assertMailSent(1);
+        $this->assertNotNull(Notification::findOne(['source_class' => Comment::class, 'source_pk' => $comment->id, 'user_id' => 1]));
     }
 
     public function testDeleteUser()
@@ -40,8 +69,7 @@ class CommentTest extends HumHubDbTestCase
 
         $comment = new Comment([
             'message' => 'User2 comment!',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]);
 
         $comment->save();
@@ -58,16 +86,53 @@ class CommentTest extends HumHubDbTestCase
 
         $comment = new Comment([
             'message' => 'User2 comment!',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]);
 
         $comment->save();
 
         $post = Post::findOne(['id' => 11]);
-        $post->delete();
+        $post->hardDelete();
 
         $this->assertNull(Comment::findOne(['id' => $comment->id]));
+    }
+
+    public function testNotificationHtmlForPostWithoutText()
+    {
+        $this->becomeUser('User2');
+
+        $post = Post::findOne(['id' => 11]);
+        $post->updateAttributes(['message' => '']);
+
+        $comment = new Comment([
+            'message' => 'User2 comment!',
+            'content_id' => 11,
+        ]);
+        $comment->save();
+
+        $html = NewComment::instance()->from(User::findOne(['id' => 3]))->about($comment)->html();
+
+        $this->assertStringNotContainsString('[Deleted]', $html);
+        $this->assertStringEndsWith('commented post.', $html);
+    }
+
+    public function testNotificationHtmlForDeletedRecord()
+    {
+        $this->becomeUser('User2');
+
+        $comment = new Comment([
+            'message' => 'User2 comment!',
+            'content_id' => 11,
+        ]);
+        $comment->save();
+
+        // Simulate an orphaned content record by removing the underlying post without cleanup
+        Post::deleteAll(['id' => 11]);
+        $comment = Comment::findOne(['id' => $comment->id]);
+
+        $html = NewComment::instance()->from(User::findOne(['id' => 3]))->about($comment)->html();
+
+        $this->assertStringContainsString('[Deleted]', $html);
     }
 
     public function testGetCommentLimited()
@@ -76,58 +141,106 @@ class CommentTest extends HumHubDbTestCase
 
         (new Comment([
             'message' => 'Test comment1',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]))->save();
 
         (new Comment([
             'message' => 'Test comment2',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]))->save();
 
         (new Comment([
             'message' => 'Test comment3',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]))->save();
 
-        $comments = Comment::GetCommentsLimited(Post::class, 11, 2);
-        $this->assertCount(2, $comments);
-        $this->assertEquals('Test comment2', $comments[0]->message);
-        $this->assertEquals('Test comment3', $comments[1]->message);
+        // A single comment beyond the limit is included directly instead of
+        // being hidden behind a "Show previous 1 comments" link
+        $comments = CommentListService::create(Post::findOne(['id' => 11]))->getLimited(2);
+        $this->assertCount(3, $comments);
+        $this->assertEquals('Test comment1', $comments[0]->message);
+        $this->assertEquals('Test comment3', $comments[2]->message);
 
+        (new Comment([
+            'message' => 'Test comment4',
+            'content_id' => 11,
+        ]))->save();
+
+        // With two comments beyond the limit the list is cut to the limit
+        $comments = CommentListService::create(Post::findOne(['id' => 11]))->getLimited(2);
+        $this->assertCount(2, $comments);
+        $this->assertEquals('Test comment3', $comments[0]->message);
+        $this->assertEquals('Test comment4', $comments[1]->message);
+
+    }
+
+    public function testGetCommentLimitedWithHighlightedComment()
+    {
+        $this->becomeUser('User2');
+
+        ($commentA = new Comment([
+            'message' => 'Test comment A',
+            'content_id' => 11,
+        ]))->save();
+
+        ($commentB = new Comment([
+            'message' => 'Test comment B',
+            'content_id' => 11,
+        ]))->save();
+
+        $post = Post::findOne(['id' => 11]);
+
+        // Permalink of the older comment A must also include the newer comment B
+        $comments = CommentListService::create($post)->getLimited(2, $commentA->id);
+        $this->assertCount(2, $comments);
+        $this->assertEquals('Test comment A', $comments[0]->message);
+        $this->assertEquals('Test comment B', $comments[1]->message);
+
+        // Permalink of the newest comment B must also include the older comment A
+        $comments = CommentListService::create($post)->getLimited(2, $commentB->id);
+        $this->assertCount(2, $comments);
+        $this->assertEquals('Test comment A', $comments[0]->message);
+        $this->assertEquals('Test comment B', $comments[1]->message);
     }
 
     public function testGetCommentCount()
     {
         $this->becomeUser('User2');
 
-        $count = Comment::GetCommentCount(Post::class, 11);
+        $count = CommentListService::create(Post::findOne(['id' => 11]))->getCount();
         $this->assertEquals(0, $count);
-
-        Comment::flushCommentCache(Post::class, 11);
 
         (new Comment([
             'message' => 'Test comment1',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]))->save();
 
-        (new Comment([
+        ($comment2 = new Comment([
             'message' => 'Test comment2',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
+        ]))->save();
+
+        $count = CommentListService::create(Post::findOne(['id' => 11]))->getCount();
+        $this->assertEquals(2, $count);
+
+        (new Comment([
+            'message' => 'Test comment2b',
+            'content_id' => 11,
+            'parent_comment_id' => $comment2->id,
         ]))->save();
 
         (new Comment([
             'message' => 'Test comment3',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]))->save();
 
-        $count = Comment::GetCommentCount(Post::class, 11);
-        $this->assertEquals(3, $count);
+        // The content count includes the sub comment
+        $count = CommentListService::create(Post::findOne(['id' => 11]))->getCount();
+        $this->assertEquals(4, $count);
+
+        $count = CommentListService::create($comment2)->getCount();
+        $this->assertEquals(1, $count);
+
     }
 
 }

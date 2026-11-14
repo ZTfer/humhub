@@ -9,7 +9,10 @@
 namespace humhub\modules\post\widgets;
 
 use humhub\modules\content\widgets\WallCreateContentForm;
-use humhub\modules\post\permissions\CreatePost;
+use humhub\modules\post\models\Post;
+use humhub\modules\space\models\Space;
+use humhub\widgets\form\ActiveForm;
+use yii\helpers\Url;
 
 /**
  * This widget is used include the post form.
@@ -19,18 +22,48 @@ use humhub\modules\post\permissions\CreatePost;
  */
 class Form extends WallCreateContentForm
 {
-
     /**
      * @inheritdoc
      */
     public $submitUrl = '/post/post/post';
 
     /**
+     * @var string
+     */
+    public $mentioningUrl = '/user/mentioning/space';
+
+    /**
+     * Get params for form rendering
+     *
+     * @param array $additionalParams
+     * @return array
+     */
+    public function getRenderParams(array $additionalParams = []): array
+    {
+        $post = new Post($this->contentContainer);
+        $canCreatePostInSpace = ($this->contentContainer instanceof Space && $post->content->canEdit());
+
+        return array_merge([
+            'post' => $post,
+            'wallCreateContentForm' => $this,
+            'mentioningUrl' => $canCreatePostInSpace ? Url::to([$this->mentioningUrl, 'id' => $this->contentContainer->id]) : null,
+        ], $additionalParams);
+    }
+
+    /**
      * @inheritdoc
      */
-    public function renderForm()
+    public function renderForm(): string
     {
-        return $this->render('form', []);
+        return $this->render('form', $this->getRenderParams());
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function renderActiveForm(ActiveForm $form): string
+    {
+        return $this->render('form', $this->getRenderParams(['form' => $form]));
     }
 
     /**
@@ -38,8 +71,8 @@ class Form extends WallCreateContentForm
      */
     public function run()
     {
-        if (!$this->contentContainer->permissionManager->can(new CreatePost())) {
-            return;
+        if (!(new Post($this->contentContainer))->content->canEdit()) {
+            return '';
         }
 
         return parent::run();

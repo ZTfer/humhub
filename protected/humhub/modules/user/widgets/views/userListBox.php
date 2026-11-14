@@ -1,59 +1,55 @@
 <?php
 
-use humhub\widgets\ModalButton;
-use humhub\widgets\ModalDialog;
+use humhub\helpers\Html;
+use humhub\modules\user\widgets\Image;
 use humhub\widgets\AjaxLinkPager;
-use yii\helpers\Html;
+use humhub\widgets\modal\Modal;
+use humhub\widgets\modal\ModalButton;
+use yii\data\Pagination;
 
 /* @var $users \humhub\modules\user\models\User[] */
+/* @var $hideOnlineStatus bool */
+/* @var $title string */
+/* @var $pagination Pagination */
 ?>
 
-<?php ModalDialog::begin(['header' => $title]) ?>
+<?php Modal::beginDialog([
+    'title' => $title,
+    'footer' => ModalButton::cancel(Yii::t('base', 'Close')),
+    'bodyOptions' => ['style' => 'margin: 0 calc(var(--hh-modal-content-padding) * -1); padding: var(--bs-modal-padding) 0;'], // Body fullwidth
+]) ?>
 
     <?php if (count($users) === 0): ?>
-        <div class="modal-body">
-            <p><?= Yii::t('UserModule.base', 'No users found.'); ?></p>
-        </div>
+        <p><?= Yii::t('UserModule.base', 'No users found.') ?></p>
     <?php endif; ?>
 
-    <div id="userlist-content">
+    <div id="userlist-content" class="hh-list">
+        <?php foreach ($users as $user) : ?>
+            <a href="<?= $user->getUrl() ?>" data-modal-close="1" class="d-flex">
+                <div class="flex-shrink-0 me-2">
+                    <?= Image::widget([
+                        'user' => $user,
+                        'link' => false,
+                        'hideOnlineStatus' => $hideOnlineStatus,
+                        'htmlOptions' => ['class' => 'm-0'], // Remove the bottom margin for the online status icon
+                    ]) ?>
+                </div>
 
-        <ul class="media-list">
-            <?php foreach ($users as $user) : ?>
-                <li>
-                    <a href="<?= $user->getUrl(); ?>"  data-modal-close="1">
-                        <div class="media">
-                            <img class="media-object img-rounded pull-left"
-                                 src="<?= $user->getProfileImage()->getUrl(); ?>" width="50"
-                                 height="50" alt="50x50" data-src="holder.js/50x50"
-                                 style="width: 50px; height: 50px;">
-
-                            <div class="media-body">
-                                <h4 class="media-heading"><?= Html::encode($user->displayName); ?></h4>
-                                <h5><?= Html::encode($user->displayNameSub); ?></h5>
-                            </div>
-                        </div>
-                    </a>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-
-        <div class="pagination-container">
-            <?= AjaxLinkPager::widget(['pagination' => $pagination]); ?>
-        </div>
+                <div class="flex-grow-1">
+                    <h4 class="mt-0"><?= Html::encode($user->displayName) ?></h4>
+                    <h5><?= Html::encode($user->displayNameSub) ?></h5>
+                </div>
+            </a>
+        <?php endforeach; ?>
     </div>
 
-    <div class="modal-footer">
-        <?= ModalButton::cancel(Yii::t('base', 'Close'))?>
+    <div class="pagination-container">
+        <?= AjaxLinkPager::widget(['pagination' => $pagination]) ?>
     </div>
 
-<script <?= \humhub\libs\Html::nonce() ?>>
+    <script <?= Html::nonce() ?>>
+        // scroll to top of list
+        $(".modal-body").animate({scrollTop: 0}, 200);
+    </script>
 
-    // scroll to top of list
-    $(".modal-body").animate({scrollTop: 0}, 200);
-
-</script>
-
-<?php ModalDialog::end() ?>
-
-
+<?php Modal::endDialog() ?>

@@ -2,10 +2,12 @@
 
 namespace humhub\modules\content\controllers;
 
+use Exception;
+use humhub\components\assets\AssetImage;
 use Yii;
+use yii\web\HttpException;
 use yii\web\Response;
 use yii\web\UploadedFile;
-use humhub\libs\ProfileImage;
 use humhub\models\forms\CropProfileImage;
 use humhub\models\forms\UploadProfileImage;
 use humhub\modules\content\components\ContentContainerController;
@@ -18,8 +20,8 @@ use humhub\modules\content\components\ContentContainerController;
  */
 abstract class ContainerImageController extends ContentContainerController
 {
-    const TYPE_PROFILE_IMAGE = 'image';
-    const TYPE_PROFILE_BANNER_IMAGE = 'banner';
+    public const TYPE_PROFILE_IMAGE = 'image';
+    public const TYPE_PROFILE_BANNER_IMAGE = 'banner';
 
     /**
      * @var string file upload name for profile image, this exists due to legacy compatibility for views prio to v1.4
@@ -71,21 +73,33 @@ abstract class ContainerImageController extends ContentContainerController
     protected function handleImageUpload($uploadName, $type = self::TYPE_PROFILE_IMAGE)
     {
         $files = UploadedFile::getInstancesByName($uploadName);
-
-        $model = new UploadProfileImage(['image' => isset($files[0]) ? $files[0] : null]);
+        $model = new UploadProfileImage(['image' => $files[0] ?? null]);
 
         if ($model->validate()) {
-            $profileImage = $this->getImageByType($type);
-            $profileImage->setNew($model->image);
+            try {
+                $assetImage = $this->getImageByType($type);
+                $assetImage->setUploadedFile($files[0]);
+            } catch (Exception $e) {
+                Yii::error($e);
+                return $this->asJson([
+                    'files' => [
+                        [
+                            'name' => isset($files[0]) ? $files[0]->name : '',
+                            'error' => true,
+                            'errors' => [$e->getMessage()],
+                        ],
+                    ],
+                ]);
+            }
 
             return $this->asJson([
                 'files' => [
                     [
-                        'url' => $profileImage->getUrl(),
+                        'url' => $assetImage->getUrl(),
                         'type' => $type,
                         'container_id' => $this->contentContainer->contentcontainer_id,
                         'space_id' => $this->contentContainer->id, // Deprecated, only remained for legacy themes prior to 1.4
-                    ]
+                    ],
                 ]]);
         }
 
@@ -94,33 +108,34 @@ abstract class ContainerImageController extends ContentContainerController
                 [
                     'name' => isset($files[0]) ? $files[0]->name : '',
                     'error' => true,
-                    'errors' => $model->getErrorSummary(false)
-                ]
-            ]
+                    'errors' => $model->getErrorSummary(false),
+                ],
+            ],
         ]);
     }
 
     public function handleCrop($type = self::TYPE_PROFILE_IMAGE)
     {
         $model = new CropProfileImage();
-        $profileImage = $this->getImageByType($type);
+        $assetImage = $this->getImageByType($type);
 
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-            $profileImage->cropOriginal($model->cropX, $model->cropY, $model->cropH, $model->cropW);
+            $assetImage->crop($model->cropX, $model->cropY, $model->cropH, $model->cropW);
             $this->view->saved();
             return $this->htmlRedirect($this->contentContainer->getUrl());
         }
 
         return $this->renderAjax('@content/views/container-image/cropModal', [
             'model' => $model,
-            'profileImage' => $profileImage,
-            'container' => $this->contentContainer
+            'assetImage' => $assetImage,
+            'imageType' => $type,
+            'container' => $this->contentContainer,
         ]);
     }
 
     /**
      * Deletes the profile image or profile banner
-     * @throws \yii\web\HttpException
+     * @throws HttpException
      */
     public function actionDelete($type)
     {
@@ -137,14 +152,10 @@ abstract class ContainerImageController extends ContentContainerController
         return $this->asJson($result);
     }
 
-    /**
-     * @param $type
-     * @return ProfileImage
-     */
-    protected function getImageByType($type)
+    protected function getImageByType($type): AssetImage
     {
         return $type === static::TYPE_PROFILE_BANNER_IMAGE
-            ? $this->contentContainer->getProfileBannerImage()
-            : $this->contentContainer->getProfileImage();
+            ? $this->contentContainer->bannerImage
+            : $this->contentContainer->image;
     }
 }

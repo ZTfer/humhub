@@ -1,15 +1,16 @@
 <?php
 
+use humhub\modules\admin\widgets\AdminMenu;
 use humhub\widgets\FooterMenu;
 
 /** @var $content string */
 ?>
 <div class="container">
     <div class="row">
-        <div class="col-md-3">
-            <?= \humhub\modules\admin\widgets\AdminMenu::widget(); ?>
+        <div class="col-lg-3">
+            <?= AdminMenu::widget(); ?>
         </div>
-        <div class="col-md-9">
+        <div class="col-lg-9">
             <?= $content; ?>
             <?= FooterMenu::widget(); ?>
         </div>

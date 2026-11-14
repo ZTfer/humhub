@@ -3,8 +3,9 @@
 namespace humhub\modules\content\widgets;
 
 use humhub\components\Widget;
+use humhub\helpers\Html;
+use humhub\modules\ui\icon\widgets\Icon;
 use yii\helpers\ArrayHelper;
-use yii\helpers\Html;
 
 /**
  * Generic WallEntryControlLink.
@@ -14,7 +15,6 @@ use yii\helpers\Html;
  */
 class WallEntryControlLink extends Widget
 {
-
     /**
      * @var string link label
      */
@@ -31,7 +31,7 @@ class WallEntryControlLink extends Widget
     public $actionUrl;
 
     /**
-     * Object derived from HActiveRecordContent
+     * Object derived from ContentActiveRecord
      *
      * @var string
      */
@@ -48,17 +48,19 @@ class WallEntryControlLink extends Widget
      */
     public function init()
     {
-        if(empty($this->getLabel())) {
+        if (empty($this->getLabel())) {
             $this->label = ArrayHelper::remove($this->options, 'label', 'Label');
         }
 
-        if(!empty($this->getAction())) {
+        if (!empty($this->getAction())) {
             $this->options['data-action-click'] = $this->getAction();
         }
 
-        if(!empty($this->getActionUrl())) {
+        if (!empty($this->getActionUrl())) {
             $this->options['data-action-url'] = $this->getActionUrl();
         }
+
+        $this->options['class'] = 'dropdown-item';
 
         ArrayHelper::remove($this->options, 'sortOrder');
         parent::init();
@@ -69,11 +71,11 @@ class WallEntryControlLink extends Widget
      */
     public function run()
     {
-        if($this->preventRender()) {
+        if ($this->preventRender()) {
             return '';
         }
 
-        return '<li>'.$this->renderLink().'</li>';
+        return '<li>' . $this->renderLink() . '</li>';
     }
 
     /**
@@ -99,7 +101,8 @@ class WallEntryControlLink extends Widget
      */
     protected function renderLinkText()
     {
-        return ($this->icon) ? '<i class="fa '.$this->getIcon().'"></i> '.$this->getLabel() : $this->getLabel();
+        $label = trim($this->getLabel());
+        return $this->icon ? Icon::get($this->getIcon()) . ' ' . $label : $label;
     }
 
     /**
@@ -115,7 +118,7 @@ class WallEntryControlLink extends Widget
      */
     public function getIcon()
     {
-        if(empty($this->icon)) {
+        if (empty($this->icon)) {
             $this->icon = ArrayHelper::remove($this->options, 'icon');
         }
 

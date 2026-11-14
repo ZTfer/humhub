@@ -1,13 +1,13 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
  * @license https://www.humhub.com/licences
  *
  */
- 
-namespace humhub\modules\content\components;
 
+namespace humhub\modules\content\components;
 
 use Yii;
 use humhub\components\access\ActionAccessValidator;
@@ -46,7 +46,7 @@ class UserGroupAccessValidator extends ActionAccessValidator
 
     protected function validate($rule)
     {
-        if($this->globalPermissionCheck()) {
+        if ($this->globalPermissionCheck()) {
             return true;
         }
 
@@ -54,12 +54,18 @@ class UserGroupAccessValidator extends ActionAccessValidator
             $allowedGroups = is_string($rule[$this->name]) ? [$rule[$this->name]] : $rule[$this->name];
             $userGroup = $this->contentContainer->getUserGroup($this->access->user);
 
-            if(isset($rule['strict']) && $rule['strict'] == true) {
+            if (isset($rule['strict']) && $rule['strict'] == true) {
                 return in_array($userGroup, $allowedGroups);
             }
 
+            // getUserGroupLevel() ranks unknown groups highest, which is intended for the
+            // allowed groups of a rule but must never grant access to an unknown user group.
+            if (!in_array($userGroup, $this->getUserGroupLevels(), true)) {
+                return false;
+            }
+
             foreach ($allowedGroups as $allowedUserGroup) {
-                if($this->getUserGroupLevel($userGroup) >= $this->getUserGroupLevel($allowedUserGroup)) {
+                if ($this->getUserGroupLevel($userGroup) >= $this->getUserGroupLevel($allowedUserGroup)) {
                     return true;
                 }
             }
@@ -77,24 +83,35 @@ class UserGroupAccessValidator extends ActionAccessValidator
      */
     protected function globalPermissionCheck()
     {
-        if(!$this->access->user) {
+        if (!$this->access->user) {
             return false;
         }
 
-        $userPermissionManager =  new PermissionManager(['subject' => $this->access->user]);
+        $userPermissionManager = new PermissionManager(['subject' => $this->access->user]);
         return ($this->access->user->isSystemAdmin())
             || ($this->contentContainer instanceof Space && $userPermissionManager->can(ManageSpaces::class));
     }
 
     public function getUserGroupLevel($userGroup)
     {
-        $userGroupLevelArr = ($this->contentContainer instanceof Space) ? $this->spaceGroupLevel : $this->profileGroupLevel;
+        $userGroupLevelArr = $this->getUserGroupLevels();
 
-        if(!in_array($userGroup, $userGroupLevelArr)) {
+        if (!in_array($userGroup, $userGroupLevelArr)) {
             return PHP_INT_MAX;
         }
 
         return array_search($userGroup, $userGroupLevelArr);
+    }
+
+    /**
+     * Returns the known user groups of the current content container, ordered by level.
+     *
+     * @return string[]
+     * @since 1.18.5
+     */
+    public function getUserGroupLevels(): array
+    {
+        return ($this->contentContainer instanceof Space) ? $this->spaceGroupLevel : $this->profileGroupLevel;
     }
 
     protected function extractActions($rule)

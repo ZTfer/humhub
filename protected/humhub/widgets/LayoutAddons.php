@@ -8,9 +8,13 @@
 
 namespace humhub\widgets;
 
+use humhub\components\InstallationState;
+use humhub\helpers\DeviceDetectorHelper;
+use humhub\helpers\MobileAppHelper;
 use humhub\modules\admin\widgets\TrackingWidget;
 use humhub\modules\tour\widgets\Tour;
-use humhub\modules\ui\form\widgets\MarkdownModals;
+use humhub\widgets\modal\GlobalConfirmModal;
+use humhub\widgets\modal\GlobalModal;
 use Yii;
 
 /**
@@ -21,7 +25,6 @@ use Yii;
  */
 class LayoutAddons extends BaseStack
 {
-
     /**
      * @inheritdoc
      */
@@ -31,27 +34,35 @@ class LayoutAddons extends BaseStack
             $this->addWidget(GlobalModal::class);
             $this->addWidget(GlobalConfirmModal::class);
 
-            if(Yii::$app->params['installed']) {
+            if (Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED)) {
                 $this->addWidget(Tour::class);
                 $this->addWidget(TrackingWidget::class);
             }
 
             $this->addWidget(LoaderWidget::class, ['show' => false, 'id' => "humhub-ui-loader-default"]);
             $this->addWidget(StatusBar::class);
-            if (Yii::$app->params['installed']) {
-
-                // Temporary fix until v1.6 then bundled with css pack
-                Yii::$app->view->registerCss('img { image-orientation: from-image; }', [], 'fix-orient');
-
+            if (Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED)) {
                 $this->addWidget(BlueimpGallery::class);
-                $this->addWidget(MarkdownModals::class);
 
                 if (Yii::$app->params['enablePjax']) {
-                    $this->addWidget(Pjax::class);
+                    $this->addWidget(PjaxLayoutContent::class);
                 }
             }
         }
-        parent::init();
-    }
 
+        parent::init();
+
+        if (Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED)) {
+            // If the mobile app Opener page is open (after login and switching instance)
+            if (DeviceDetectorHelper::appOpenerState()) {
+                MobileAppHelper::registerHideOpenerScript();
+            }
+
+            if (Yii::$app->session->has(MobileAppHelper::SESSION_VAR_SHOW_OPENER)) {
+                MobileAppHelper::registerShowOpenerScript();
+                Yii::$app->session->remove(MobileAppHelper::SESSION_VAR_SHOW_OPENER);
+            }
+        }
+
+    }
 }

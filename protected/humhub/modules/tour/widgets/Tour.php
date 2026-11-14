@@ -2,9 +2,14 @@
 
 namespace humhub\modules\tour\widgets;
 
+use humhub\components\SettingsManager;
+use humhub\components\Widget;
 use humhub\modules\tour\assets\TourAsset;
+use humhub\modules\tour\Module;
+use humhub\modules\tour\TourConfig;
+use humhub\modules\tour\widgets\Dashboard as DashboardWidget;
+use humhub\modules\user\models\User;
 use Yii;
-
 
 /**
  * Will show the introduction tour
@@ -13,60 +18,85 @@ use Yii;
  * @since 0.5
  * @author andystrobel
  */
-class Tour extends \humhub\components\Widget
+class Tour extends Widget
 {
-
     /**
-     * Executes the widgets
+     * @inerhitdoc
      */
     public function run()
     {
-
-        if (Yii::$app->user->isGuest)
-            return;
-
-        // Active tour flag not set
-        if (!isset($_GET['tour'])) {
-            return;
+        if (Yii::$app->user->isGuest) {
+            return '';
         }
 
+        // Active Tour flag is not set and auto start is not enabled
+        if (!Yii::$app->request->get('tour') && !self::isEnabledAutoStart()) {
+            return '';
+        }
 
         // Tour only possible when we are in a module
         if (Yii::$app->controller->module === null) {
-            return;
+            return '';
         }
 
-        // Check if tour is activated by admin and users
-        $settings = Yii::$app->getModule('tour')->settings;
-        if ($settings->get('enable') == 0 && $settings->user()->get("hideTourPanel") == 1) {
-            return;
+        // Check if Tour is activated by admin and users
+        if (!DashboardWidget::isVisible()) {
+            return '';
         }
+
+        $config = TourConfig::getCurrent();
+
+        if (!$config) {
+            return '';
+        }
+
+        self::disableAutoStart(TourConfig::getTourId($config));
+
+        $tourId = TourConfig::getTourId($config);
+        $nextUrl = TourConfig::getNextUrl($config);
+        $driverJs = json_encode(TourConfig::getDriverJs($config), JSON_THROW_ON_ERROR);
+        $js = "
+humhub.require('tour').start({
+    tourId: '{$tourId}',
+    nextUrl: '{$nextUrl}',
+    driverJs: {$driverJs}
+});
+        ";
 
         TourAsset::register($this->view);
+        $this->view->registerJs($js);
+        return '';
+    }
 
-        // save current module and controller id's
-        $currentModuleId = Yii::$app->controller->module->id;
-        $currentControllerId = Yii::$app->controller->id;
+    private static function getSettings(): SettingsManager
+    {
+        /* @var Module $module */
+        $module = Yii::$app->getModule('tour');
+        return $module->settings;
+    }
 
-        if ($currentModuleId == "dashboard" && $currentControllerId == "dashboard") {
-            return $this->render('guide_interface');
-        } elseif ($currentModuleId == "space" && $currentControllerId == "space") {
-            return $this->render('guide_spaces', []);
-        } elseif ($currentModuleId == "user" && $currentControllerId == "profile") {
-            return $this->render('guide_profile', []);
-        } elseif ($currentModuleId == "marketplace" && $currentControllerId == "browse") {
-            return $this->render('guide_administration', []);
+    public static function isEnabledAutoStart(?string $tourId = null, ?User $user = null): bool
+    {
+        if ($tourId === null) {
+            $config = TourConfig::getCurrent();
+            if (!$config) {
+                return false;
+            }
+            $tourId = TourConfig::getTourId($config);
+        }
+
+        return (bool)self::getSettings()->user($user)->get('autoStartTour.' . $tourId, false);
+    }
+
+    public static function enableAutoStart(string $tourId, ?User $user = null)
+    {
+        self::getSettings()->user($user)->set('autoStartTour.' . $tourId, true);
+    }
+
+    public static function disableAutoStart(string $tourId, ?User $user = null)
+    {
+        if (self::isEnabledAutoStart($tourId)) {
+            self::getSettings()->user($user)->delete('autoStartTour.' . $tourId);
         }
     }
-
-    /**
-     * @deprecated since 1.3.13
-     */
-    public function loadResources(\yii\web\View $view)
-    {
-        // Dummy for old template version
-    }
-
 }
-
-?>

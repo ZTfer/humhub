@@ -1,0 +1,19 @@
+//
+// Tooltips
+// --------------------------------------------------
+
+@if not $prev-tooltip {
+    // Bootstrap overwrite: see the tooltip Sass variables in variables.scss.
+    // The arrow colors are derived from `$tooltip-bg` by Bootstrap itself.
+
+    .tooltip-inner {
+        text-align: left;
+        padding: 2px 8px 4px;
+        font-weight: bold;
+        white-space: pre-wrap;
+    }
+
+    .tooltip.in {
+        opacity: 1;
+    }
+}

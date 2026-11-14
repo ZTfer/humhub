@@ -3,16 +3,18 @@
 namespace humhub\modules\admin\models\forms;
 
 use Yii;
+use yii\base\Model;
 
 /**
  * @package humhub.modules_core.admin.forms
  * @since 0.10
  */
-class OEmbedProviderForm extends \yii\base\Model
+class OEmbedProviderForm extends Model
 {
-
-    public $prefix;
+    public $name;
     public $endpoint;
+    public $pattern;
+    public $access_token;
 
     /**
      * Declares the validation rules.
@@ -20,9 +22,13 @@ class OEmbedProviderForm extends \yii\base\Model
     public function rules()
     {
         return [
-            ['prefix', 'safe'],
-            [['prefix', 'endpoint'], 'required'],
+            [['name', 'pattern', 'endpoint'], 'string'],
+            [['name', 'pattern', 'endpoint'], 'required'],
             ['endpoint', 'url'],
+            ['access_token', 'required', 'when' => function ($model) {
+                parse_str((string) $model->endpoint, $query);
+                return isset($query['access_token']);
+            }],
         ];
     }
 
@@ -34,8 +40,10 @@ class OEmbedProviderForm extends \yii\base\Model
     public function attributeLabels()
     {
         return [
-            'prefix' => Yii::t('AdminModule.settings', 'Url Prefix'),
+            'name' => Yii::t('AdminModule.settings', 'Provider Name'),
             'endpoint' => Yii::t('AdminModule.settings', 'Endpoint Url'),
+            'pattern' => Yii::t('AdminModule.settings', 'Url Pattern'),
+            'access_token' => Yii::t('AdminModule.settings', 'Access Token'),
         ];
     }
 

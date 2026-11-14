@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -8,23 +9,22 @@
 
 namespace humhub\modules\file\widgets;
 
+use humhub\helpers\Html;
 use humhub\libs\MimeHelper;
 use humhub\modules\file\models\File;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
 use Yii;
-use yii\helpers\Html;
-use yii\helpers\Url;
 
 class FileDownload extends Button
 {
     public function file(File $file, $withIcon = true, $showSize = true, $download = false, $scheme = false)
     {
-        if($withIcon) {
+        if ($withIcon) {
             $mimeIconClass = MimeHelper::getMimeIconClassByExtension($file);
-            $this->icon(Html::tag('i', '', ['class' => 'mime '.$mimeIconClass, 'style' => 'width:10px;height:10px;']), false, true);
+            $this->icon(Html::tag('i', '', ['class' => 'mime ' . $mimeIconClass, 'style' => 'width:10px;height:10px;']));
         }
 
-        if($showSize) {
+        if ($showSize) {
             $this->text .= static::getFileSizeString($file);
         }
 
@@ -36,7 +36,7 @@ class FileDownload extends Button
 
     public static function getFileSizeString(File $file)
     {
-        return ' <small>('.Yii::$app->formatter->asShortSize($file->size, 1).')</small>';
+        return ' <small>(' . Yii::$app->formatter->asShortSize($file->size, 1) . ')</small>';
     }
 
     public static function getFileDataAttributes(File $file)

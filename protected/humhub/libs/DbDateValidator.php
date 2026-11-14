@@ -19,12 +19,11 @@ use yii\validators\DateValidator;
  */
 class DbDateValidator extends DateValidator
 {
-
     /**
      * Database Field - Validators
      */
-    const REGEX_DBFORMAT_DATE = '/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$/';
-    const REGEX_DBFORMAT_DATETIME = '/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/';
+    public const REGEX_DBFORMAT_DATE = '/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$/';
+    public const REGEX_DBFORMAT_DATETIME = '/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/';
 
     /**
      * @var string the format the value should converted to (database datetime or date format)
@@ -50,7 +49,7 @@ class DbDateValidator extends DateValidator
             $this->format = Yii::$app->formatter->dateInputFormat;
         }
 
-        if(!$this->timeZone) {
+        if (!$this->timeZone) {
             $this->timeZone = DateHelper::getUserTimeZone(true);
         }
 
@@ -59,11 +58,81 @@ class DbDateValidator extends DateValidator
 
     /**
      * @inheritdoc
+     *
+     * HUMHUB PATCH: On some ICU builds, IntlDateFormatter::parse() (used here in strict/non-lenient
+     * mode, see yii\validators\DateValidator::parseDateValueIntl()) requires an exact character match
+     * for a locale's literal separators - including a "special" space character such as U+202F NARROW
+     * NO-BREAK SPACE that CLDR embeds before a trailing quoted literal, e.g. the "г." year-suffix in
+     * `ru` or "р." in `uk` - while the very same ICU library's own format() output (used by
+     * Yii::$app->formatter->asDate() to render the value the user sees and re-submits, and by the
+     * DatePicker widget when a date is picked) can use a plain space there instead. A value that the
+     * app itself just displayed can therefore fail to parse back. If the raw value fails to parse,
+     * retry after normalizing space variants, so genuinely invalid input is still rejected but this
+     * whitespace mismatch alone no longer blocks a save.
+     *
+     * Since PHP 8.4, IntlDateFormatter::parse() returns the end position of the parsed text in bytes instead
+     * of characters, while yii\validators\DateValidator compares it with mb_strlen(). A value containing
+     * non-ASCII characters (e.g. digits in `fa-IR` or direction marks in `ar`) is therefore rejected although
+     * it was parsed completely. If the raw value fails to parse, retry with the length counted in bytes.
+     *
+     * @param mixed $value
+     * @return int|false
+     */
+    protected function parseDateValue($value)
+    {
+        $result = parent::parseDateValue($value);
+        if ($result !== false || !is_string($value)) {
+            return $result;
+        }
+
+        // (0) PHP 8.4+: the parse position is returned in bytes, so compare it with the byte length of the value.
+        if (Yii::$app !== null && preg_match('/[^\x00-\x7F]/', $value)) {
+            $charset = Yii::$app->charset;
+            Yii::$app->charset = '8bit';
+            try {
+                $result = parent::parseDateValue($value);
+            } finally {
+                Yii::$app->charset = $charset;
+            }
+
+            if ($result !== false) {
+                return $result;
+            }
+        }
+
+        // (a) collapse every "special" space-like character to a plain space - covers the case where
+        // ICU wrote/parse wants a plain space but the value has some other Unicode space variant.
+        $collapsed = preg_replace('/[\x{00A0}\x{2000}-\x{200A}\x{202F}\x{205F}\x{FEFF}]/u', ' ', $value);
+        if ($collapsed !== $value) {
+            $result = parent::parseDateValue($collapsed);
+            if ($result !== false) {
+                return $result;
+            }
+        }
+
+        // (b) promote only the LAST run of plain spaces (closest to a trailing quoted literal, e.g.
+        // the "<year> г." year-suffix in `ru`) to a narrow no-break space and retry - covers the
+        // opposite case, observed on some servers, where parse() specifically requires it there.
+        if (preg_match('/^(.*) ([^ ]*)$/us', $value, $matches)) {
+            $promoted = $matches[1] . "\u{202F}" . $matches[2];
+            if ($promoted !== $value) {
+                $result = parent::parseDateValue($promoted);
+                if ($result !== false) {
+                    return $result;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @inheritdoc
      */
     public function validateAttribute($model, $attribute)
     {
         // If the date is already in system format, we do not need any further translation or parsing
-        if(DateHelper::isInDbFormat($model->$attribute, $this->isDateOnly())) {
+        if (DateHelper::isInDbFormat($model->$attribute, $this->isDateOnly())) {
             return;
         }
 
@@ -78,7 +147,7 @@ class DbDateValidator extends DateValidator
             $this->addError($model, $attribute, $this->tooBig, ['max' => $this->maxString]);
         } else {
             // If there is no error, and attribute is not yet in DB Format - convert to DB
-            $date = new \DateTime(null, new \DateTimeZone('UTC'));
+            $date = new \DateTime('now', new \DateTimeZone('UTC'));
             $date->setTimestamp($timestamp);
 
             if ($timeValue) {
@@ -86,7 +155,7 @@ class DbDateValidator extends DateValidator
                 $date->setTimezone(DateHelper::getSystemTimeZone());
             }
 
-            $targetAttribute = ($this->targetAttribute === null) ? $attribute : $this->targetAttribute;
+            $targetAttribute = $this->targetAttribute ?? $attribute;
 
             if ($this->convertToFormat !== null) {
                 $model->$targetAttribute = $date->format($this->convertToFormat);
@@ -108,20 +177,43 @@ class DbDateValidator extends DateValidator
             return strtotime($value);
         }
 
-        $timestamp = $this->parseDateValue($value);
+        if ($this->hasTime() && !empty($timeValue)) {
+            if (!DateHelper::isInDbFormat($value, true)) {
+                $timestamp = $this->parseDateValue($value);
 
-        if ($timestamp !== false && $this->hasTime() && !empty($timeValue)) {
-            $timestamp += $this->parseTimeValue($timeValue);
-            $timestamp = $this->fixTimestampTimeZone($timestamp, $this->timeZone);
+                if ($timestamp === false) {
+                    return false;
+                }
+
+                $value = (new \DateTimeImmutable('@' . $timestamp))
+                    ->setTimezone(new \DateTimeZone('UTC'))
+                    ->format('Y-m-d');
+            }
+
+            try {
+                $timeValue = (new \DateTimeImmutable($timeValue, new \DateTimeZone('UTC')))->format('H:i:s');
+            } catch (\Exception) {
+                return false;
+            }
+
+            $dateTime = \DateTimeImmutable::createFromFormat(
+                '!Y-m-d H:i:s',
+                $value . ' ' . $timeValue,
+                new \DateTimeZone($this->timeZone),
+            );
+
+            return $dateTime === false
+                ? false
+                : $dateTime->setTimezone(new \DateTimeZone('UTC'))->getTimestamp();
         }
 
-        return $timestamp;
+        return $this->parseDateValue($value);
     }
 
     /**
      * Checks a time attribute name is given, if empty don't handle time
      *
-     * @return boolean
+     * @return bool
      */
     protected function hasTime()
     {
@@ -165,35 +257,4 @@ class DbDateValidator extends DateValidator
         return (new self())->parseDateTimeValue($value, $timeValue);
     }
 
-    /**
-     * Parses given time value (hh:mm) to seconds
-     *
-     * @todo Allow more time formats
-     * @param string $value
-     * @return int time converted to seconds
-     */
-    protected function parseTimeValue($value)
-    {
-        return strtotime($value) - strtotime('TODAY');
-    }
-
-    /**
-     * Converts the given timestamp from user (or configured) timezone to a utc timestamp
-     *
-     * @param int $ts the timestamp
-     * @param String $timeZone users timezone
-     * @return int
-     * @throws \Exception
-     */
-    protected function fixTimestampTimeZone($ts, $timeZone)
-    {
-        // Create date string
-        $fromDateTime = new \DateTime('@' . $ts);
-
-        // Create date object
-        $toDateTime = \DateTime::createFromFormat('Y-m-d H:i:s', $fromDateTime->format('Y-m-d H:i:s'), new \DateTimeZone($timeZone));
-        $toDateTime->setTimezone(new \DateTimeZone('UTC'));
-
-        return $toDateTime->getTimestamp();
-    }
 }

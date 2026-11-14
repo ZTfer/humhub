@@ -1,27 +1,21 @@
 <?php
 
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\dashboard\widgets\DashboardContent;
 use humhub\modules\dashboard\widgets\Sidebar;
-use humhub\modules\directory\widgets\NewMembers;
-use humhub\modules\directory\widgets\NewSpaces;
+use humhub\modules\space\widgets\NewSpaces;
 use humhub\widgets\FooterMenu;
 
 ?>
 
 <?= Html::beginContainer(); ?>
 <div class="row">
-    <div class="col-md-8 layout-content-container">
+    <div class="col-lg-8 layout-content-container">
         <?= DashboardContent::widget(); ?>
     </div>
-    <div class="col-md-4 layout-sidebar-container">
+    <aside class="col-lg-4 layout-sidebar-container" aria-label="<?= Html::encode(Yii::t('base', 'Sidebar')) ?>">
         <?= Sidebar::widget([
             'widgets' => [
-                [
-                    NewMembers::class,
-                    ['showMoreButton' => true],
-                    ['sortOrder' => 300]
-                ],
                 [
                     NewSpaces::class,
                     ['showMoreButton' => true],
@@ -31,6 +25,6 @@ use humhub\widgets\FooterMenu;
         ]);
         ?>
         <?= FooterMenu::widget(['location' => FooterMenu::LOCATION_SIDEBAR]); ?>
-    </div>
+    </aside>
 </div>
 <?= Html::endContainer(); ?>

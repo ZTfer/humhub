@@ -8,11 +8,10 @@
 
 namespace humhub\modules\tour\controllers;
 
-use humhub\modules\space\models\Membership;
+use humhub\components\Controller;
+use humhub\modules\tour\TourConfig;
+use humhub\modules\user\models\User;
 use Yii;
-use yii\web\HttpException;
-use humhub\modules\space\models\Space;
-
 
 /**
  * TourController
@@ -21,12 +20,15 @@ use humhub\modules\space\models\Space;
  * @package humhub.modules_core.tour.controllers
  * @since 0.5
  */
-class TourController extends \humhub\components\Controller
+class TourController extends Controller
 {
-    public function getAccessRules()
+    /**
+     * @inheritdoc
+     */
+    protected function getAccessRules()
     {
         return [
-            ['login']
+            ['login'],
         ];
     }
 
@@ -35,54 +37,21 @@ class TourController extends \humhub\components\Controller
      */
     public function actionTourCompleted()
     {
+        // get Tour ID from the completed tour
+        $tourId = Yii::$app->request->post('tour_id');
 
-        // get section parameter from completed tour
-        $section = Yii::$app->request->post('section');
-
-        if (!in_array($section, Yii::$app->params['tour']['acceptableNames'])) {
+        if (!TourConfig::IsCurrentRouteAcceptable($tourId)) {
             return;
         }
 
         // set tour status to seen for current user
-        Yii::$app->getModule('tour')->settings->user()->set($section, 1);
+        Yii::$app->getModule('tour')->settings->user()->set($tourId, true);
     }
 
     public function actionHidePanel()
     {
         // set tour status to seen for current user
-        Yii::$app->getModule('tour')->settings->user()->set('hideTourPanel', 1);
-    }
-
-    /**
-     *  This is a special case, because we need to find a space to start the tour
-     *
-     * @return \yii\web\Response
-     * @throws HttpException
-     */
-    public function actionStartSpaceTour()
-    {
-
-        $space = null;
-
-        // Loop over all spaces where the user is member
-        foreach (Membership::getUserSpaces() as $space) {
-            if ($space->isAdmin() && !$space->isArchived()) {
-                // If user is admin on this space, it´s the perfect match
-                break;
-            }
-        }
-
-        if ($space === null) {
-            // If user is not member of any space, try to find a public space
-            // to run tour in
-            $space = Space::findOne(['and', ['!=', 'visibility' => Space::VISIBILITY_NONE], ['status' => Space::STATUS_ENABLED]]);
-        }
-
-        if ($space === null) {
-            throw new HttpException(404, 'Could not find any public space to run tour!');
-        }
-
-        return $this->redirect($space->createUrl('/space/space', ['tour' => true]));
+        Yii::$app->getModule('tour')->settings->user()->set('hideTourPanel', true);
     }
 
     /**
@@ -90,19 +59,23 @@ class TourController extends \humhub\components\Controller
      */
     public function actionWelcome()
     {
+        /* @var User $user */
         $user = Yii::$app->user->getIdentity();
-        $profile = $user->profile;
 
-        if ($user->id == 1 && $user->load(Yii::$app->request->post()) && $user->validate() && $user->save()) {
-            if ($profile->load(Yii::$app->request->post()) && $profile->validate() && $profile->save()) {
-                Yii::$app->getModule('tour')->settings->contentContainer($user)->set("welcome", 1);
-                return $this->redirect(['/dashboard/dashboard']);
-            }
+        if (
+            Yii::$app->getModule('tour')->settings->user($user)->get('showWelcome')
+            && $user->load(Yii::$app->request->post())
+            && $user->save(true, ['tagsField'])
+            && ($profile = $user->profile)
+            && $profile->load(Yii::$app->request->post())
+            && $profile->save(true, ['firstname', 'lastname', 'title', 'birthday', 'birthday_hide_year', 'phone_work', 'mobile'])
+        ) {
+            Yii::$app->getModule('tour')->settings->contentContainer($user)->set('welcome', true);
+            return $this->redirect(['/dashboard/dashboard']);
         }
 
         return $this->renderAjax('welcome', [
-                    'user' => $user
+            'user' => $user,
         ]);
     }
-
 }

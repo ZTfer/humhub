@@ -1,24 +1,33 @@
 <?php
 
-use humhub\libs\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\ui\menu\MenuEntry;
+use humhub\modules\ui\menu\widgets\DropdownMenu;
+use humhub\widgets\bootstrap\Button;
 
-/* @var $this \humhub\modules\ui\view\components\View */
-/* @var $menu \humhub\modules\ui\menu\widgets\DropdownMenu */
-/* @var $entries \humhub\modules\ui\menu\MenuEntry[] */
+/* @var $this View */
+/* @var $menu DropdownMenu */
+/* @var $entries MenuEntry[] */
 /* @var $options [] */
 ?>
 
-<?= Html::beginTag('div', $options)?>
-    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true">
-        <?= $menu->label ?>
-        <span class="caret"></span>
-   </button>
+<?= Html::beginTag('div', $options) ?>
+    <?= Button::light($menu->label)
+        ->encodeLabel($menu->encodeLabel)
+        ->icon($menu->icon)
+        ->cssClass('dropdown-toggle')
+        ->options([
+            'data-bs-toggle' => 'dropdown',
+            'aria-label' => $menu->label ?? Yii::t('base', 'Actions'),
+        ])
+        ->loader(false) ?>
 
-    <ul class="dropdown-menu pull-right">
+    <ul class="dropdown-menu dropdown-menu-end">
         <?php foreach ($entries as $entry) : ?>
             <li>
-                <?= $entry->render() ?>
+                <?= $entry->render(['class' => 'dropdown-item']) ?>
             </li>
         <?php endforeach; ?>
     </ul>
-<?= Html::endTag('div')?>
+<?= Html::endTag('div') ?>

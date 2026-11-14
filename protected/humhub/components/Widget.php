@@ -8,20 +8,19 @@
 
 namespace humhub\components;
 
-use Yii;
 use humhub\libs\WidgetCreateEvent;
+use Yii;
 
 /**
  * @inheritdoc
- * @property-read \humhub\modules\ui\view\components\View $view
+ * @property-read \humhub\components\View $view
  */
 class Widget extends \yii\base\Widget
 {
-
     /**
      * @event WidgetCreateEvent an event raised before creating a widget.
      */
-    const EVENT_CREATE = 'create';
+    public const EVENT_CREATE = 'create';
 
     /**
      * @var bool if set to false this widget won't be rendered
@@ -44,7 +43,7 @@ class Widget extends \yii\base\Widget
     public static function widget($config = [])
     {
         if (!isset($config['class'])) {
-            $config['class'] = get_called_class();
+            $config['class'] = static::class;
         }
 
         if (isset($config['render']) && $config['render'] === false) {
@@ -60,7 +59,7 @@ class Widget extends \yii\base\Widget
             $widget = Yii::createObject($config);
             $out = '';
             if ($widget->beforeRun()) {
-                $result = (empty($widget->widgetLayout)) ?  $widget->run() : $widget->render($widget->widgetLayout, $widget->getLayoutViewParams());
+                $result = (empty($widget->widgetLayout)) ? $widget->run() : $widget->render($widget->widgetLayout, $widget->getLayoutViewParams());
                 $out = $widget->afterRun($result);
             }
         } catch (\Throwable $e) {
@@ -84,7 +83,7 @@ class Widget extends \yii\base\Widget
     public function getLayoutViewParams()
     {
         return [
-            'content' => $this->run()
+            'content' => $this->run(),
         ];
     }
 

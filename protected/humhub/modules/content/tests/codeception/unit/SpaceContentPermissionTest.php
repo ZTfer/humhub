@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -14,14 +15,12 @@ use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
 use Codeception\Specify;
 use humhub\modules\post\models\Post;
-
 use humhub\modules\space\models\Space;
 use humhub\modules\content\models\Content;
 use humhub\modules\stream\actions\ContentContainerStream;
 
 class SpaceContentPermissionTest extends HumHubDbTestCase
 {
-
     /**
      *  - User is the owner of the content
      *  - User is system administrator and the content module setting `adminCanEditAllContent` is set to true (default)
@@ -34,7 +33,7 @@ class SpaceContentPermissionTest extends HumHubDbTestCase
     public $publicPost;
     public $space;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
         $this->becomeUser('Admin');
@@ -42,13 +41,19 @@ class SpaceContentPermissionTest extends HumHubDbTestCase
         $this->space->visibility = Space::VISIBILITY_ALL;
         $this->space->save();
 
-        $this->privatePost = new Post;
+        $this->privatePost = new Post();
+        if (version_compare(PHP_VERSION, '7.4', '<')) {
+            $this->privatePost->silentContentCreation = true;
+        }
         $this->privatePost->message = "Private Space1 Post";
         $this->privatePost->content->setContainer($this->space);
         $this->privatePost->content->visibility = Content::VISIBILITY_PRIVATE;
         $this->privatePost->save();
 
-        $this->publicPost = new Post;
+        $this->publicPost = new Post();
+        if (version_compare(PHP_VERSION, '7.4', '<')) {
+            $this->publicPost->silentContentCreation = true;
+        }
         $this->publicPost->message = "Public Space1 Post";
         $this->publicPost->content->setContainer($this->space);
         $this->publicPost->content->visibility = Content::VISIBILITY_PUBLIC;
@@ -183,7 +188,8 @@ class SpaceContentPermissionTest extends HumHubDbTestCase
         $this->assertFalse($this->privatePost->content->canEdit());
     }
 
-    protected function setSpaceVisibility($visibility) {
+    protected function setSpaceVisibility($visibility)
+    {
         $this->space->visibility = $visibility;
         $this->space->save();
     }
@@ -191,7 +197,8 @@ class SpaceContentPermissionTest extends HumHubDbTestCase
     /**
      * Used for resetting the permissionmanager cache etc.
      */
-    protected function reloadPosts() {
+    protected function reloadPosts()
+    {
         $this->privatePost = Post::findOne(['id' => $this->privatePost->id]);
         $this->publicPost = Post::findOne(['id' => $this->publicPost->id]);
     }

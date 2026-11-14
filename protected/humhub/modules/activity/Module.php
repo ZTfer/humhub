@@ -1,28 +1,14 @@
 <?php
 
-/**
- * @link https://www.humhub.org/
- * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
- * @license https://www.humhub.com/licences
- */
-
 namespace humhub\modules\activity;
 
-use Yii;
+use Exception;
+use humhub\helpers\DataTypeHelper;
 use humhub\modules\activity\interfaces\ConfigurableActivityInterface;
+use Yii;
 
-/**
- * Activity BaseModule
- *
- * @author Lucas Bartholemy <lucas@bartholemy.com>
- * @since 0.5
- */
 class Module extends \humhub\components\Module
 {
-
-    /**
-     * @inheritdocs
-     */
     public $resourcesPath = 'resources';
 
     /**
@@ -31,28 +17,35 @@ class Module extends \humhub\components\Module
     public $weeklySummaryDay = 0;
 
     /**
-     * @var boolean enable mail summary feature
+     * @var int day to send monthly summaries on daily cron run (1 = first day of the month)
+     */
+    public $monthlySummaryDay = 1;
+
+    /**
+     * @var bool enable mail summary feature
      * @since 1.4
      */
     public $enableMailSummaries = true;
 
-
-    /**
-     * Returns all configurable Activitiess
-     *
-     * @since 1.2
-     * @return ConfigurableActivityInterface[] a list of configurable activities
-     */
-    public static function getConfigurableActivities()
+    public static function getConfigurableActivities(): array
     {
         $activities = [];
         foreach (Yii::$app->getModules(false) as $moduleId => $module) {
-            $module = Yii::$app->getModule($moduleId);
+            try {
+                $module = Yii::$app->getModule($moduleId);
+            } catch (Exception $ex) {
+                Yii::error(
+                    'Could not load module to determine activites! Module: ' . $moduleId . ' Error: ' . $ex->getMessage(
+                    ),
+                    'activity',
+                );
+                continue;
+            }
+
             if ($module instanceof \humhub\components\Module) {
                 foreach ($module->getActivityClasses() as $class) {
-                    $activity = new $class;
-                    if ($activity instanceof ConfigurableActivityInterface) {
-                        $activities[] = $activity;
+                    if (DataTypeHelper::isClassType($class, ConfigurableActivityInterface::class)) {
+                        $activities[] = $class;
                     }
                 }
             }

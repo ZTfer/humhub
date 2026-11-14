@@ -1,12 +1,10 @@
 <?php
 
-
 namespace humhub\modules\content\widgets\stream;
 
-
+use Exception;
 use humhub\modules\content\components\ContentActiveRecord;
 use humhub\widgets\JsWidget;
-use Yii;
 
 /**
  * This widget class serves as base class for all kind of wall entries.
@@ -16,7 +14,6 @@ use Yii;
  */
 abstract class StreamEntryWidget extends JsWidget
 {
-
     /**
      * @inheritDoc
      */
@@ -59,12 +56,12 @@ abstract class StreamEntryWidget extends JsWidget
     {
         parent::init();
 
-        if(!$this->renderOptions || !is_a($this->renderOptions, $this->renderOptionClass, true)) {
+        if (!$this->renderOptions || !is_a($this->renderOptions, $this->renderOptionClass, true)) {
             $optionClass = $this->renderOptionClass;
             $this->renderOptions = new $optionClass($this->renderOptions);
         } else {
             // Make sure we are using an own instance of renderOptions
-           $this->renderOptions = clone $this->renderOptions;
+            $this->renderOptions = clone $this->renderOptions;
         }
     }
 
@@ -75,49 +72,16 @@ abstract class StreamEntryWidget extends JsWidget
      * @param StreamEntryOptions|null $renderOptions
      * @param array $widgetParams
      * @return string
-     * @throws \Exception
+     * @throws Exception
      */
-    public static function renderStreamEntry(ContentActiveRecord $model, StreamEntryOptions $renderOptions = null, $widgetParams = [])
+    public static function renderStreamEntry(ContentActiveRecord $model, ?StreamEntryOptions $renderOptions = null, $widgetParams = [])
     {
-        if(!is_a($model->wallEntryClass , static::class, true)) {
-            return static::renderLegacyWallEntry($model, $widgetParams);
-        }
-
         $widgetParams['model'] = $model;
         $widgetParams['renderOptions'] = $renderOptions;
-        if($renderOptions && is_a($renderOptions->getStreamEntryWidgetClass(), static::class, true)) {
+        if ($renderOptions && is_a($renderOptions->getStreamEntryWidgetClass(), static::class, true)) {
             $widgetParams['class'] = $renderOptions->getStreamEntryWidgetClass();
         }
-        return call_user_func($model->wallEntryClass.'::widget', $widgetParams);
-    }
-
-    /**
-     * @param ContentActiveRecord $record
-     * @param array $options
-     * @return string
-     * @throws \Exception
-     * @deprecated since 1.7 contains render logic for deprecated WallEntry widget
-     */
-    private static function renderLegacyWallEntry(ContentActiveRecord $record, $options = [])
-    {
-        if(!is_array($options)) {
-            $options = [];
-        }
-
-        if (isset($options['jsWidget'])) {
-            $jsWidget = $options['jsWidget'];
-            unset($options['jsWidget']);
-        } else {
-            $jsWidget = $record->getWallEntryWidget()->jsWidget;
-        }
-
-        $params = [
-            'content' => $record->getWallOut($options),
-            'jsWidget' => $jsWidget,
-            'entry' => $record->content
-        ];
-
-        return Yii::$app->controller->renderPartial('@humhub/modules/content/views/layouts/wallEntry', $params);
+        return call_user_func($model->wallEntryClass . '::widget', $widgetParams);
     }
 
     /**
@@ -129,7 +93,7 @@ abstract class StreamEntryWidget extends JsWidget
             'model' => $this->model,
             'rootElement' => $this->rootElement,
             'bodyLayout' => $this->renderBody(),
-            'options' => $this->getOptions()
+            'options' => $this->getOptions(),
         ]);
     }
 
@@ -143,11 +107,12 @@ abstract class StreamEntryWidget extends JsWidget
         $result = [
             'content-container-id' => $content->contentcontainer_id,
             'stream-entry' => 1,
-            'stream-pinned' => (int) $this->renderOptions->isPinned($this->model),
-            'content-key' => $content->id
+            'stream-pinned' => (int)$this->renderOptions->isPinned($this->model),
+            'content-key' => $content->id,
+            'view-context' => $this->renderOptions->getViewContext(),
         ];
 
-        if($this->renderOptions->isInjected()) {
+        if ($this->renderOptions->isInjected()) {
             $result['stream-injected'] = 1;
         }
 

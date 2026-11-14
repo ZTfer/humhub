@@ -1,0 +1,24 @@
+//
+// Progress bar
+// --------------------------------------------------
+
+@if not $prev-progress {
+    // Bootstrap overwrite: see the progress Sass variables in variables.scss
+
+    .progress {
+        margin-bottom: 15px;
+    }
+
+    .progress-bar-info {
+        background-color: var(--bs-accent);
+        box-shadow: none;
+    }
+
+    //
+    // Pjax page loader bar since 1.2
+    //
+    #nprogress .bar {
+        height: 2px;
+        background: lighten($accent, 8%);
+    }
+}

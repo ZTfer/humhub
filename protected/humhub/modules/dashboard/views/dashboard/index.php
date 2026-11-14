@@ -1,38 +1,38 @@
 <?php
+
 /**
  * @var \humhub\modules\user\models\User $contentContainer
  * @var bool $showProfilePostForm
  */
 
-use humhub\modules\activity\widgets\ActivityStreamViewer;
+use humhub\helpers\Html;
+use humhub\modules\activity\widgets\ActivityBox;
 use humhub\modules\dashboard\widgets\DashboardContent;
 use humhub\modules\dashboard\widgets\Sidebar;
 use humhub\widgets\FooterMenu;
-use humhub\libs\Html;
 
 ?>
 
 <?= Html::beginContainer() ?>
 <div class="row">
-    <div class="col-md-8 layout-content-container">
+    <div class="col-lg-8 layout-content-container">
         <?= DashboardContent::widget([
             'contentContainer' => $contentContainer,
             'showProfilePostForm' => $showProfilePostForm
         ]);
         ?>
     </div>
-    <div class="col-md-4 layout-sidebar-container">
+    <aside class="col-lg-4 layout-sidebar-container" aria-label="<?= Html::encode(Yii::t('base', 'Sidebar')) ?>">
         <?= Sidebar::widget([
             'widgets' => [
                 [
-                    ActivityStreamViewer::class,
-                    ['streamAction' => '/dashboard/dashboard/activity-stream'],
+                    ActivityBox::class, [],
                     ['sortOrder' => 150]
                 ]
             ]
         ]);
         ?>
         <?= FooterMenu::widget(['location' => FooterMenu::LOCATION_SIDEBAR]); ?>
-    </div>
+    </aside>
 </div>
 <?= Html::endContainer() ?>

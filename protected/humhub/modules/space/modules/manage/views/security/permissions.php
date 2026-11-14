@@ -1,8 +1,9 @@
 <?php
 
+use humhub\modules\space\modules\manage\widgets\SecurityTabMenu;
 use humhub\modules\user\widgets\PermisionGridModuleFilter;
 use humhub\modules\user\widgets\PermissionGridEditor;
-use humhub\modules\space\modules\manage\widgets\SecurityTabMenu;
+
 ?>
 
 <div class="panel panel-default">
@@ -15,21 +16,22 @@ use humhub\modules\space\modules\manage\widgets\SecurityTabMenu;
     <?= SecurityTabMenu::widget(['space' => $space]); ?>
 
     <div class="panel-body">
-        <p class="help-block"><?= Yii::t('SpaceModule.manage', 'Permissions are assigned to different user-roles. To edit a permission, select the user-role you want to edit and change the drop-down value of the given permission.'); ?></p>
+        <p class="text-body-secondary"><?= Yii::t('SpaceModule.manage', 'Permissions are assigned to different user-roles. To edit a permission, select the user-role you want to edit and change the drop-down value of the given permission.'); ?></p>
     </div>
 
     <div class="clearfix">
-        <?= PermisionGridModuleFilter::widget() ?>
+        <div class="float-end me-4 mb-2">
+            <?= PermisionGridModuleFilter::widget() ?>
+        </div>
     </div>
 
     <ul id="tabs" class="nav nav-tabs tab-sub-menu permission-group-tabs">
         <?php foreach ($groups as $currentGroupId => $groupLabel) : ?>
-            <li class="<?= ($groupId === $currentGroupId) ? 'active' : '' ?>">
-                <a href='<?= $space->createUrl('permissions', ['groupId' => $currentGroupId]); ?>'><?= $groupLabel ?></a>
+            <li class="nav-item">
+                <a class="nav-link<?= ($groupId === $currentGroupId) ? ' active' : '' ?>" href='<?= $space->createUrl('permissions', ['groupId' => $currentGroupId]); ?>'><?= $groupLabel ?></a>
             </li>
         <?php endforeach; ?>
     </ul>
-
 
 
     <div class="panel-body" style="padding-top: 0px;">

@@ -1,14 +1,14 @@
 <?php
 
-
 namespace humhub\modules\content\widgets;
 
-use humhub\modules\user\controllers\ImageController;
-use Yii;
+use humhub\helpers\Html;
 use humhub\modules\content\components\ContentContainerActiveRecord;
-use humhub\modules\space\models\Space;
 use humhub\modules\content\controllers\ContainerImageController;
+use humhub\modules\space\models\Space;
+use humhub\modules\user\controllers\ImageController;
 use humhub\widgets\JsWidget;
+use Yii;
 
 class ContainerProfileHeader extends JsWidget
 {
@@ -52,8 +52,9 @@ class ContainerProfileHeader extends JsWidget
     {
         parent::init();
 
-        $this->title = $this->container->getDisplayName();
-        $this->subTitle = $this->container->getDisplayNameSub();
+        // HTML encode here and not in the view: https://github.com/humhub/humhub/issues/6952
+        $this->title = Html::encode($this->container->getDisplayName());
+        $this->subTitle = Html::encode($this->container->getDisplayNameSub());
 
         if ($this->container instanceof Space) {
             $this->initSpaceData();
@@ -91,7 +92,7 @@ class ContainerProfileHeader extends JsWidget
         $this->coverUploadName = $this->imageUploadName = 'images[]';
         $this->classPrefix = 'profile';
 
-        if(!Yii::$app->user->isGuest) {
+        if (!Yii::$app->user->isGuest) {
             /** @TODO move this out of ImageController layer... */
             $this->canEdit = ImageController::canEditProfileImage($this->container);
         }
@@ -114,14 +115,14 @@ class ContainerProfileHeader extends JsWidget
             'coverUploadUrl' => $this->coverUploadUrl,
             'imageUploadName' => $this->imageUploadName,
             'coverUploadName' => $this->coverUploadName,
-            'headerControlView' => $this->headerControlView
+            'headerControlView' => $this->headerControlView,
         ]);
     }
 
     public function getAttributes()
     {
         return [
-            'class' => 'panel panel-default panel-profile'
+            'class' => 'panel panel-default panel-profile',
         ];
     }
 }

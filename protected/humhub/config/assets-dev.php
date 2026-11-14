@@ -7,14 +7,14 @@
  */
 
 return [
-    'yii\bootstrap\BootstrapPluginAsset' => [
+    'yii\bootstrap5\BootstrapAsset' => [
+        'css' => [],
+    ],
+    'yii\bootstrap5\BootstrapPluginAsset' => [
         'depends' => [
             'yii\web\JqueryAsset',
-            'yii\bootstrap\BootstrapAsset',
-            'humhub\assets\JuiBootstrapBridgeAsset'
-        ]
-    ],
-    'yii\web\JqueryAsset' => [
-        'sourcePath' => '@npm/jquery/dist',
+            'yii\bootstrap5\BootstrapAsset',
+            'humhub\assets\JuiBootstrapBridgeAsset',
+        ],
     ],
 ];

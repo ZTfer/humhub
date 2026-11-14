@@ -3,9 +3,12 @@
 namespace tests\codeception\_support;
 
 use Codeception\Module;
+use Codeception\TestInterface;
 use humhub\modules\activity\tests\codeception\fixtures\ActivityFixture;
+use humhub\modules\content\tests\codeception\fixtures\ContentContainerSettingFixture;
 use humhub\modules\content\tests\codeception\fixtures\ContentFixture;
 use humhub\modules\file\tests\codeception\fixtures\FileFixture;
+use humhub\modules\file\tests\codeception\fixtures\FileHistoryFixture;
 use humhub\modules\friendship\tests\codeception\fixtures\FriendshipFixture;
 use humhub\modules\live\tests\codeception\fixtures\LiveFixture;
 use humhub\modules\notification\tests\codeception\fixtures\NotificationFixture;
@@ -26,9 +29,6 @@ use yii\test\InitDbFixture;
  */
 class DynamicFixtureHelper extends Module
 {
-
-    public $beforeTest = true;
-
     /**
      * Redeclare visibility because codeception includes all public methods that do not start with "_"
      * and are not excluded by module settings, in actor class.
@@ -43,6 +43,8 @@ class DynamicFixtureHelper extends Module
         getFixture as protected;
     }
 
+    public $beforeTest = true;
+
     public function _beforeSuite($settings = [])
     {
 
@@ -54,7 +56,7 @@ class DynamicFixtureHelper extends Module
         }
     }
 
-     public function _afterSuite($settings = [])
+    public function _afterSuite($settings = [])
     {
         if (!$this->beforeTest) {
             $this->unloadFixtures();
@@ -66,7 +68,7 @@ class DynamicFixtureHelper extends Module
      * to use in acceptance and functional tests.
      * @param array $settings
      */
-    public function _before(\Codeception\TestCase $test)
+    public function _before(TestInterface $test)
     {
         $this->unloadFixtures();
 
@@ -78,7 +80,7 @@ class DynamicFixtureHelper extends Module
     /**
      * Method is called after all suite tests run
      */
-    public function _after(\Codeception\TestCase $test)
+    public function _after(TestInterface $test)
     {
         if ($this->beforeTest) {
             //$this->unloadFixtures();
@@ -123,14 +125,16 @@ class DynamicFixtureHelper extends Module
             'url_oembed' => ['class' => UrlOembedFixture::class],
             'group_permission' => ['class' => GroupPermissionFixture::class],
             'settings' => ['class' => SettingFixture::class],
+            'contentcontainer_settings' => ['class' => ContentContainerSettingFixture::class],
             'space' => [ 'class' => SpaceFixture::class],
             'space_membership' => [ 'class' => SpaceMembershipFixture::class],
             'content' => ['class' => ContentFixture::class],
             'file' => ['class' => FileFixture::class],
+            'file_history' => ['class' => FileHistoryFixture::class],
             'notification' => [ 'class' => NotificationFixture::class],
             'activity' => [ 'class' => ActivityFixture::class],
             'friendship' => ['class' => FriendshipFixture::class],
-            'live' => ['class' => LiveFixture::class]
+            'live' => ['class' => LiveFixture::class],
         ];
     }
 }

@@ -8,12 +8,17 @@
 
 namespace humhub\modules\notification\models\forms;
 
+use humhub\components\Module;
+use humhub\modules\admin\permissions\ManageSettings;
+use humhub\modules\admin\permissions\ManageUsers;
+use humhub\modules\content\models\ContentContainerSetting;
 use humhub\modules\notification\components\NotificationCategory;
+use humhub\modules\notification\components\NotificationManager;
+use humhub\modules\notification\targets\BaseTarget;
+use humhub\modules\user\models\User;
 use Yii;
 use yii\base\Model;
 use yii\web\HttpException;
-use humhub\modules\notification\targets\BaseTarget;
-use humhub\modules\admin\permissions\ManageSettings;
 
 /**
  * Description of NotificationSettings
@@ -22,11 +27,10 @@ use humhub\modules\admin\permissions\ManageSettings;
  */
 class NotificationSettings extends Model
 {
-
     /**
      * Will hold the selected notification settings. Note this will only be filled with selected settings
      * and not with deselected notification settings.
-     * 
+     *
      * @var array
      */
     public $settings = [];
@@ -37,17 +41,12 @@ class NotificationSettings extends Model
     public $spaceGuids = [];
 
     /**
-     * @var \humhub\modules\user\models\User instance for which the settings should by appleid, if null global settings are used.
+     * @var User instance for which the settings should by appleid, if null global settings are used.
      */
     public $user;
 
     /**
-     * @var boolean manage if the user/users should receive desktop notifications. 
-     */
-    public $desktopNotifications;
-
-    /**
-     * @var BaseTarget[] 
+     * @var BaseTarget[]
      */
     protected $_targets;
 
@@ -59,14 +58,10 @@ class NotificationSettings extends Model
         if ($this->user) {
             // Note the user object has to be provided in the model constructor.
             $spaces = Yii::$app->notification->getSpaces($this->user);
-            $this->spaceGuids = array_map(function ($space) {
-                return $space->guid;
-            }, $spaces);
+            $this->spaceGuids = array_map(fn($space) => $space->guid, $spaces);
         } else {
             $this->spaceGuids = Yii::$app->getModule('notification')->settings->getSerialized('sendNotificationSpaces');
         }
-
-        $this->desktopNotifications = Yii::$app->notification->getDesktopNoficationSettings($this->user);
 
         $module = Yii::$app->getModule('notification');
 
@@ -79,8 +74,7 @@ class NotificationSettings extends Model
     public function rules()
     {
         return [
-            ['desktopNotifications', 'integer'],
-            [['settings', 'spaceGuids'], 'safe']
+            [['settings', 'spaceGuids'], 'safe'],
         ];
     }
 
@@ -89,25 +83,19 @@ class NotificationSettings extends Model
      */
     public function attributeLabels()
     {
-        if ($this->user) {
-            $desktopNotificationLabel = Yii::t('NotificationModule.base', 'Receive desktop notifications when you are online.');
-        } else {
-            $desktopNotificationLabel = Yii::t('NotificationModule.base', 'Allow desktop notifications by default.');
-        }
         return [
             'spaceGuids' => Yii::t('NotificationModule.base', 'Receive \'New Content\' Notifications for the following spaces'),
-            'desktopNotifications' => $desktopNotificationLabel
         ];
     }
 
     /**
      * Checks if this form has already been saved before.
-     * @return boolean
+     * @throws \Throwable
      */
-    public function isUserSettingLoaded()
+    public function isTouchedSettings(): bool
     {
         if ($this->user) {
-            return $this->getSettings()->get('notification.like_email') !== null;
+            return NotificationManager::isTouchedSettings($this->user);
         }
 
         return false;
@@ -135,7 +123,7 @@ class NotificationSettings extends Model
 
     /**
      * Returns the field name for the given category/target combination.
-     * 
+     *
      * @param NotificationCategory $category
      * @param BaseTarget $target
      * @return string
@@ -147,9 +135,9 @@ class NotificationSettings extends Model
 
     /**
      * Saves the settings for the given user (or global if no user is given).
-     * 
-     * @return boolean if the save process was successful else false
-     * @throws \yii\web\HttpException
+     *
+     * @return bool if the save process was successful else false
+     * @throws HttpException
      */
     public function save()
     {
@@ -161,11 +149,13 @@ class NotificationSettings extends Model
             return false;
         }
 
-        $this->saveSpaceSettings();
-        Yii::$app->notification->setDesktopNoficationSettings($this->desktopNotifications, $this->user);
         Yii::$app->notification->setSpaces($this->spaceGuids, $this->user);
 
         $settings = $this->getSettings();
+
+        if ($this->user) {
+            $settings->set(NotificationManager::IS_TOUCHED_SETTINGS, true);
+        }
 
         // Save all active settings
         foreach ($this->settings as $settingKey => $value) {
@@ -193,31 +183,9 @@ class NotificationSettings extends Model
         return true;
     }
 
-    /**
-     * Saves the Notificaton Space settings for the given user.
-     * This is skipped if no user is selected (global settings).
-     * 
-     * If the user is already a member of this space this function activates the sending of notifications for
-     * his membership.
-     * 
-     * If the user is already following the space this function activates the sendinf of notification for his follow record.
-     * 
-     * Otherwise a new follow record is created.
-     * 
-     * @return type
-     */
-    private function saveSpaceSettings()
-    {
-        // There is no global space setting right now.
-        if (!$this->user) {
-            return;
-        }
-
-        Yii::$app->notification->setSpaces($this->spaceGuids, $this->user);
-    }
-
     public function getSettings()
     {
+        /** @var Module $module */
         $module = Yii::$app->getModule('notification');
 
         return ($this->user) ? $module->settings->user($this->user) : $module->settings;
@@ -241,6 +209,7 @@ class NotificationSettings extends Model
         }
 
         $settings = $this->getSettings();
+        $settings?->delete(NotificationManager::IS_TOUCHED_SETTINGS);
         foreach ($this->targets() as $target) {
             foreach ($this->categories() as $category) {
                 $settings->delete($target->getSettingKey($category));
@@ -251,4 +220,37 @@ class NotificationSettings extends Model
         return true;
     }
 
+    /**
+     * @return bool
+     */
+    public function canResetAllUsers()
+    {
+        return !isset($this->user) && Yii::$app->user->can(ManageUsers::class);
+    }
+
+    /**
+     * Resets all settings stored for all current user
+     * @throws \Throwable
+     */
+    public function resetAllUserSettings()
+    {
+        $notificationSettings = [NotificationManager::IS_TOUCHED_SETTINGS];
+        foreach ($this->targets() as $target) {
+            foreach ($this->categories() as $category) {
+                $notificationSettings[] = $target->getSettingKey($category);
+            }
+        }
+
+        ContentContainerSetting::deleteAll(['AND',
+            ['module_id' => 'notification'],
+            ['IN', 'name', $notificationSettings],
+        ]);
+
+        Yii::$app->notification->resetSpaces();
+
+        /** @var Module $module */
+        $module = Yii::$app->getModule('notification');
+        $settingsManager = $module->settings->user();
+        $settingsManager?->reload();
+    }
 }

@@ -5,19 +5,34 @@
  * @license https://www.humhub.com/licences
  */
 
+use humhub\helpers\Html;
+use humhub\modules\ui\menu\MenuLink;
+use humhub\widgets\LanguageChooser;
 use humhub\widgets\PoweredBy;
-use yii\helpers\Html;
+
+/* @var $this \humhub\components\View */
+/* @var $entries MenuLink[] */
+/* @var $options array */
+/* @var $menu \humhub\widgets\FooterMenu */
 
 ?>
 
-<?php if ($numItems > 0): ?>
-    <div class="text-center footer-nav">
-        <small>
-            <?php foreach ($items as $item): ?>
-                <?= Html::a($item['label'], $item['url']); ?>&nbsp;&middot;&nbsp;
-            <?php endforeach; ?>
-            <?= PoweredBy::widget(); ?>
-        </small>
-    </div>
-    <br/>
-<?php endif; ?>
+<div class="text-center footer-nav footer-nav-default">
+    <small>
+        <?php foreach ($entries as $k => $entry): ?>
+            <?php if ($entry instanceof MenuLink): ?>
+                <?= Html::a($entry->getLink()->encodeLabel ? Html::encode($entry->getLabel()) : $entry->getLabel(), $entry->getUrl(), $entry->getHtmlOptions()); ?>
+
+                <?php if (!PoweredBy::isHidden() || array_key_last($entries) !== $k): ?>
+                    &nbsp;&middot;&nbsp;
+                <?php endif; ?>
+            <?php endif; ?>
+        <?php endforeach; ?>
+
+        <?= PoweredBy::widget() ?>
+    </small>
+</div>
+<div class="text-center">
+    <?= LanguageChooser::widget() ?>
+</div>
+<br/>

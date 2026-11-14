@@ -2,33 +2,122 @@
 
 namespace tests\codeception\unit\modules\like;
 
+use humhub\modules\comment\models\Comment;
+use humhub\modules\like\activities\LikeActivity;
+use humhub\modules\like\notifications\NewLike;
+use humhub\modules\like\services\LikeService;
+use humhub\modules\post\models\Post;
+use humhub\modules\space\models\Space;
 use Yii;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
 use Codeception\Specify;
 use humhub\modules\like\models\Like;
-use humhub\modules\post\models\Post;
 
 class LikeTest extends HumHubDbTestCase
 {
-
     use Specify;
 
     public function testLikePost()
     {
         $this->becomeUser('User2');
 
-        $like = new Like([
-            'object_model' => Post::class,
-            'object_id' => 1
-        ]);
-        
+        $likeService = new LikeService(Post::findOne(['id' => 1]));
         Yii::$app->getModule('notification')->settings->user(User::findOne(['id' => 1]))->set('notification.like_email', 1);
 
-        $this->assertTrue($like->save(), 'Save like.');
-        $this->assertMailSent(1, 'Like notification sent');
-        $this->assertHasNotification(\humhub\modules\like\notifications\NewLike::class, $like);
-        $this->assertHasActivity(\humhub\modules\like\activities\Liked::class, $like);
+        $this->assertEquals($likeService->getCount(), 0);
+        $this->assertTrue($likeService->like());
+        $this->assertEquals($likeService->getCount(), 1);
+
+        $this->assertMailSent(1);
+        $this->assertHasNotification(NewLike::class, Like::findOne(['content_id' => 1, 'created_by' => 3]));
+        $this->assertHasActivity(LikeActivity::class, Like::findOne(['content_id' => 1, 'created_by' => 3]));
+    }
+
+    public function testNotificationHtmlForPostWithoutText()
+    {
+        $this->becomeUser('User2');
+
+        $post = new Post(['scenario' => Post::SCENARIO_HAS_FILES, 'message' => '']);
+        $post->silentContentCreation = true;
+        $post->content->setContainer(Space::findOne(['id' => 2]));
+        $post->save();
+
+        $likeService = new LikeService($post);
+        $this->assertTrue($likeService->like());
+
+        $like = Like::findOne(['content_id' => $post->content->id, 'created_by' => 3]);
+        $html = NewLike::instance()->from(User::findOne(['id' => 3]))->about($like)->html();
+
+        $this->assertStringEndsWith('likes post.', $html);
+    }
+
+    public function testNotificationUrlPointsToLikedContent()
+    {
+        $this->becomeUser('User2');
+
+        $post = Post::findOne(['id' => 1]);
+        $this->assertTrue((new LikeService($post))->like());
+
+        $like = Like::findOne(['content_id' => $post->content->id, 'created_by' => 3]);
+        $notification = NewLike::instance()->from(User::findOne(['id' => 3]))->about($like);
+
+        $this->assertTrue($notification->hasContent());
+        $this->assertEquals($post->content->id, $notification->getContent()->id);
+        $this->assertEquals($post->content->getUrl(true), $notification->getUrl());
+    }
+
+    public function testNotificationUrlOfCommentLikePointsToComment()
+    {
+        $this->becomeUser('User1');
+
+        $post = Post::findOne(['id' => 1]);
+        $comment = new Comment(['message' => 'Test comment', 'content_id' => $post->content->id]);
+        $this->assertTrue($comment->save());
+
+        $this->becomeUser('User2');
+        $this->assertTrue((new LikeService($comment))->like());
+
+        $like = Like::findOne(['content_id' => $post->content->id, 'created_by' => 3]);
+        $notification = NewLike::instance()->from(User::findOne(['id' => 3]))->about($like);
+
+        $this->assertEquals($comment->getUrl(true), $notification->getUrl());
+    }
+
+    public function testNotificationMailOfCommentLike()
+    {
+        $this->becomeUser('User2');
+
+        $post = new Post(['message' => 'Test post']);
+        $post->silentContentCreation = true;
+        $post->content->setContainer(Space::findOne(['id' => 3]));
+        $this->assertTrue($post->save());
+
+        $this->becomeUser('User1');
+        $comment = new Comment(['message' => 'Test comment', 'content_id' => $post->content->id]);
+        $this->assertTrue($comment->save());
+
+        Yii::$app->getModule('notification')->settings->user(User::findOne(['id' => 2]))->set('notification.like_email', 1);
+
+        $this->becomeUser('User2');
+        $this->assertTrue((new LikeService($comment))->like());
+
+        $this->assertEqualsLastEmailTo('user1@example.com');
+        $this->assertEqualsLastEmailSubject('Sara Tester likes your comment "Test comment".');
+    }
+
+    public function testDeleteLikesOnContentHardDelete()
+    {
+        $this->becomeUser('User2');
+
+        $post = Post::findOne(['id' => 1]);
+        $likeService = new LikeService($post);
+
+        $this->assertTrue($likeService->like());
+        $this->assertNotNull(Like::findOne(['content_id' => $post->content->id]));
+
+        $this->assertTrue($post->hardDelete());
+        $this->assertNull(Like::findOne(['content_id' => $post->content->id]));
     }
 
 }

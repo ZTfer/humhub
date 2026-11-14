@@ -3,13 +3,13 @@
 namespace humhub\modules\admin\models\forms;
 
 use Yii;
+use yii\base\Model;
 
 /**
  * ProxySettingsForm
  */
-class ProxySettingsForm extends \yii\base\Model
+class ProxySettingsForm extends Model
 {
-
     public $enabled;
     public $server;
     public $port;
@@ -25,12 +25,12 @@ class ProxySettingsForm extends \yii\base\Model
         parent::init();
 
         $settingsManager = Yii::$app->settings;
-        $this->enabled = $settingsManager->get('proxy.enabled');
-        $this->server = $settingsManager->get('proxy.server');
-        $this->port = $settingsManager->get('proxy.port');
-        $this->user = $settingsManager->get('proxy.user');
-        $this->password = $settingsManager->get('proxy.password');
-        $this->noproxy = $settingsManager->get('proxy.noproxy');
+        $this->enabled = $settingsManager->get('proxyEnabled');
+        $this->server = $settingsManager->get('proxyServer');
+        $this->port = $settingsManager->get('proxyPort');
+        $this->user = $settingsManager->get('proxyUser');
+        $this->password = $settingsManager->get('proxyPassword');
+        $this->noproxy = $settingsManager->get('proxyNoproxy');
     }
 
     /**
@@ -62,17 +62,17 @@ class ProxySettingsForm extends \yii\base\Model
     /**
      * Saves the form
      *
-     * @return boolean
+     * @return bool
      */
     public function save()
     {
         $settingsManager = Yii::$app->settings;
-        $settingsManager->set('proxy.enabled', $this->enabled);
-        $settingsManager->set('proxy.server', $this->server);
-        $settingsManager->set('proxy.port', $this->port);
-        $settingsManager->set('proxy.user', $this->user);
-        $settingsManager->set('proxy.password', $this->password);
-        $settingsManager->set('proxy.noproxy', $this->noproxy);
+        $settingsManager->set('proxyEnabled', $this->enabled);
+        $settingsManager->set('proxyServer', $this->server);
+        $settingsManager->set('proxyPort', $this->port);
+        $settingsManager->set('proxyUser', $this->user);
+        $settingsManager->set('proxyPassword', $this->password);
+        $settingsManager->set('proxyNoproxy', $this->noproxy);
 
         return true;
     }

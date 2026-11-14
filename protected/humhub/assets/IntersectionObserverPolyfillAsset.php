@@ -21,11 +21,6 @@ class IntersectionObserverPolyfillAsset extends AssetBundle
     /**
      * @inheritdoc
      */
-    public $defaultDepends = false;
-
-    /**
-     * @inheritdoc
-     */
     public $defer = false;
 
     /**
@@ -48,8 +43,8 @@ class IntersectionObserverPolyfillAsset extends AssetBundle
      */
     public $publishOptions = [
         'only' => [
-            'intersection-observer.js'
-        ]
+            'intersection-observer.js',
+        ],
     ];
 
 }

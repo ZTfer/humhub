@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -8,6 +9,7 @@
 
 namespace humhub\modules\ui\filter\widgets;
 
+use Yii;
 use yii\helpers\ArrayHelper;
 
 class CheckboxFilterInput extends FilterInput
@@ -36,6 +38,17 @@ class CheckboxFilterInput extends FilterInput
     /**
      * @inheritdoc
      */
+    protected function initFromRequest()
+    {
+        $filters = Yii::$app->request->get($this->category);
+        if (!empty($filters[$this->id])) {
+            $this->checked = true;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function prepareOptions()
     {
         parent::prepareOptions();
@@ -54,7 +67,7 @@ class CheckboxFilterInput extends FilterInput
         return ArrayHelper::merge(parent::getWidgetOptions(), [
             'checked' => $this->checked,
             'iconActive' => $this->iconActive,
-            'iconInActive' => $this->iconInActive
+            'iconInActive' => $this->iconInActive,
         ]);
     }
 

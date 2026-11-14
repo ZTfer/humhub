@@ -21,7 +21,6 @@ use yii\web\JsExpression;
  */
 class CropProfileImage extends Model
 {
-
     /**
      * @var Int X Coordinates of the area
      */
@@ -77,7 +76,7 @@ class CropProfileImage extends Model
     public $boxWidth = '440';
 
     /**
-     * @var boolean
+     * @var bool
      */
     public $keySupport = true;
 
@@ -116,6 +115,23 @@ class CropProfileImage extends Model
             'onChange' => new JsExpression('function(c){ $("#cropX").val(c.x);$("#cropY").val(c.y);$("#cropW").val(c.w);$("#cropH").val(c.h); }'),
             'keySupport' => $this->keySupport,
         ];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function load($data, $formName = null)
+    {
+        if (parent::load($data, $formName)) {
+            // Make sure the params are integer formatted
+            $this->cropX = intval($this->cropX);
+            $this->cropY = intval($this->cropY);
+            $this->cropW = intval($this->cropW);
+            $this->cropH = intval($this->cropH);
+            return true;
+        }
+
+        return false;
     }
 
 }

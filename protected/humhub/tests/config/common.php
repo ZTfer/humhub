@@ -8,18 +8,39 @@ return [
             'password' => 'root',
             'charset' => 'utf8',
             'attributes' => [
-                PDO::ATTR_PERSISTENT => true
-            ]
+                PDO::ATTR_PERSISTENT => true,
+            ],
+        ],
+        'fs' => [
+            'mounts' => [
+                'assets' => [
+                    'path' => '@webroot/assets/tests',
+                    'baseUrl' => '@web/assets/tests',
+                ],
+                'data' => [
+                    'path' => '@webroot/uploads/tests',
+                ],
+            ],
         ],
         'view' => [
-            'theme' =>
-            [
-                'name' => 'HumHub',
-                'basePath' => '@webroot/themes/HumHub',
+            'theme'
+            => [
+                'name' => \humhub\components\Theme::CORE_THEME_NAME,
+                'basePath' => '@humhub/themes/' . \humhub\components\Theme::CORE_THEME_NAME,
             ],
         ],
         'queue' => [
             'class' => 'humhub\modules\queue\driver\Instant',
+        ],
+        'urlManager' => [
+            'class' => \humhub\components\console\UrlManager::class,
+        ],
+        'captcha' => [
+            'class' => \humhub\components\captcha\YiiCaptcha::class,
+        ],
+        'cache' => [
+            'class' => \yii\caching\FileCache::class,
+            'cachePath' => '@runtime/tests/cache',
         ],
     ],
     'params' => [
@@ -27,55 +48,55 @@ return [
     ],
     'modules' => [
         'user' => [
-            'loginRememberMeDefault' => false
+            'loginRememberMeDefault' => false,
+            'enableRegistrationFormCaptcha' => false,
         ],
         'web' => [
-            'security' =>  [
+            'security' => [
                 "headers" => [
                     "Strict-Transport-Security" => "max-age=31536000",
-                    "X-XSS-Protection" => "1; mode=block",
                     "X-Content-Type-Options" => "nosniff",
                     "X-Frame-Options" => "deny",
                     "Referrer-Policy" => "no-referrer-when-downgrade",
                     "X-Permitted-Cross-Domain-Policies" => "master-only",
-                    "My-Custom-Security-Header" => "test"
+                    "My-Custom-Security-Header" => "test",
                 ],
                 "csp" => [
                     "nonce" => true,
                     "report-only" => false,
                     "report" => false,
                     "default-src" => [
-                        "self" => true
+                        "self" => true,
                     ],
                     "img-src" => [
                         "allow" => [
-                            "*"
-                        ]
+                            "*",
+                        ],
                     ],
                     "font-src" => [
-                        "self" => true
+                        "self" => true,
                     ],
                     "style-src" => [
                         "self" => true,
-                        "unsafe-inline" => true
+                        "unsafe-inline" => true,
                     ],
                     "object-src" => [
-                        'self' => true
+                        'self' => true,
                     ],
                     "frame-src" => [
                         "allow" => [
-                            "*"
-                        ]
+                            "*",
+                        ],
                     ],
                     "script-src" => [
                         "self" => true,
                         "unsafe-inline" => true,
                         "unsafe-eval" => false,
-                        "report-sample" => true
+                        "report-sample" => true,
                     ],
-                    "upgrade-insecure-requests" => true
-                ]
-            ]
-        ]
-    ]
+                    "upgrade-insecure-requests" => true,
+                ],
+            ],
+        ],
+    ],
 ];

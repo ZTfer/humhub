@@ -2,11 +2,10 @@
 
 namespace humhub\modules\ui\form\widgets;
 
-use humhub\components\ActiveRecord;
+use humhub\helpers\Html;
 use Yii;
-use yii\base\Model;
 use yii\db\ActiveQuery;
-use yii\helpers\Html;
+use yii\db\ActiveRecord;
 use yii\helpers\Url;
 
 /**
@@ -48,8 +47,31 @@ abstract class BasePicker extends JsInputWidget
 
     /**
      * Disabled items
+     * @var array
      */
     public $disabledItems;
+
+    /**
+     * Item keys (values of $itemKey, e.g. guids) which are currently selected but which the
+     * current user is not allowed to remove from the selection. The picker will still display
+     * these as selected, but hides their remove ("x") control and refuses client side removal.
+     * Locked items are always rendered first, followed by the removable ones and then, once the
+     * user starts adding more, any newly picked items - a predictable fixed > editable > add
+     * layout, without callers having to sort their selection themselves.
+     *
+     * Note: this is a UX convenience only - it does not replace server side authorization, the
+     * form/controller handling the submitted value still has to enforce this independently.
+     *
+     * @since 1.18.6
+     * @var array
+     */
+    public $lockedItems;
+
+    /**
+     * Disables the picker field
+     * @var bool
+     */
+    public $disabled = false;
 
     /**
      * Default route used for search queries.
@@ -69,21 +91,21 @@ abstract class BasePicker extends JsInputWidget
     /**
      * Maximum amount of selection items.
      *
-     * @var integer
+     * @var int
      */
     public $maxSelection = 50;
 
     /**
-     * Minimum character input before triggering search query.
+     * Minimum characters input before triggering search query.
      *
-     * @var integer
+     * @var int
      */
     public $minInput = 3;
 
     /**
-     * Minimum character input before triggering search query.
+     * Maximum characters input before triggering search query.
      *
-     * @var integer
+     * @var int
      */
     public $maxInput = 20;
 
@@ -113,7 +135,7 @@ abstract class BasePicker extends JsInputWidget
 
     /**
      * The item key used as option value and loading items by attribute value.
-     * e.g. id or guid.
+     * Available values: `id` or `guid`
      *
      * @since v1.3 'id' by default
      *
@@ -125,19 +147,14 @@ abstract class BasePicker extends JsInputWidget
      * If the ActiveForm is set, it will be used to create the picker field,
      * otherwise it's created by Html::activeDropDownList
      *
-     * @var \yii\widgets\ActiveForm
+     * @var \humhub\widgets\form\ActiveForm
      */
     public $form;
 
     /**
-     * @deprecated since 1.2.2 use $name instead
-     */
-    public $formName;
-
-    /**
      * Model instance.
      *
-     * @var \yii\db\ActiveRecord
+     * @var ActiveRecord
      */
     public $model;
 
@@ -189,51 +206,38 @@ abstract class BasePicker extends JsInputWidget
     /**
      * If set to true the picker will be focused automatically.
      *
-     * @var boolean
+     * @var bool
      */
     public $focus = false;
 
     /**
      * @inheritdoc
-     * @var boolean
+     * @var bool
      */
     public $init = true;
 
     /**
      * Used to retrieve the option text of a given $item.
      *
-     * @param \yii\db\ActiveRecord $item selected item
+     * @param ActiveRecord $item selected item
      * @return string item option text
      */
-    protected abstract function getItemText($item);
+    abstract protected function getItemText($item);
 
     /**
      * Used to retrieve the option image url of a given $item.
      *
-     * @param \yii\db\ActiveRecord $item selected item
+     * @param ActiveRecord $item selected item
      * @return string|null image url or null if no selection image required.
      */
-    protected abstract function getItemImage($item);
-
-    /**
-     * @inhertidoc
-     */
-    public function beforeRun()
-    {
-        //Only for compatibility
-        if (empty($this->name)) {
-            $this->name = $this->formName;
-        }
-
-        return parent::beforeRun();
-    }
+    abstract protected function getItemImage($item);
 
     /**
      * @inhertidoc
      */
     public function run()
     {
-        if ($this->selection != null && !is_array($this->selection)) {
+        if ($this->selection !== null && !is_array($this->selection)) {
             $this->selection = [$this->selection];
         }
 
@@ -275,7 +279,7 @@ abstract class BasePicker extends JsInputWidget
      */
     protected function getSelectedOptions()
     {
-        if (!$this->selection && $this->model != null) {
+        if ($this->selection === null && $this->model !== null) {
             $attribute = $this->attribute;
             if (strrpos($attribute, '[') !== false) {
                 $this->selection = $this->loadItems(Html::getAttributeValue($this->model, $attribute));
@@ -284,27 +288,79 @@ abstract class BasePicker extends JsInputWidget
             }
         }
 
-
         if (!$this->selection) {
             $this->selection = [];
         }
 
-        $result = [];
-        foreach ($this->selection as $item) {
-            if (!$item) {
-                continue;
-            }
+        // Note: sorting works on a local copy, $this->selection is a public property owned
+        // by the caller and must not be reordered or re-keyed behind its back.
+        $selection = array_filter($this->selection);
 
+        if (!empty($this->lockedItems)) {
+            $selection = $this->sortLockedItemsFirst($selection);
+        }
+
+        $result = [];
+        foreach ($selection as $item) {
             $result[$this->getItemKey($item)] = $this->buildItemOption($item);
         }
         return $result;
     }
 
     /**
+     * Sorts the given (already selected) $items so that locked items (see $lockedItems) come
+     * first, followed by the removable ones - a predictable "fixed items > editable items >
+     * add new item" layout for every picker that uses $lockedItems, rather than each usage
+     * site having to sort its selection itself. The initial render order of a multi select
+     * picker is fully determined by the order of the underlying <option> elements, so sorting
+     * here is sufficient - no client side reordering is needed.
+     *
+     * usort() is stable since PHP 8, so the relative order within the locked/removable groups
+     * themselves is preserved. Newly added items (picked via search) are unaffected, they are
+     * simply appended after the initial selection by the picker widget on the client.
+     *
+     * @param array $items
+     * @return array
+     */
+    protected function sortLockedItemsFirst(array $items): array
+    {
+        usort($items, function ($a, $b) {
+            return (int)!$this->isLockedItem($a) <=> (int)!$this->isLockedItem($b);
+        });
+
+        return $items;
+    }
+
+    /**
+     * Checks whether the given item is locked, meaning the current user is not allowed to
+     * remove it from the selection again (see $lockedItems).
+     *
+     * Item keys are compared as strings: they end up as <option value> attributes on the
+     * client and are therefore strings there in any case, while $lockedItems is typically
+     * built from model attributes and may well contain integers (e.g. the default
+     * $itemKey = 'id').
+     *
+     * @param mixed $item
+     * @return bool
+     */
+    protected function isLockedItem($item): bool
+    {
+        return in_array((string)$this->getItemKey($item), $this->getLockedItemKeys(), true);
+    }
+
+    /**
+     * @return string[] $lockedItems normalized to strings, see isLockedItem()
+     */
+    protected function getLockedItemKeys(): array
+    {
+        return array_map('strval', (array)$this->lockedItems);
+    }
+
+    /**
      * Responsible for building the option data for an item.
      *
      * @param mixed $item
-     * @param boolean $selected
+     * @param bool $selected
      * @return array
      */
     protected function buildItemOption($item, $selected = true)
@@ -363,17 +419,19 @@ abstract class BasePicker extends JsInputWidget
         return $itemClass::find()->where([$this->itemKey => $selection])->all();
     }
 
-    /*
+    /**
      * @inheritdoc
      */
     protected function getAttributes()
     {
         return [
             'multiple' => 'multiple',
+            'data-multiple' => 'true',
+            'data-tags' => 'true',
             'size' => '1',
             'class' => 'form-control',
             'style' => 'width:100%',
-            'title' => $this->placeholder
+            'title' => $this->placeholder,
         ];
     }
 
@@ -397,10 +455,11 @@ abstract class BasePicker extends JsInputWidget
         $allowMultiple = $this->maxSelection !== 1;
 
         $placeholder = ($this->placeholder != null) ? $this->placeholder : Yii::t('UserModule.chooser', 'Select {n,plural,=1{item} other{items}}', ['n' => ($allowMultiple) ? 2 : 1]);
-        $placeholderMore = ($this->placeholderMore != null) ? $this->placeholderMore : Yii::t('UserModule.chooser', 'Add more...');
+        $placeholderMore = ($this->placeholderMore != null) ? $this->placeholderMore : Yii::t('UserModule.chooser', 'Select...');
 
         $result = [
             'add-options' => $this->addOptions,
+            'item-key' => $this->itemKey,
             'picker-url' => $this->getUrl(),
             'picker-focus' => $this->focus,
             'maximum-selection-length' => $this->maxSelection,
@@ -413,11 +472,17 @@ abstract class BasePicker extends JsInputWidget
             'load-more' => Yii::t('UserModule.chooser', 'Load more'),
             'input-too-short' => Yii::t('UserModule.chooser', 'Please enter at least {n} character', ['n' => $this->minInput]),
             'input-too-long' => Yii::t('UserModule.chooser', 'You reached the maximum number of allowed characters ({n}).', ['n' => $this->maxInput]),
-            'default-results' => $this->getDefaultResultData()
+            'default-results' => $this->getDefaultResultData(),
+            'disabled' => $this->disabled,
         ];
 
-        if(!empty($this->disabledItems)) {
+        if (!empty($this->disabledItems)) {
             $result['disabled-items'] = $this->disabledItems;
+        }
+
+        if (!empty($this->lockedItems)) {
+            $result['locked-items'] = $this->getLockedItemKeys();
+            $result['locked-text'] = Yii::t('UserModule.chooser', 'You are not allowed to remove this item.');
         }
 
         if ($this->maxSelection) {
@@ -442,6 +507,6 @@ abstract class BasePicker extends JsInputWidget
      */
     protected function getUrl()
     {
-        return ($this->url) ? $this->url : Url::to([$this->defaultRoute]);
+        return $this->url ?: Url::to([$this->defaultRoute]);
     }
 }

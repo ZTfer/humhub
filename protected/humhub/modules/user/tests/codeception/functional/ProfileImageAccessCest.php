@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -23,10 +24,10 @@ class ProfileImageAccessCest
 
         $user2 = User::findOne(['id' => 3]);
 
-        $I->amOnRoute('user/profile', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/profile', ['cguid' => $user2->guid]);
         $I->seeElement('.image-upload-buttons');
 
-        $I->amOnRoute('user/image/upload', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/image/upload', ['cguid' => $user2->guid]);
         $I->seeResponseCodeIs(200);
     }
 
@@ -38,10 +39,10 @@ class ProfileImageAccessCest
 
         $user2 = User::findOne(['id' => 3]);
 
-        $I->amOnRoute('user/profile', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/profile', ['cguid' => $user2->guid]);
         $I->dontSeeElement('.image-upload-buttons');
 
-        $I->amOnRoute('user/image/upload', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/image/upload', ['cguid' => $user2->guid]);
         $I->seeInCurrentUrl('login');
     }
 
@@ -55,10 +56,10 @@ class ProfileImageAccessCest
 
         $user2 = User::findOne(['id' => 3]);
 
-        $I->amOnRoute('user/profile', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/profile', ['cguid' => $user2->guid]);
         $I->seeElement('.image-upload-buttons');
 
-        $I->amOnRoute('user/image/upload', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/image/upload', ['cguid' => $user2->guid]);
         $I->seeResponseCodeIs(200);
     }
 
@@ -72,10 +73,10 @@ class ProfileImageAccessCest
 
         $user2 = User::findOne(['id' => 3]);
 
-        $I->amOnRoute('user/profile', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/profile', ['cguid' => $user2->guid]);
         $I->dontSeeElement('.image-upload-buttons');
 
-        $I->amOnRoute('user/image/upload', ['cguid' => $user2->guid]);
+        $I->amOnRoute('/user/image/upload', ['cguid' => $user2->guid]);
         $I->seeInCurrentUrl('login');
     }
 }

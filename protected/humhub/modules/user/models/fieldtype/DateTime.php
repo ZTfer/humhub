@@ -8,8 +8,12 @@
 
 namespace humhub\modules\user\models\fieldtype;
 
-use Yii;
+use DateTimeZone;
+use humhub\helpers\Html;
 use humhub\libs\DbDateValidator;
+use humhub\modules\user\models\Profile;
+use humhub\modules\user\models\User;
+use Yii;
 
 /**
  * ProfileFieldTypeDateTime
@@ -19,11 +23,15 @@ use humhub\libs\DbDateValidator;
  */
 class DateTime extends BaseType
 {
+    /**
+     * @inheritdoc
+     */
+    public $type = 'datetime';
 
     /**
      * Checkbox show also time picker
      *
-     * @var boolean
+     * @var bool
      */
     public $showTimePicker = false;
 
@@ -35,7 +43,7 @@ class DateTime extends BaseType
     public function rules()
     {
         return [
-            [['showTimePicker'], 'in', 'range' => [0, 1]]
+            [['showTimePicker'], 'in', 'range' => [0, 1]],
         ];
     }
 
@@ -47,17 +55,17 @@ class DateTime extends BaseType
     public function getFormDefinition($definition = [])
     {
         return parent::getFormDefinition([
-                    get_class($this) => [
-                        'type' => 'form',
-                        'title' => Yii::t('UserModule.profile', 'Date(-time) field options'),
-                        'elements' => [
-                            'showTimePicker' => [
-                                'type' => 'checkbox',
-                                'label' => Yii::t('UserModule.profile', 'Show date/time picker'),
-                                'class' => 'form-control',
-                            ],
-                        ]
-        ]]);
+            static::class => [
+                'type' => 'form',
+                'title' => Yii::t('UserModule.profile', 'Date(-time) field options'),
+                'elements' => [
+                    'showTimePicker' => [
+                        'type' => 'checkbox',
+                        'label' => Yii::t('UserModule.profile', 'Show date/time picker'),
+                        'class' => 'form-control',
+                    ],
+                ],
+            ]]);
     }
 
     /**
@@ -66,8 +74,8 @@ class DateTime extends BaseType
     public function save()
     {
         $columnName = $this->profileField->internal_name;
-        if (!\humhub\modules\user\models\Profile::columnExists($columnName)) {
-            $query = Yii::$app->db->getQueryBuilder()->addColumn(\humhub\modules\user\models\Profile::tableName(), $columnName, 'DATETIME');
+        if (!Profile::columnExists($columnName)) {
+            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), $columnName, 'DATETIME');
             Yii::$app->db->createCommand($query)->execute();
         }
 
@@ -87,36 +95,40 @@ class DateTime extends BaseType
     }
 
     /**
-     * Return the Form Element to edit the value of the Field
+     * @inheritdoc
      */
-    public function getFieldFormDefinition()
+    public function getFieldFormDefinition(?User $user = null, array $options = []): array
     {
-        return [$this->profileField->internal_name => [
-                'type' => 'datetime',
-                'format' => Yii::$app->formatter->dateInputFormat,
-                'class' => 'form-control',
-                'readonly' => (!$this->profileField->editable),
-                'dateTimePickerOptions' => [
-                    'pickTime' => ($this->showTimePicker)
-                ]
-        ]];
+        return parent::getFieldFormDefinition($user, array_merge([
+            'format' => Yii::$app->formatter->dateInputFormat,
+            'dateTimePickerOptions' => [
+                'pickTime' => ($this->showTimePicker),
+            ],
+        ], $options));
     }
 
     /**
      * @inheritdoc
      */
-    public function getUserValue($user, $raw = true)
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
-
         $internalName = $this->profileField->internal_name;
-        $date = $user->profile->$internalName;
+        $value = $user->profile->$internalName ?? '';
+        $date = \DateTime::createFromFormat(
+            'Y-m-d H:i:s',
+            $value,
+            new DateTimeZone(Yii::$app->formatter->timeZone),
+        );
 
-        if ($date == '' || $date == '0000-00-00 00:00:00')
+        if ($date === false) {
             return '';
+        }
 
-        return \yii\helpers\Html::encode($date);
+        if (!$raw) {
+            $value = Yii::$app->formatter->asDatetime($date, 'long');
+        }
+
+        return $encode ? Html::encode($value) : $value;
     }
 
 }
-
-?>

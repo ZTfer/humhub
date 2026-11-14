@@ -9,7 +9,8 @@ use humhub\modules\user\models\User;
 $text = Yii::t(
     'UserModule.account',
     'You have requested to change your e-mail address.<br>Your new e-mail address is {newemail}.<br><br>To confirm your new e-mail address please click on the button below.',
-    ['{newemail}' => $newEmail]);
+    ['{newemail}' => $newEmail]
+);
 
 $text = str_replace("<br>", "\n", $text);
 ?>
@@ -21,4 +22,4 @@ $text = str_replace("<br>", "\n", $text);
 <?= $text ?>
 
 
-<?= Yii::t('UserModule.account', 'Confirm') ?>: <?= urldecode($approveUrl) ?>
+<?= Yii::t('UserModule.account', 'Confirm') ?>: <?= urldecode((string) $approveUrl) ?>

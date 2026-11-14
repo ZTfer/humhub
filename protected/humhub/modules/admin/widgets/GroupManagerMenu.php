@@ -8,18 +8,20 @@
 
 namespace humhub\modules\admin\widgets;
 
-use Yii;
+use humhub\helpers\ControllerHelper;
+use humhub\modules\admin\permissions\ManageGroups;
+use humhub\modules\user\models\Group;
 use humhub\modules\ui\menu\MenuLink;
 use humhub\modules\ui\menu\widgets\SubTabMenu;
+use Yii;
 
 /**
  * Group Administration Menu
  */
 class GroupManagerMenu extends SubTabMenu
 {
-
     /**
-     * @var \humhub\modules\user\models\Group
+     * @var Group
      */
     public $group;
 
@@ -32,22 +34,23 @@ class GroupManagerMenu extends SubTabMenu
             'label' => Yii::t('AdminModule.user', 'Settings'),
             'url' => ['/admin/group/edit', 'id' => $this->group->id],
             'sortOrder' => 100,
-            'isActive' => MenuLink::isActiveState('admin', 'group', 'edit')
+            'isActive' => ControllerHelper::isActivePath('admin', 'group', 'edit'),
         ]));
 
-        $this->addEntry(new MenuLink([
-            'label' => Yii::t('AdminModule.user', "Permissions"),
-            'url' => ['/admin/group/manage-permissions', 'id' => $this->group->id],
-            'sortOrder' => 200,
-            'isActive' => MenuLink::isActiveState('admin', 'group', 'manage-permissions')
-        ]));
+        if (Yii::$app->user->can(ManageGroups::class)) {
+            $this->addEntry(new MenuLink([
+                'label' => Yii::t('AdminModule.user', 'Permissions'),
+                'url' => ['/admin/group/manage-permissions', 'id' => $this->group->id],
+                'sortOrder' => 200,
+                'isActive' => ControllerHelper::isActivePath('admin', 'group', 'manage-permissions'),
+            ]));
+        }
 
-
         $this->addEntry(new MenuLink([
-            'label' => Yii::t('AdminModule.user', "Members"),
+            'label' => Yii::t('AdminModule.user', 'Members'),
             'url' => ['/admin/group/manage-group-users', 'id' => $this->group->id],
-            'sortOrder' => 200,
-            'isActive' => MenuLink::isActiveState('admin', 'group', 'manage-group-users')
+            'sortOrder' => 300,
+            'isActive' => ControllerHelper::isActivePath('admin', 'group', 'manage-group-users'),
         ]));
 
         parent::init();

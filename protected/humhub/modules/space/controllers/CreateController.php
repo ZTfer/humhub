@@ -8,16 +8,15 @@
 
 namespace humhub\modules\space\controllers;
 
+use Colors\RandomColor;
 use humhub\components\Controller;
 use humhub\components\behaviors\AccessControl;
-use humhub\models\Setting;
-use humhub\modules\content\components\ContentContainerModule;
-use humhub\modules\content\components\ContentContainerModuleManager;
+use humhub\modules\space\models\forms\InviteForm;
 use humhub\modules\space\models\Space;
+use humhub\modules\space\Module;
 use humhub\modules\space\permissions\CreatePrivateSpace;
 use humhub\modules\space\permissions\CreatePublicSpace;
-use humhub\modules\space\models\forms\InviteForm;
-use Colors\RandomColor;
+use humhub\modules\space\permissions\InviteUsers;
 use humhub\modules\user\helpers\AuthHelper;
 use Yii;
 use yii\base\Exception;
@@ -31,7 +30,6 @@ use yii\web\HttpException;
  */
 class CreateController extends Controller
 {
-
     /**
      * @inheritdoc
      */
@@ -45,7 +43,18 @@ class CreateController extends Controller
         return [
             'acl' => [
                 'class' => AccessControl::class,
-            ]
+                'rules' => $this->getAccessRules(),
+            ],
+        ];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function getAccessRules()
+    {
+        return [
+            ['permissions' => [CreatePublicSpace::class, CreatePrivateSpace::class], 'actions' => ['create']],
         ];
     }
 
@@ -61,11 +70,6 @@ class CreateController extends Controller
      */
     public function actionCreate($visibility = null, $skip = 0)
     {
-        // User cannot create spaces (public or private)
-        if (!Yii::$app->user->permissionmanager->can(new CreatePublicSpace) && !Yii::$app->user->permissionmanager->can(new CreatePrivateSpace)) {
-            throw new HttpException(400, 'You are not allowed to create spaces!');
-        }
-
         $model = $this->createSpaceModel();
 
         if ($model->load(Yii::$app->request->post()) && $model->save()) {
@@ -76,13 +80,13 @@ class CreateController extends Controller
         }
 
         $visibilityOptions = [];
-        if (AuthHelper::isGuestAccessEnabled() && Yii::$app->user->permissionmanager->can(new CreatePublicSpace)) {
+        if (AuthHelper::isGuestAccessEnabled() && Yii::$app->user->permissionmanager->can(new CreatePublicSpace())) {
             $visibilityOptions[Space::VISIBILITY_ALL] = Yii::t('SpaceModule.base', 'Public (Members & Guests)');
         }
-        if (Yii::$app->user->permissionmanager->can(new CreatePublicSpace)) {
+        if (Yii::$app->user->permissionmanager->can(new CreatePublicSpace())) {
             $visibilityOptions[Space::VISIBILITY_REGISTERED_ONLY] = Yii::t('SpaceModule.base', 'Public (Members only)');
         }
-        if (Yii::$app->user->permissionmanager->can(new CreatePrivateSpace)) {
+        if (Yii::$app->user->permissionmanager->can(new CreatePrivateSpace())) {
             $visibilityOptions[Space::VISIBILITY_NONE] = Yii::t('SpaceModule.base', 'Private (Invisible)');
         }
 
@@ -104,7 +108,7 @@ class CreateController extends Controller
         $joinPolicyOptions = [
             Space::JOIN_POLICY_NONE => Yii::t('SpaceModule.base', 'Only by invite'),
             Space::JOIN_POLICY_APPLICATION => Yii::t('SpaceModule.base', 'Invite and request'),
-            Space::JOIN_POLICY_FREE => Yii::t('SpaceModule.base', 'Everyone can enter')
+            Space::JOIN_POLICY_FREE => Yii::t('SpaceModule.base', 'Everyone can enter'),
         ];
 
         return $this->renderAjax('create', ['model' => $model, 'visibilityOptions' => $visibilityOptions, 'joinPolicyOptions' => $joinPolicyOptions]);
@@ -117,7 +121,7 @@ class CreateController extends Controller
      */
     protected function createSpaceModel()
     {
-        /* @var \humhub\modules\space\Module $module */
+        /* @var Module $module */
         $module = Yii::$app->getModule('space');
 
         $model = new Space();
@@ -159,6 +163,10 @@ class CreateController extends Controller
             throw new HttpException(404);
         }
 
+        if (!$space->can(InviteUsers::class)) {
+            throw new HttpException(400, 'You are not allowed to invite users to the space!');
+        }
+
         $model = new InviteForm(['space' => $space]);
 
         if ($model->load(Yii::$app->request->post()) && $model->save()) {
@@ -166,9 +174,8 @@ class CreateController extends Controller
         }
 
         return $this->renderAjax('invite', [
-            'canInviteExternal' => $model->canInviteExternal(),
             'model' => $model,
-            'space' => $space
+            'space' => $space,
         ]);
     }
 

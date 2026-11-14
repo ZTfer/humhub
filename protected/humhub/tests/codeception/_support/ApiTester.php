@@ -27,22 +27,22 @@ class ApiTester extends BaseTester
 
     public function amAdmin()
     {
-        $this->amUser('Admin', 'test');
+        $this->amUser('Admin', 'admin&humhub@PASS%worD!');
     }
 
     public function amUser1()
     {
-        $this->amUser('User1', '123qwe');
+        $this->amUser('User1', 'user^humhub@PASS%worD!');
     }
 
     public function amUser2()
     {
-        $this->amUser('User2', '123qwe');
+        $this->amUser('User2', 'user^humhub@PASS%worD!');
     }
 
     public function amUser3()
     {
-        $this->amUser('User3', '123qwe');
+        $this->amUser('User3', 'user^humhub@PASS%worD!');
     }
 
     public function amUser($user = null, $password = null)
@@ -113,9 +113,19 @@ class ApiTester extends BaseTester
      * @param string $url
      * @param array $jsonResults
      * @param array $paginationParams
+     * @param array $urlParams
      */
-    public function seePaginationGetResponse($url, $jsonResults = [], $paginationParams = [])
+    public function seePaginationGetResponse($url, $jsonResults = [], $paginationParams = [], $urlParams = [])
     {
+        $encodedUrlParams = [];
+        foreach ($urlParams as $paramKey => $paramValue) {
+            $encodedUrlParams[] = $paramKey . '=' . urlencode((string) $paramValue);
+        }
+
+        if (!empty($encodedUrlParams)) {
+            $url .= (!str_contains($url, '?') ? '?' : '&') . implode('&', $encodedUrlParams);
+        }
+
         $this->sendGet($url);
         $this->seePaginationResponseContainsJson($url, $jsonResults, $paginationParams);
     }
@@ -176,11 +186,13 @@ class ApiTester extends BaseTester
             'total' => $jsonResultsCount,
             'page' => 1,
             'pages' => $jsonResultsCount ? 1 : 0,
+            'perPage' => 100,
         ], $paginationParams);
 
         $json['links'] = $this->getPaginationUrls($url, $json);
         $json['results'] = $jsonResults;
 
+        unset($json['perPage']);
         $this->seeSuccessResponseContainsJson($json);
     }
 
@@ -188,21 +200,21 @@ class ApiTester extends BaseTester
      * Get pagination URLs, Used to check JSON response
      *
      * @param string $url
-     * @param array $params Possible keys: 'page', 'pages'
+     * @param array $params Possible keys: 'page', 'pages', 'perPage'
      * @return string[]
      */
     protected function getPaginationUrls($url, $params)
     {
-        $links = [Link::REL_SELF => $this->getPaginationUrl($url, $params['page'])];
+        $links = [Link::REL_SELF => $this->getPaginationUrl($url, $params['page'], $params['perPage'])];
 
         if ($params['pages'] > 0) {
-            $links[Pagination::LINK_FIRST] = $this->getPaginationUrl($url, 0);
-            $links[Pagination::LINK_LAST] = $this->getPaginationUrl($url, $params['pages'] - 1);
+            $links[Pagination::LINK_FIRST] = $this->getPaginationUrl($url, 0, $params['perPage']);
+            $links[Pagination::LINK_LAST] = $this->getPaginationUrl($url, $params['pages'] - 1, $params['perPage']);
             if ($params['page'] > 1) {
-                $links[Pagination::LINK_PREV] = $this->getPaginationUrl($url, $params['page'] - 1);
+                $links[Pagination::LINK_PREV] = $this->getPaginationUrl($url, $params['page'] - 1, $params['perPage']);
             }
             if ($params['page'] < $params['pages'] - 1) {
-                $links[Pagination::LINK_NEXT] = $this->getPaginationUrl($url, $params['page'] + 1);
+                $links[Pagination::LINK_NEXT] = $this->getPaginationUrl($url, $params['page'] + 1, $params['perPage']);
             }
         }
 
@@ -212,11 +224,12 @@ class ApiTester extends BaseTester
     /**
      * @param string $url
      * @param int $page
+     * @param int $perPage
      * @return string
      */
-    protected function getPaginationUrl($url, $page = 1)
+    protected function getPaginationUrl($url, $page = 1, $perPage = 100)
     {
-        return '/api/v1/' . trim($url, '/') . '?page=' . (empty($page) ? 1 : $page) . '&per-page=100';
+        return '/api/v1/' . trim($url, '/') . (!str_contains($url, '?') ? '?' : '&') . 'page=' . (empty($page) ? 1 : $page) . '&per-page=' . $perPage;
     }
 
     /**

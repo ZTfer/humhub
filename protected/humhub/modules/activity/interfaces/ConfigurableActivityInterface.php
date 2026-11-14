@@ -19,19 +19,18 @@ namespace humhub\modules\activity\interfaces;
  */
 interface ConfigurableActivityInterface
 {
-
     /**
      * Returns the title of the activity, which is displayed on the configuration page.
      *
      * @return string the title of the activity
      */
-    public function getTitle();
+    public static function getTitle(): string;
 
     /**
      * Returns the description of the activity, which is displayed on the configuration page.
      *
      * @return string the description of the activity
      */
-    public function getDescription();
+    public static function getDescription(): string;
 
 }

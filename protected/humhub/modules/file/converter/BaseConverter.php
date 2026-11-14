@@ -21,7 +21,6 @@ use yii\base\BaseObject;
  */
 abstract class BaseConverter extends BaseObject
 {
-
     /**
      * @var File the file record
      */
@@ -45,8 +44,8 @@ abstract class BaseConverter extends BaseObject
         /** @var Module $module */
         $module = Yii::$app->getModule('file');
 
-        if (!empty($module->converterOptions[get_class($this)])) {
-            Yii::configure($this, $module->converterOptions[get_class($this)]);
+        if (!empty($module->converterOptions[static::class])) {
+            Yii::configure($this, $module->converterOptions[static::class]);
         }
     }
 
@@ -80,7 +79,7 @@ abstract class BaseConverter extends BaseObject
      */
     public function getId()
     {
-        return 'v' . sprintf('%x', crc32(get_class($this) . http_build_query($this->options)));
+        return 'v' . sprintf('%x', crc32(static::class . http_build_query($this->options)));
     }
 
     /**
@@ -90,14 +89,14 @@ abstract class BaseConverter extends BaseObject
      */
     public function getUrl()
     {
-        return $this->file == null ? '' : $this->file->getUrl($this->getFileName());
+        return $this->file == null ? '' : $this->file->getUrl($this->getFilename());
     }
 
     /**
      * Sets file for the converter
      *
-     * @param \humhub\modules\file\models\File $file
-     * @return boolean returns false if file cannot be converted
+     * @param File $file
+     * @return bool returns false if file cannot be converted
      */
     public function applyFile(File $file)
     {

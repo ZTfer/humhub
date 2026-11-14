@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -7,14 +8,14 @@
 
 namespace humhub\modules\user\models\fieldtype;
 
-use humhub\libs\Helpers;
+use humhub\helpers\DataTypeHelper;
+use humhub\helpers\Html;
 use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\ProfileField;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\base\Exception;
 use yii\base\Model;
-use yii\helpers\Html;
 use yii\helpers\Json;
 
 /**
@@ -28,6 +29,28 @@ use yii\helpers\Json;
  */
 class BaseType extends Model
 {
+    /**
+     * @event Event an event raised after init. Can be used to add custom field types.
+     *
+     * Example config.php:
+     *     'events' => [
+     *         [BaseType::class, BaseType::EVENT_INIT, [Events::class, 'onFieldTypesInit']]
+     *     ]
+     *
+     * Example Events.php:
+     *     public static function onFieldTypesInit($event) {
+     *         $event->sender->addFieldType(CustomFieldType::class, "Custom field");
+     *     }
+     *
+     * @since 1.12
+     */
+    public const EVENT_INIT = "fieldTypesInit";
+
+    /**
+     * @var string
+     * @since 1.13.1
+     */
+    public $type = 'text';
 
     /**
      * Holds all profile field types
@@ -46,13 +69,28 @@ class BaseType extends Model
      */
     public $profileField = null;
 
-
     /**
-     * @var boolean is a virtual field (readonly)
+     * @var bool is a virtual field (readonly)
      * @see BaseTypeVirtual
      * @since 1.6
      */
     public $isVirtual = false;
+
+    /**
+     * @var bool can be used as directory filter (readonly)
+     * @since 1.9
+     */
+    public $canBeDirectoryFilter = false;
+
+    /**
+     * @inheritdoc
+     */
+    public function init()
+    {
+        parent::init();
+
+        $this->trigger(self::EVENT_INIT);
+    }
 
     /**
      * Links a ProfileField to the ProfileFieldType.
@@ -88,6 +126,8 @@ class BaseType extends Model
             UserName::class => Yii::t('UserModule.profile', 'Username'),
             UserMemberSince::class => Yii::t('UserModule.profile', 'Creation date of the user'),
             UserLastLogin::class => Yii::t('UserModule.profile', 'Last login date of the user'),
+            UserGroupMemberships::class => Yii::t('UserModule.profile', 'Group memberships'),
+            Template::class => Yii::t('UserModule.profile', 'Template'),
         ], $this->fieldTypes);
 
         return $fieldTypes;
@@ -96,14 +136,14 @@ class BaseType extends Model
     /**
      * Returns additional form field item options for all field types.
      *
-     * @internal
      * @return array
+     * @internal
      */
     final public function getFieldTypeItemOptions()
     {
         $result = [];
         foreach ($this->getFieldTypes() as $field_class => $label) {
-            $result[$field_class] = ['data-hidden-fields' => call_user_func($field_class.'::getHiddenFormFields')];
+            $result[$field_class] = ['data-hidden-fields' => call_user_func($field_class . '::getHiddenFormFields')];
         }
         return $result;
     }
@@ -135,19 +175,18 @@ class BaseType extends Model
     {
         $types = [];
         foreach ($this->getFieldTypes() as $className => $title) {
-            if (Helpers::CheckClassType($className, static::class)) {
-                /** @var BaseType $instance */
-                $instance = new $className;
-                if ($profileField !== null) {
-                    $instance->profileField = $profileField;
+            $className = DataTypeHelper::matchClassType($className, static::class, true);
+            /** @var BaseType $instance */
+            $instance = new $className();
+            if ($profileField !== null) {
+                $instance->profileField = $profileField;
 
-                    // Seems current type, so try load data
-                    if ($profileField->field_type_class == $className) {
-                        $instance->loadFieldConfig();
-                    }
+                // Seems current type, so try load data
+                if ($profileField->field_type_class == $className) {
+                    $instance->loadFieldConfig();
                 }
-                $types[] = $instance;
             }
+            $types[] = $instance;
         }
 
         return $types;
@@ -155,16 +194,19 @@ class BaseType extends Model
 
     /**
      * Return the Form Element to edit the value of the Field
+     *
+     * @param User|null $user If a context exists, the user is passed through here. May be null e.g. when filtering multiple users.
+     * @param array $options Additional options
      * @return array
      */
-    public function getFieldFormDefinition()
+    public function getFieldFormDefinition(?User $user = null, array $options = []): array
     {
         return [
-            $this->profileField->internal_name => [
-                'type' => 'text',
+            $this->profileField->internal_name => array_merge([
+                'type' => $this->type,
                 'class' => 'form-control',
-                'readonly' => (!$this->profileField->editable)
-            ]
+                'readonly' => !$this->profileField->editable,
+            ], $options),
         ];
     }
 
@@ -178,7 +220,7 @@ class BaseType extends Model
      */
     public function getFormDefinition($definition = [])
     {
-        $className = get_class($this);
+        $className = static::class;
         $definition[$className]['class'] = 'fieldTypeSettings ' . str_replace('\\', '_', $className);
 
         return $definition;
@@ -192,7 +234,7 @@ class BaseType extends Model
      *
      * @param ProfileField|null $attributes
      * @param bool $clearErrors
-     * @return boolean
+     * @return bool
      */
     public function validate($attributes = null, $clearErrors = true)
     {
@@ -200,7 +242,7 @@ class BaseType extends Model
         // Bound to a profile field?
         if ($this->profileField != null) {
             // Current Profile Field matches the selected profile field
-            if ($this->profileField->field_type_class == get_class($this)) {
+            if ($this->profileField->field_type_class == static::class) {
                 return parent::validate($attributes, $clearErrors);
             }
         }
@@ -274,7 +316,7 @@ class BaseType extends Model
             $query = $db->getQueryBuilder()->dropColumn(Profile::tableName(), $this->profileField->internal_name);
             $db->createCommand($query)->execute();
         } else {
-            Yii::error('Could not delete profile column - not exists!');
+            Yii::error('Could not delete profile column "' . $columnName . '" - not exists!');
         }
     }
 
@@ -300,7 +342,7 @@ class BaseType extends Model
     {
 
         if ($this->profileField->required) {
-            $rules[] = [$this->profileField->internal_name, 'required'];
+            $rules[] = [$this->profileField->internal_name, 'required', 'except' => Profile::SCENARIO_EDIT_ADMIN];
         }
 
         return $rules;
@@ -311,17 +353,14 @@ class BaseType extends Model
      *
      * @param User $user
      * @param bool $raw
-     * @return string
+     * @param bool $encode
+     * @return string|null
      */
-    public function getUserValue($user, $raw = true)
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
-        $internalName = $this->profileField->internal_name;
+        $value = $user->profile->{$this->profileField->internal_name} ?? '';
 
-        if ($raw) {
-            return $user->profile->$internalName;
-        } else {
-            return Html::encode($user->profile->$internalName);
-        }
+        return $encode ? Html::encode($value) : $value;
     }
 
     /**
@@ -333,8 +372,8 @@ class BaseType extends Model
         return [
             $this->profileField->internal_name => Yii::t(
                 $this->profileField->getTranslationCategory(),
-                $this->profileField->title
-            )
+                $this->profileField->title,
+            ),
         ];
     }
 
@@ -370,5 +409,50 @@ class BaseType extends Model
      */
     public function loadDefaults(Profile $profile)
     {
+    }
+
+    /**
+     * Validate options which must be as associative array with format Key=>Value
+     *
+     * @param string $attribute
+     * @return void
+     */
+    public function validateListOptions(string $attribute): void
+    {
+        if (!is_string($this->$attribute) || $this->$attribute === '') {
+            return;
+        }
+
+        foreach (preg_split('/[\r\n]+/', $this->$attribute) as $option) {
+            if (!str_contains($option, '=>')) {
+                $this->addError($attribute, Yii::t('UserModule.profile', 'Each line must be formatted as Key=>Value!'));
+                return;
+            }
+        }
+    }
+
+    /**
+     * Returns a list of possible options
+     *
+     * @return array
+     */
+    public function getSelectItems(): array
+    {
+        $items = [];
+
+        if (!isset($this->options) || !is_string($this->options)) {
+            return $items;
+        }
+
+        foreach (preg_split('/[\r\n]+/', $this->options) as $option) {
+            if (str_contains($option, '=>')) {
+                [$key, $value] = explode('=>', $option, 2);
+                $items[trim($key)] = Yii::t($this->profileField->getTranslationCategory(), trim($value));
+            } else {
+                $items[trim($option)] = Yii::t($this->profileField->getTranslationCategory(), trim($option));
+            }
+        }
+
+        return $items;
     }
 }

@@ -2,27 +2,31 @@
 
 namespace admin\functional;
 
-use humhub\modules\admin\permissions\ManageModules;
-use humhub\modules\admin\permissions\ManageSpaces;
-use humhub\modules\admin\permissions\SeeAdminInformation;
-use tests\codeception\_pages\AdminPage;
 use admin\FunctionalTester;
+use humhub\modules\admin\permissions\ManageGroups;
+use humhub\modules\admin\permissions\ManageModules;
+use humhub\modules\admin\permissions\ManageSettings;
+use humhub\modules\admin\permissions\ManageSpaces;
+use humhub\modules\admin\permissions\ManageUsers;
+use humhub\modules\admin\permissions\SeeAdminInformation;
+use humhub\modules\user\models\User;
+use tests\codeception\_pages\AdminPage;
+use yii\helpers\Url;
 
 class PermissionCest
 {
-
     public function testSeeAdminInformation(FunctionalTester $I)
     {
         $I->wantTo('ensure that see admin information permission works');
 
-        $I->amUser2();
+        $I->loginUserWithoutGroupManagerPermission();
         $I->amGoingTo('try to access admin page without any permissions');
 
         AdminPage::openBy($I);
         $I->expectTo('see permission denied message');
         $I->seeResponseCodeIs(403);
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->expectTo('see permission denied message');
         $I->see('You are not permitted to access this section.');
 
@@ -38,7 +42,7 @@ class PermissionCest
         $I->dontSee('Settings', '#admin-menu');
         $I->see('Information', '#admin-menu');
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->expect('not to see permission denied message');
         $I->dontSee('You are not permitted to access this section.');
     }
@@ -47,15 +51,15 @@ class PermissionCest
     {
         $I->wantTo('ensure that the manage users permission works as expected');
 
-        $I->amUser2();
+        $I->loginUserWithoutGroupManagerPermission();
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->expectTo('see permission denied message');
         $I->see('You are not permitted to access this section.');
 
-        $I->setGroupPermission(3, new \humhub\modules\admin\permissions\ManageUsers());
+        $I->setGroupPermission(3, new ManageUsers());
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->expectTo('not to see permission denied message');
         $I->see('Add new user');
         $I->see('Profiles');
@@ -66,47 +70,80 @@ class PermissionCest
         $I->dontSee('Settings', '#admin-menu');
         $I->dontSee('Information', '#admin-menu');
 
-        $I->amOnPage(['/admin/user/edit', 'id' => 1]);
-        $I->expectTo('see edit user profile view');
-        $I->see('User administration');
-        $I->dontSee('Groups');
-        $I->dontSee('You are not permitted to access this section.');
+        // A ManageUsers-only holder must not be able to edit the System Administrator's
+        // account (e.g. take it over by changing its e-mail) - see checkUserAccess().
+        $I->amOnRoute('/admin/user/edit', ['id' => 1]);
+        $I->expectTo('be forbidden from editing the System Administrator account');
+        $I->seeResponseCodeIs(403);
+        $I->see('Forbidden');
 
-        $I->amOnPage(['/admin/user-profile']);
+        $I->amOnRoute('/admin/user-profile');
         $I->see('Add new field');
 
-        $I->amOnPage(['/admin/authentication']);
+        $I->amOnRoute('/admin/authentication');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/group']);
+        $I->amOnRoute('/admin/group');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/space']);
+        $I->amOnRoute('/admin/space');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/module']);
+        $I->amOnRoute('/admin/module');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/setting']);
+        $I->amOnRoute('/admin/setting');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->see('You are not permitted to access this section.');
+    }
+
+    public function testManageUsersCannotEnableDisabledSystemAdmin(FunctionalTester $I)
+    {
+        $I->wantTo('ensure that non-admin user managers cannot enable disabled system admins');
+
+        $I->loginUserWithoutGroupManagerPermission();
+        $I->setGroupPermission(3, new ManageUsers());
+
+        $admin = User::findOne(['username' => 'Admin']);
+        $admin->status = User::STATUS_DEACTIVATED;
+        $admin->save(false);
+
+        $I->sendAjaxPostRequest(Url::toRoute(['/admin/user/enable', 'id' => $admin->id]));
+        $I->seeResponseCodeIs(403);
+        $I->seeRecord(User::class, ['id' => $admin->id, 'status' => User::STATUS_DEACTIVATED]);
+    }
+
+    public function testManageUsersCanEnableDisabledNonAdminUser(FunctionalTester $I)
+    {
+        $I->wantTo('ensure that non-admin user managers can still enable disabled non-admin users');
+
+        $I->loginUserWithoutGroupManagerPermission();
+        $I->setGroupPermission(3, new ManageUsers());
+
+        $user = User::findOne(['username' => 'User1']);
+        $user->status = User::STATUS_DEACTIVATED;
+        $user->save(false);
+
+        $I->sendAjaxPostRequest(Url::toRoute(['/admin/user/enable', 'id' => $user->id]));
+        $I->seeResponseCodeIs(302);
+        $I->seeRecord(User::class, ['id' => $user->id, 'status' => User::STATUS_ENABLED]);
     }
 
     public function testCanManageGroups(FunctionalTester $I)
     {
         $I->wantTo('ensure that see manage groups permission works');
 
-        $I->amUser2();
+        $I->loginUserWithoutGroupManagerPermission();
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->expectTo('see permission denied message');
         $I->see('You are not permitted to access this section.');
 
-        $I->setGroupPermission(3, new \humhub\modules\admin\permissions\ManageGroups());
+        $I->setGroupPermission(3, new ManageGroups());
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->expectTo('not to see permission denied message');
         $I->see('Add new user');
         $I->see('Groups');
@@ -117,74 +154,77 @@ class PermissionCest
         $I->dontSee('Settings', '#admin-menu');
         $I->dontSee('Information', '#admin-menu');
 
-        $I->amOnPage(['/admin/user/edit', 'id' => 1]);
-        $I->expectTo('see edit user profile view');
-        $I->see('User administration');
-        $I->see('Groups');
+        // A ManageGroups-only holder must not be able to edit the System Administrator's
+        // account (e.g. take it over by changing its e-mail) - see checkUserAccess().
+        $I->amOnRoute('/admin/user/edit', ['id' => 1]);
+        $I->expectTo('be forbidden from editing the System Administrator account');
+        $I->seeResponseCodeIs(403);
+        $I->see('Forbidden');
+
+        $I->amOnRoute('/admin/group');
         $I->dontSee('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/group']);
-        $I->dontSee('You are not permitted to access this section.');
-
-        $I->amOnPage(['/admin/user-profile']);
+        $I->amOnRoute('/admin/user-profile');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/authentication']);
+        $I->amOnRoute('/admin/authentication');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/space']);
+        $I->amOnRoute('/admin/space');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/module']);
+        $I->amOnRoute('/admin/module');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/setting']);
+        $I->amOnRoute('/admin/setting');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->see('You are not permitted to access this section.');
     }
 
     public function testCanManageSettings(FunctionalTester $I)
     {
-        $I->wantTo('ensure that see manage groups permission works');
+        $I->wantTo('ensure that see manage settings permission works');
 
-        $I->amUser2();
+        $I->loginUserWithoutGroupManagerPermission();
 
-        $I->amOnPage(['/admin/setting']);
+        $I->amOnRoute('/admin/setting');
         $I->expectTo('see permission denied message');
         $I->see('You are not permitted to access this section.');
 
-        $I->setGroupPermission(3, new \humhub\modules\admin\permissions\ManageSettings());
+        $I->setGroupPermission(3, new ManageSettings());
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->expectTo('not to see permission denied message');
         $I->dontSee('Groups');
         $I->see('User Settings');
 
         $I->see('Users', '#admin-menu');
         $I->see('Spaces', '#admin-menu');
-        $I->dontSee('Modules', '#admin-menu');
+        $I->see('Modules', '#admin-menu');
         $I->see('Settings', '#admin-menu');
         $I->dontSee('Information', '#admin-menu');
 
-        $I->amOnPage(['/admin/group']);
+        $I->amOnRoute('/admin/group');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/user-profile']);
+        $I->amOnRoute('/admin/user-profile');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/authentication']);
+        $I->amOnRoute('/admin/authentication');
         $I->dontSee('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/space']);
+        $I->amOnRoute('/admin/space');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('Space Settings');
 
-        $I->amOnPage(['/admin/module']);
-        $I->see('You are not permitted to access this section.');
+        $I->amOnRoute('/admin/module');
+        $I->expectTo('not to see permission denied message');
+        $I->see('Module administration');
+        $I->see('You do not have the permission to manage modules.');
 
-        $I->amOnPage(['/admin/setting']);
+        $I->amOnRoute('/admin/setting');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('General Settings');
         $I->see('Appearance');
@@ -193,86 +233,85 @@ class PermissionCest
         $I->see('Advanced');
         $I->see('General');
 
-        $I->amOnPage(['/admin/setting/design']);
+        $I->amOnRoute('/admin/setting/design');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('Appearance Settings');
 
-        $I->amOnPage(['/notification/admin/defaults']);
+        $I->amOnRoute('/notification/admin/defaults');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('Notification Settings');
 
-        $I->amOnPage(['/activity/admin/defaults']);
+        $I->amOnRoute('/activity/admin/defaults');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('E-Mail Summaries');
 
-        $I->amOnPage(['/admin/setting/caching']);
+        $I->amOnRoute('/admin/setting/file');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('Advanced Settings');
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->see('You are not permitted to access this section.');
     }
 
     public function testCanManageModules(FunctionalTester $I)
     {
-        $I->wantTo('ensure that see manage groups permission works');
+        $I->wantTo('ensure that see manage modules permission works');
 
-        $I->amUser2();
+        $I->loginUserWithoutGroupManagerPermission();
 
-        $I->amOnPage(['/admin/module']);
+        $I->amOnRoute('/admin/module');
         $I->expectTo('see permission denied message');
         $I->see('You are not permitted to access this section.');
 
         $I->setGroupPermission(3, new ManageModules());
 
-        $I->amOnPage(['/admin/module']);
+        $I->amOnRoute('/admin/module');
         $I->expectTo('not to see permission denied message');
         $I->see('Module administration');
+        $I->see('You do not have the permission to configure modules.');
 
-        $I->dontSee('Users', '#admin-menu');
-        $I->dontSee('Spaces', '#admin-menu');
-        $I->see('Modules', '#admin-menu');
-        $I->dontSee('Settings', '#admin-menu');
-        $I->dontSee('Information', '#admin-menu');
+        $I->amOnRoute('/marketplace/browse');
+        $I->see('Marketplace');
+        $I->dontSeeElement('#admin-menu');
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/user/edit', 'id' => 1]);
+        $I->amOnRoute('/admin/user/edit', ['id' => 1]);
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/group']);
+        $I->amOnRoute('/admin/group');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/user-profile']);
+        $I->amOnRoute('/admin/user-profile');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/authentication']);
+        $I->amOnRoute('/admin/authentication');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/space']);
+        $I->amOnRoute('/admin/space');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/setting']);
+        $I->amOnRoute('/admin/setting');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->see('You are not permitted to access this section.');
     }
 
     public function testCanManageSpaces(FunctionalTester $I)
     {
-        $I->wantTo('ensure that see manage groups permission works');
+        $I->wantTo('ensure that see manage spaces permission works');
 
-        $I->amUser2();
+        $I->loginUserWithoutGroupManagerPermission();
 
-        $I->amOnPage(['/admin/space']);
+        $I->amOnRoute('/admin/space');
         $I->expectTo('see permission denied message');
         $I->see('You are not permitted to access this section.');
 
         $I->setGroupPermission(3, new ManageSpaces());
 
-        $I->amOnPage(['/admin/space']);
+        $I->amOnRoute('/admin/space');
         $I->expectTo('see permission denied message');
         $I->dontSee('You are not permitted to access this section.');
         $I->see('Manage spaces');
@@ -282,33 +321,33 @@ class PermissionCest
         $I->dontSee('Settings', '#admin-menu');
         $I->dontSee('Information', '#admin-menu');
 
-        $I->amOnPage(['/space/manage', 'sguid' => '5396d499-20d6-4233-800b-c6c86e5fa34c']);
+        $I->amOnRoute('/space/manage', ['sguid' => '5396d499-20d6-4233-800b-c6c86e5fa34c']);
         $I->see('Space settings');
         $I->see('Basic');
         $I->see('Advanced');
 
-        $I->amOnPage(['/admin/user']);
+        $I->amOnRoute('/admin/user');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/user/edit', 'id' => 1]);
+        $I->amOnRoute('/admin/user/edit', ['id' => 1]);
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/module']);
+        $I->amOnRoute('/admin/module');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/group']);
+        $I->amOnRoute('/admin/group');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/user-profile']);
+        $I->amOnRoute('/admin/user-profile');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/authentication']);
+        $I->amOnRoute('/admin/authentication');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/setting']);
+        $I->amOnRoute('/admin/setting');
         $I->see('You are not permitted to access this section.');
 
-        $I->amOnPage(['/admin/information']);
+        $I->amOnRoute('/admin/information');
         $I->see('You are not permitted to access this section.');
     }
 

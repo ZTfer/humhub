@@ -1,0 +1,140 @@
+// variables.scss, functions.scss and maps.scss are imported separately by the \humhub\helpers\ThemeHelper class
+@import "mixins";
+@import "root";
+
+// TODO: Remove this when Bootstrap 3 is no longer supported
+$prev-bootstrap3: false !default;
+@import "bootstrap3";
+
+// Import base components. Components can be deactivated by $prev-* variables.
+$prev-base: false !default;
+@import "base";
+
+$prev-topbar: false !default;
+@import "topbar";
+
+$prev-login: false !default;
+@import "login";
+
+$prev-dropdown: false !default;
+@import "dropdown";
+
+$prev-media: false !default;
+@import "media";
+
+$prev-installer: false !default;
+@import "installer";
+
+$prev-input-group: false !default;
+@import "input-group";
+
+$prev-pagination: false !default;
+@import "pagination";
+
+$prev-nav: false !default;
+@import "nav";
+
+$prev-button: false !default;
+@import "button";
+
+$prev-link: false !default;
+@import "link";
+
+$prev-form: false !default;
+@import "form";
+
+$prev-notification: false !default;
+@import "notification";
+
+$prev-badge: false !default;
+@import "badge";
+
+$prev-popover: false !default;
+@import "popover";
+
+$prev-profile: false !default;
+@import "profile";
+
+$prev-list: false !default;
+@import "list";
+
+$prev-list-group: false !default;
+@import "list-group";
+
+$prev-modal: false !default;
+@import "modal";
+
+$prev-tooltip: false !default;
+@import "tooltip";
+
+$prev-progress: false !default;
+@import "progress";
+
+$prev-table: false !default;
+@import "table";
+
+$prev-comment: false !default;
+@import "comment";
+
+$prev-gridview: false !default;
+@import "gridview";
+
+$prev-oembed: false !default;
+@import "oembed";
+
+$prev-activities: false !default;
+@import "activities";
+
+$prev-stream: false !default;
+@import "stream";
+
+$prev-space: false !default;
+@import "space";
+
+$prev-file: false !default;
+@import "file";
+
+$prev-tour: false !default;
+@import "tour";
+
+$prev-mentioning: false !default;
+@import "mentioning";
+
+$prev-markdown: false !default;
+@import "markdown";
+
+$prev-sidebar: false !default;
+@import "sidebar";
+
+$prev-datepicker: false !default;
+@import "datepicker";
+
+$prev-user-feedback: false !default;
+@import "user-feedback";
+
+$prev-tags: false !default;
+@import "tags";
+
+$prev-richtext: false !default;
+@import "richtext";
+
+$prev-mobile: false !default;
+@import "mobile";
+
+$prev-icon: false !default;
+@import "icon";
+
+$prev-print: false !default;
+@import "print";
+
+$prev-cards: false !default;
+@import "cards";
+
+$prev-modules: false !default;
+@import "modules";
+
+$prev-search: false !default;
+@import "search";
+
+$prev-select2: false !default;
+@import "select2";

@@ -1,24 +1,30 @@
 <?php
 
-use humhub\libs\Html;
+/**
+ * @link https://www.humhub.org/
+ * @copyright Copyright (c) HumHub GmbH & Co. KG
+ * @license https://www.humhub.com/licences
+ */
+
+use humhub\helpers\Html;
 use humhub\modules\marketplace\models\Licence;
-use humhub\modules\ui\view\components\View;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
 
-/* @var $this View */
 /* @var $licence Licence */
-
 ?>
-<div style="padding:20px" class="jumbotron">
-    <div class="pull-left" style="padding-right:24px">
-        <?= Html::img(Yii::getAlias('@web-static/img/humhub_pro.jpg'), ['style' => 'height:124px']) ?>
+<div class="d-flex flex-wrap">
+    <div class="pe-3 mb-3">
+        <?= Html::img(Yii::$app->assetManager->getPublishedUrl('@humhub/resources') . '/img/hh_professional.png', ['class' => 'hh-about-logo rounded-1']) ?>
     </div>
-    <div class="pull-right">
-        <?= Button::primary(Yii::t('MarketplaceModule.base', 'Edit licence'))
-            ->link(['/marketplace/licence'])->icon('cogs')->sm() ?>
+    <div class="pe-3 mb-3 flex-grow-1">
+        <h4>HumHub Professional Edition</h4>
+        <div class="text-muted"><?= Yii::t('MarketplaceModule.base', 'Version:') . ' ' . Html::encode(Yii::$app->version) ?></div>
+        <div class="text-muted"><?= Yii::t('MarketplaceModule.base', 'Licensed to:') . ' ' . Html::encode($licence->licencedTo) ?></div>
+        <div class="text-muted"><?= Yii::t('MarketplaceModule.base', 'Max. users:') . ' ' . Html::encode($licence->maxUsers) ?></div>
     </div>
-    <span style="font-size:36px">HumHub&nbsp;&nbsp;</span><span style="font-size:24px">Professional Edition</span><br/>
-    <span style="font-size:18px"><?= Yii::t('MarketplaceModule.base', 'Version:') ?> <?=  Html::encode(Yii::$app->version) ?></span><br/>
-    <span style="font-size:18px"><?= Yii::t('MarketplaceModule.base', 'Licenced to:') ?> <?= Html::encode($licence->licencedTo) ?></span><br/>
-    <span style="font-size:18px"><?= Yii::t('MarketplaceModule.base', 'Max. users:') ?> <?=  Html::encode($licence->maxUsers) ?></span><br/>
+    <div class="ms-auto mb-3 flex-sm-grow-0 flex-grow-1">
+        <?= Button::primary(Yii::t('MarketplaceModule.base', 'Edit License'))
+            ->link(['/marketplace/licence'])
+            ->cssClass('w-100') ?>
+    </div>
 </div>

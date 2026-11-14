@@ -1,152 +1,53 @@
 <?php
 
+use humhub\components\Module;
+use humhub\modules\admin\assets\AdminAsset;
+use humhub\modules\admin\models\forms\ModuleSetAsDefaultForm;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
+use humhub\widgets\modal\Modal;
+use humhub\widgets\modal\ModalButton;
+use yii\helpers\Url;
+use yii\web\View;
+
+/**
+ * @var $this View
+ * @var $module Module
+ * @var $model ModuleSetAsDefaultForm
+ */
+
+AdminAsset::register($this);
+
 ?>
 
-<div class="modal-dialog modal-dialog-normal animated fadeIn">
-    <div class="modal-content">
-        <div class="modal-header">
-            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-            <h4 class="modal-title" id="myModalLabel">
-                <?= Yii::t('AdminModule.modules', '%moduleName% - Set as default module', ['%moduleName%' => "<strong>" . $module->getName() . "</strong>"]); ?>
-            </h4>
-        </div>
-        <?php $form = humhub\compat\CActiveForm::begin(); ?>
-        <div class="modal-body">
+<?php $form = Modal::beginFormDialog([
+    'title' => Yii::t('AdminModule.modules', '%moduleName% - Set as default module', ['%moduleName%' => "<strong>" . $module->getName() . "</strong>"]),
+    'footer' => ModalButton::cancel(Yii::t('base', 'Close')) . ' ' . ModalButton::primary(Yii::t('AdminModule.modules', 'Save'))->action('admin.moduleSetAsDefault', Url::to(['/admin/module/set-as-default', 'moduleId' => $module->id])),
+]) ?>
 
-            <p>
-                <?= Yii::t('AdminModule.modules', 'Here you can choose whether or not a module should be automatically activated on a space or user profile. If the module should be activated, choose "always activated".'); ?>
-            </p>
+    <p><?= Yii::t('AdminModule.modules', 'Here you can choose whether or not a module should be automatically activated on a space or user profile. If the module should be activated, choose "always activated".'); ?></p>
+    <br>
 
-            <br>
-
-            <div class="row">
-
-                <?php if ($module->hasContentContainerType(Space::class)) : ?>
-                    <div class="col-md-6">
-                        <label for=""><?= Yii::t('AdminModule.modules', 'Spaces'); ?></label>
-
-                        <div class="radio">
-                            <label>
-                                <?=
-                                $form->radioButton($model, 'spaceDefaultState', [
-                                    'value' => 0,
-                                    'uncheckValue' => null,
-                                    'id' => 'radioSpaceDeactivated',
-                                    'checked' => ($model->spaceDefaultState == 0)]);
-                                ?>
-                                <?= Yii::t('AdminModule.modules', 'Deactivated'); ?>
-                            </label>
-                        </div>
-                        <div class="radio">
-                            <label>
-                                <?=
-                                $form->radioButton($model, 'spaceDefaultState', [
-                                    'value' => 1,
-                                    'uncheckValue' => null,
-                                    'id' => 'radioSpaceActivated',
-                                    'checked' => ($model->spaceDefaultState == 1)
-                                ]);
-                                ?>
-                                <?= Yii::t('AdminModule.modules', 'Activated'); ?>
-                            </label>
-                        </div>
-                        <div class="radio">
-                            <label>
-                                <?=
-                                $form->radioButton($model, 'spaceDefaultState', [
-                                    'value' => 2,
-                                    'uncheckValue' => null,
-                                    'id' => 'radioSpaceAlwaysActivated',
-                                    'checked' => ($model->spaceDefaultState == 2)
-                                ]);
-                                ?>
-                                <?= Yii::t('AdminModule.modules', 'Always activated'); ?>
-                            </label>
-                        </div>
-                        <br>
-                    </div>
-                <?php endif; ?>
-                <?php if ($module->hasContentContainerType(User::class)) : ?>
-                    <div class="col-md-6">
-                        <label for=""><?= Yii::t('AdminModule.modules', 'User Profiles'); ?></label>
-
-                        <div class="radio">
-                            <label>
-                                <?=
-                                $form->radioButton($model, 'userDefaultState', [
-                                    'value' => 0,
-                                    'uncheckValue' => null,
-                                    'id' => 'radioUserDeactivated',
-                                    'checked' => ($model->userDefaultState == 0)
-                                ]);
-                                ?>
-                                <?= Yii::t('AdminModule.modules', 'Deactivated'); ?>
-                            </label>
-                        </div>
-                        <div class="radio">
-                            <label>
-                                <?=
-                                $form->radioButton($model, 'userDefaultState', [
-                                    'value' => 1,
-                                    'uncheckValue' => null,
-                                    'id' => 'radioUserActivated',
-                                    'checked' => ($model->userDefaultState == 1)
-                                ]);
-                                ?>
-                                <?= Yii::t('AdminModule.modules', 'Activated'); ?>
-                            </label>
-                        </div>
-                        <div class="radio">
-                            <label>
-                                <?=
-                                $form->radioButton($model, 'userDefaultState', [
-                                    'value' => 2,
-                                    'uncheckValue' => null,
-                                    'id' => 'radioUserAlwaysActivated',
-                                    'checked' => ($model->userDefaultState == 2)
-                                ]);
-                                ?>
-                                <?= Yii::t('AdminModule.modules', 'Always activated'); ?>
-                            </label>
-                        </div>
-                        <br>
-                    </div>
-                <?php endif; ?>
+    <div class="row">
+        <?php if ($module->hasContentContainerType(Space::class)) : ?>
+            <div class="col-lg-6">
+                <?= $form->field($model, 'spaceDefaultState')->radioList($model->getStatesList())
+                    ->label(Yii::t('AdminModule.modules', 'Spaces')); ?>
             </div>
-        </div>
-        <div class="modal-footer">
+        <?php endif; ?>
 
-            <?=
-            \humhub\widgets\AjaxButton::widget([
-                'label' => Yii::t('AdminModule.modules', 'Save'),
-                'ajaxOptions' => [
-                    'type' => 'POST',
-                    'beforeSend' => new yii\web\JsExpression('function(){ setModalLoader(); }'),
-                    'success' => new yii\web\JsExpression('function(html){ $("#globalModal").html(html); }'),
-                    'url' => \yii\helpers\Url::to(['/admin/module/set-as-default', 'moduleId' => $module->id]),
-                ],
-                'htmlOptions' => [
-                    'class' => 'btn btn-primary'
-                ]
-            ]);
-            ?>
-            <button type="button" class="btn btn-primary" data-dismiss="modal">
-                <?= Yii::t('AdminModule.modules', 'Close'); ?>
-            </button>
-
-            <?=
-            \humhub\widgets\LoaderWidget::widget([
-                'id' => 'default-loader',
-                'cssClass' => 'loader-modal hidden'
-            ]);
-            ?>
-
-        </div>
-
-        <?php humhub\compat\CActiveForm::end(); ?>
-
+        <?php if ($module->hasContentContainerType(User::class)) : ?>
+            <div class="col-lg-6">
+                <?= $form->field($model, 'userDefaultState')->radioList($model->getStatesList())
+                    ->label(Yii::t('AdminModule.modules', 'Users')); ?>
+            </div>
+        <?php endif; ?>
+        <br>
+        <?php if ($model->mustConfirmModuleDeactivation()) : ?>
+            <div class="col-lg-12">
+                <?= $form->field($model, 'moduleDeactivationConfirmed')->checkbox() ?>
+            </div>
+        <?php endif; ?>
     </div>
-</div>
 
+<?php Modal::endFormDialog(); ?>

@@ -9,39 +9,44 @@
 namespace humhub\modules\user\models;
 
 use humhub\components\ActiveRecord;
-use humhub\libs\Helpers;
+use humhub\helpers\DataTypeHelper;
 use humhub\modules\user\models\fieldtype\BaseType;
 use Yii;
+use yii\base\Exception;
+use yii\base\InvalidConfigException;
 use yii\db\ActiveQuery;
+use yii\helpers\ArrayHelper;
 
 /**
  * This is the model class for table "profile_field".
  *
- * @property integer $id
- * @property integer $profile_field_category_id
+ * @property int $id
+ * @property int $profile_field_category_id
  * @property string $module_id
  * @property string $field_type_class
  * @property string $field_type_config
  * @property string $internal_name
  * @property string $title
  * @property string $description
- * @property integer $sort_order
- * @property integer $required
- * @property integer $show_at_registration
- * @property integer $editable
- * @property integer $visible
+ * @property int $sort_order
+ * @property int $required
+ * @property int $show_at_registration
+ * @property int $editable
+ * @property int $visible
  * @property string $created_at
- * @property integer $created_by
+ * @property int $created_by
  * @property string $updated_at
- * @property integer $updated_by
+ * @property int $updated_by
  * @property string $ldap_attribute
  * @property string $translation_category
- * @property integer $is_system
- * @property integer $searchable
+ * @property int $is_system
+ * @property int $searchable
+ * @property int $directory_filter
+ *
+ * @property-read BaseType $fieldType
  */
 class ProfileField extends ActiveRecord
 {
-
     /**
      * Field Type Instance
      *
@@ -64,16 +69,26 @@ class ProfileField extends ActiveRecord
     {
         return [
             [['profile_field_category_id', 'field_type_class', 'internal_name', 'title', 'sort_order'], 'required'],
-            [['profile_field_category_id', 'required', 'editable', 'searchable', 'show_at_registration', 'visible', 'sort_order'], 'integer'],
+            [['profile_field_category_id', 'required', 'editable', 'searchable', 'show_at_registration', 'visible', 'sort_order', 'directory_filter'], 'integer'],
             [['module_id', 'field_type_class', 'title'], 'string', 'max' => 255],
             ['internal_name', 'string', 'max' => 100],
             [['ldap_attribute', 'translation_category'], 'string', 'max' => 255],
+            [['translation_category'], 'validateTranslationCategory'],
             ['internal_name', 'checkInternalName'],
             ['internal_name', 'match', 'not' => true, 'pattern' => '/[^a-zA-Z0-9_]/', 'message' => Yii::t('UserModule.profile', 'Only alphanumeric characters allowed!')],
             ['internal_name', 'match', 'pattern' => '/[a-zA-Z]/', 'message' => Yii::t('UserModule.profile', 'Must contain at least one character.')],
             ['field_type_class', 'checkType'],
             [['description'], 'safe'],
         ];
+    }
+
+    public function validateTranslationCategory($attribute)
+    {
+        try {
+            Yii::$app->i18n->getMessageSource($this->translation_category);
+        } catch (InvalidConfigException $e) {
+            $this->addError($attribute, $e->getMessage());
+        }
     }
 
     /**
@@ -103,6 +118,7 @@ class ProfileField extends ActiveRecord
             'translation_category' => Yii::t('UserModule.profile', 'Translation Category ID'),
             'required' => Yii::t('UserModule.profile', 'Required'),
             'searchable' => Yii::t('UserModule.profile', 'Searchable'),
+            'directory_filter' => Yii::t('UserModule.profile', 'Use as Directory filter'),
             'title' => Yii::t('UserModule.profile', 'Title'),
             'description' => Yii::t('UserModule.profile', 'Description'),
             'sort_order' => Yii::t('UserModule.profile', 'Sort order'),
@@ -142,20 +158,23 @@ class ProfileField extends ActiveRecord
      * Returns the ProfileFieldType Class for this Profile Field
      *
      * @return BaseType
-     * @throws \yii\base\Exception
+     * @throws Exception
      */
-    public function getFieldType()
+    public function getFieldType(): ?BaseType
     {
-
-        if ($this->_fieldType != null)
+        if ($this->_fieldType != null) {
             return $this->_fieldType;
+        }
 
-        if ($this->field_type_class != "" && Helpers::CheckClassType($this->field_type_class, fieldtype\BaseType::class)) {
-            $type = $this->field_type_class;
-            $this->_fieldType = new $type;
+        if (
+            $this->field_type_class != ''
+            && $type = DataTypeHelper::matchClassType($this->field_type_class, fieldtype\BaseType::class, true)
+        ) {
+            $this->_fieldType = new $type();
             $this->_fieldType->setProfileField($this);
             return $this->_fieldType;
         }
+
         return null;
     }
 
@@ -169,6 +188,7 @@ class ProfileField extends ActiveRecord
         $categories = ProfileFieldCategory::find()->orderBy('sort_order')->all();
         $profileFieldTypes = new fieldtype\BaseType();
         $isVirtualField = (!$this->isNewRecord && $this->getFieldType()->isVirtual);
+        $canBeDirectoryFilter = (!$this->isNewRecord && $this->getFieldType()->canBeDirectoryFilter);
 
         return [
             'ProfileField' => [
@@ -206,30 +226,34 @@ class ProfileField extends ActiveRecord
                         'type' => 'text',
                         'maxlength' => 255,
                         'class' => 'form-control',
-                        'isVisible' => (!$isVirtualField)
+                        'isVisible' => (!$isVirtualField),
                     ],
                     'required' => [
                         'type' => 'checkbox',
-                        'isVisible' => (!$isVirtualField)
+                        'isVisible' => (!$isVirtualField),
                     ],
                     'visible' => [
                         'type' => 'checkbox',
                     ],
                     'show_at_registration' => [
                         'type' => 'checkbox',
-                        'isVisible' => (!$isVirtualField)
+                        'isVisible' => (!$isVirtualField),
                     ],
                     'editable' => [
                         'type' => 'checkbox',
-                        'isVisible' => (!$isVirtualField)
+                        'isVisible' => (!$isVirtualField),
                     ],
                     'searchable' => [
                         'type' => 'checkbox',
-                        'isVisible' => (!$isVirtualField)
+                        'isVisible' => (!$isVirtualField),
+                    ],
+                    'directory_filter' => [
+                        'type' => 'checkbox',
+                        'isVisible' => ($canBeDirectoryFilter),
                     ],
                     'profile_field_category_id' => [
                         'type' => 'dropdownlist',
-                        'items' => \yii\helpers\ArrayHelper::map($categories, 'id', 'title'),
+                        'items' => ArrayHelper::map($categories, 'id', 'title'),
                         'class' => 'form-control',
                     ],
                     'field_type_class' => [
@@ -239,7 +263,7 @@ class ProfileField extends ActiveRecord
                         'class' => 'form-control',
                         'readonly' => !$this->isNewRecord, // Cannot be changed for existing record
                     ],
-                ]
+                ],
             ]];
     }
 
@@ -278,7 +302,6 @@ class ProfileField extends ActiveRecord
     {
 
         if (!$this->isNewRecord) {
-
             // Dont allow changes of internal_name - Maybe not the best way to check it.
             $currentProfileField = ProfileField::findOne(['id' => $this->id]);
             if ($this->field_type_class != $currentProfileField->field_type_class) {
@@ -286,7 +309,7 @@ class ProfileField extends ActiveRecord
             }
         } else {
             $profileFieldTypes = new fieldtype\BaseType();
-            if (!key_exists($this->field_type_class, $profileFieldTypes->getFieldTypes())) {
+            if (!array_key_exists($this->field_type_class, $profileFieldTypes->getFieldTypes())) {
                 $this->addError('field_type_class', Yii::t('UserModule.profile', 'Invalid field type!'));
             }
         }
@@ -295,14 +318,13 @@ class ProfileField extends ActiveRecord
     /**
      * Returns the users value for this profile field.
      *
-     * @param type $user
-     * @param type $raw
-     *
-     * @return type
+     * @param User $user
+     * @param bool $raw
+     * @return string|null
      */
-    public function getUserValue(User $user, $raw = true)
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
-        return $this->fieldType->getUserValue($user, $raw);
+        return $this->fieldType->getUserValue($user, $raw, $encode);
     }
 
     /**
@@ -320,5 +342,4 @@ class ProfileField extends ActiveRecord
 
         return "UserModule.profile";
     }
-
 }

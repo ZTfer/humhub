@@ -1,21 +1,20 @@
 <?php
 
-use yii\db\Migration;
+use humhub\components\Migration;
 use yii\db\Expression;
 
 class m160508_005740_settings_cleanup extends Migration
 {
-
     public function up()
     {
-        $this->dropColumn('setting', 'created_at');
-        $this->dropColumn('setting', 'created_by');
-        $this->dropColumn('setting', 'updated_at');
-        $this->dropColumn('setting', 'updated_by');
-        $this->alterColumn('setting', 'value', \yii\db\Schema::TYPE_TEXT);
+        $this->safeDropColumn('setting', 'created_at');
+        $this->safeDropColumn('setting', 'created_by');
+        $this->safeDropColumn('setting', 'updated_at');
+        $this->safeDropColumn('setting', 'updated_by');
+        $this->safeAlterColumn('setting', 'value', \yii\db\Schema::TYPE_TEXT);
 
         $this->update('setting', ['value' => new Expression('value_text')], 'value IS NULL and value_text IS NOT NULL');
-        $this->dropColumn('setting', 'value_text');
+        $this->safeDropColumn('setting', 'value_text');
         $this->createIndex('unique-setting', 'setting', ['name', 'module_id']);
 
         // Ensure default module_id is base
@@ -54,15 +53,15 @@ class m160508_005740_settings_cleanup extends Migration
         $this->update('setting', ['name' => 'cache.expireTime', 'module_id' => 'base'], ['module_id' => 'cache', 'name' => 'expireTime']);
 
         // Fix mail settings module id
-        $this->update('setting', ['name' => 'mailer.transportType', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'transportType']);
-        $this->update('setting', ['name' => 'mailer.hostname', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'hostname']);
-        $this->update('setting', ['name' => 'mailer.username', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'username']);
-        $this->update('setting', ['name' => 'mailer.password', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'password']);
-        $this->update('setting', ['name' => 'mailer.port', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'port']);
-        $this->update('setting', ['name' => 'mailer.encryption', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'encryption']);
-        $this->update('setting', ['name' => 'mailer.allowSelfSignedCerts', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'allowSelfSignedCerts']);
-        $this->update('setting', ['name' => 'mailer.systemEmailAddress', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'systemEmailAddress']);
-        $this->update('setting', ['name' => 'mailer.systemEmailName', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'systemEmailName']);
+        $this->update('setting', ['name' => 'mailerTransportType', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'transportType']);
+        $this->update('setting', ['name' => 'mailerHostname', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'hostname']);
+        $this->update('setting', ['name' => 'mailerUsername', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'username']);
+        $this->update('setting', ['name' => 'mailerPassword', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'password']);
+        $this->update('setting', ['name' => 'mailerPort', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'port']);
+        $this->update('setting', ['name' => 'mailerEncryption', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'encryption']);
+        $this->update('setting', ['name' => 'mailerAllowSelfSignedCerts', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'allowSelfSignedCerts']);
+        $this->update('setting', ['name' => 'mailerSystemEmailAddress', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'systemEmailAddress']);
+        $this->update('setting', ['name' => 'mailerSystemEmailName', 'module_id' => 'base'], ['module_id' => 'mailing', 'name' => 'systemEmailName']);
         $this->update('setting', ['name' => 'receive_email_activities', 'module_id' => 'activity'], ['name' => 'receive_email_activities']);
         $this->update('setting', ['name' => 'receive_email_notifications', 'module_id' => 'notification'], ['name' => 'receive_email_notifications']);
 

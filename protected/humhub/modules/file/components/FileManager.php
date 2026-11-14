@@ -8,10 +8,16 @@
 
 namespace humhub\modules\file\components;
 
-use humhub\modules\search\libs\SearchHelper;
+use humhub\components\ActiveRecord;
+use humhub\components\behaviors\PolymorphicRelation;
+use humhub\modules\comment\models\Comment;
+use humhub\modules\content\components\ContentActiveRecord;
+use humhub\modules\content\services\ContentSearchService;
+use humhub\modules\file\models\File;
 use Yii;
 use yii\base\Component;
-use humhub\modules\file\models\File;
+use yii\db\ActiveQuery;
+use yii\helpers\ArrayHelper;
 
 /**
  * FileManager
@@ -22,9 +28,8 @@ use humhub\modules\file\models\File;
  */
 class FileManager extends Component
 {
-
     /**
-     * @var \humhub\components\ActiveRecord
+     * @var ActiveRecord
      */
     public $record;
 
@@ -33,7 +38,7 @@ class FileManager extends Component
      * This is required when uploaded before the related content is saved.
      *
      * @param string|array|File $files of File records or comma separeted list of file guids or single File record
-     * @param boolean $steal steal when already assigned to other record
+     * @param bool $steal steal when already assigned to other record
      */
     public function attach($files, $steal = false)
     {
@@ -65,23 +70,47 @@ class FileManager extends Component
                 continue;
             }
 
-            $file->updateAttributes([
-                'object_model' => get_class($this->record),
+            // Standalone files are managed exclusively by the module/code that created
+            // them and must never be attachable through the generic fileList mechanism -
+            // this is not overridable via $steal.
+            if ($file->standalone) {
+                Yii::warning('Attempted to attach a standalone file: ' . $file->guid);
+                continue;
+            }
+
+            // A file may only be attached by its own creator by default, matching the
+            // ownership rule already enforced by File::canView() and ShareIntendController.
+            if (!$steal && $file->created_by != Yii::$app->user->id) {
+                Yii::warning('Attempted to attach file created by another user: ' . $file->guid);
+                continue;
+            }
+
+            $attributes = [
+                'object_model' => PolymorphicRelation::getObjectModel($this->record),
                 'object_id' => $this->record->getPrimaryKey(),
-            ]);
+            ];
+
+            if ($this->record instanceof ContentActiveRecord || $this->record instanceof Comment) {
+                $attributes['content_id'] = $this->record->content->id;
+            }
+
+            $file->updateAttributes($attributes);
         }
 
-        SearchHelper::queueUpdate($this->record);
+        if ($this->record instanceof ContentActiveRecord) {
+            (new ContentSearchService($this->record->content))->update();
+        }
+
     }
 
     /**
      * File find query
      *
-     * @return \yii\db\ActiveQuery file find query
+     * @return ActiveQuery file find query
      */
     public function find()
     {
-        return File::find()->andWhere(['object_id' => $this->record->getPrimaryKey(), 'object_model' => get_class($this->record)]);
+        return File::find()->andWhere(['object_id' => $this->record->getPrimaryKey(), 'object_model' => PolymorphicRelation::getObjectModel($this->record)]);
     }
 
     /**
@@ -104,10 +133,18 @@ class FileManager extends Component
      */
     public function findStreamFiles($showInStream = true)
     {
-        if ($showInStream) {
-            return $this->find()->andWhere(['show_in_stream' => 1])->all();
+        if ($this->record->isRelationPopulated('files')) {
+            return ArrayHelper::getValue(
+                ArrayHelper::index($this->record->files, null, 'show_in_stream'),
+                +$showInStream,
+                [],
+            );
         } else {
-            return $this->find()->andWhere(['show_in_stream' => 0])->all();
+            if ($showInStream) {
+                return $this->find()->andWhere(['show_in_stream' => 1])->all();
+            } else {
+                return $this->find()->andWhere(['show_in_stream' => 0])->all();
+            }
         }
     }
 }

@@ -2,17 +2,12 @@
 
 namespace admin\functional;
 
-use humhub\modules\admin\permissions\ManageModules;
-use humhub\modules\admin\permissions\ManageSpaces;
-use humhub\modules\admin\permissions\SeeAdminInformation;
-use humhub\modules\user\models\Invite;
-use tests\codeception\_pages\AdminPage;
 use admin\FunctionalTester;
+use humhub\modules\user\models\Invite;
 use Yii;
 
 class ApprovalCest
 {
-
     public function testApproveByAdmin(FunctionalTester $I)
     {
         $I->wantTo('ensure that admins can approve users');
@@ -64,7 +59,7 @@ class ApprovalCest
         $I->dontSee('approvalTest@test.de');
 
         // This user was created by fixtures
-        $I->see('unnapproved@example.com');
+        $I->see('unapproved@example.com');
 
         // Try to approve the user of another group
         $I->amOnRoute('/admin/approval/approve', ['id' => 8]);
@@ -97,19 +92,19 @@ class ApprovalCest
 
     private function register(FunctionalTester $I)
     {
-        $I->amOnRoute('/user/auth/login');
+        $I->amOnRoute('/user/auth/register');
         $I->see('Sign up');
         $I->fillField('#register-email', 'approvalTest@test.de');
-        $I->click('Register');
-        $I->see('Registration successful!');
+        $I->click('Send');
+        $I->see('Almost there!');
 
         $invte = Invite::find()->all()[0];
 
         $I->amOnRoute('/user/registration', ['token' => $invte->token]);
         $I->see('Account registration');
         $I->fillField(['name' => 'User[username]'], 'approvalTest');
-        $I->fillField(['name' => 'Password[newPassword]'], 'approva1TestPassword');
-        $I->fillField(['name' => 'Password[newPasswordConfirm]'], 'approva1TestPassword');
+        $I->fillField(['name' => 'Password[newPassword]'], 'approval^humhub@PASS%worD!');
+        $I->fillField(['name' => 'Password[newPasswordConfirm]'], 'approval^humhub@PASS%worD!');
         $I->fillField(['name' => 'Profile[firstname]'], 'approval');
         $I->fillField(['name' => 'Profile[lastname]'], 'test');
 
@@ -135,7 +130,7 @@ class ApprovalCest
         $I->click('Send & save');
 
         $I->logout();
-        $I->amUser('approvalTest', 'approva1TestPassword');
+        $I->amUser('approvalTest', 'approval^humhub@PASS%worD!');
         $I->seeElement('#wallStream');
     }
 

@@ -8,15 +8,18 @@
 
 namespace humhub\modules\file\libs;
 
-use humhub\modules\file\widgets\FileDownload;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\libs\MimeHelper;
-use humhub\modules\file\models\File;
-use humhub\modules\file\handler\FileHandlerCollection;
-use humhub\modules\file\handler\DownloadFileHandler;
-use humhub\modules\file\converter\PreviewImage;
 use humhub\modules\content\components\ContentActiveRecord;
+use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\file\converter\PreviewImage;
+use humhub\modules\file\handler\DownloadFileHandler;
+use humhub\modules\file\handler\FileHandlerCollection;
+use humhub\modules\file\models\File;
+use humhub\modules\file\Module;
+use humhub\modules\file\widgets\FileDownload;
 use Yii;
+use yii\helpers\Inflector;
 use yii\helpers\Url;
 
 /**
@@ -27,21 +30,30 @@ use yii\helpers\Url;
  */
 class FileHelper extends \yii\helpers\FileHelper
 {
-
     /**
      * Checks if given fileName has a extension
-     * 
+     *
      * @param string $fileName the filename
-     * @return boolean has extension
+     * @return bool has extension
      */
     public static function hasExtension($fileName)
     {
-        return (strpos($fileName, '.') !== false);
+        /**
+         * suggested alternative:
+         * `return pathinfo($file, PATHINFO_FILENAME) && pathinfo($file, PATHINFO_EXTENSION);`
+         * of
+         * `
+         * $path_parts = pathinfo($file);
+         * return ($path_parts['filename'] ?? false) && ($path_parts['extension'] ?? false);
+         * `
+         * @see \humhub\tests\codeception\unit\libs\FileHelperTest::testHasExtensionFalsePositives()
+         */
+        return (str_contains($fileName, '.'));
     }
 
     /**
      * Returns the extension of a file
-     * 
+     *
      * @param string|File $fileName the filename or File model
      * @return string the extension
      */
@@ -51,43 +63,85 @@ class FileHelper extends \yii\helpers\FileHelper
             $fileName = $fileName->file_name;
         }
 
-        $fileParts = pathinfo($fileName);
-        if (isset($fileParts['extension'])) {
-            return $fileParts['extension'];
+        if (!is_string($fileName)) {
+            return '';
         }
 
-        return '';
+        $fileParts = pathinfo($fileName);
+
+        return $fileParts['extension'] ?? '';
+    }
+
+    /**
+     * Returns a `Content-Disposition` header value that is safe to use with both old and new
+     * browsers, built the same way [[\yii\web\Response::sendFile()]] builds it.
+     *
+     * Needed whenever a download is not served by the response itself and the header has to be
+     * handed to something else - e.g. [[\humhub\modules\file\actions\DownloadAction]] passing it
+     * into a temporary storage URL, where the object key carries no usable file name.
+     * [[\yii\web\Response::getDispositionHeaderValue()]] does the same but is protected.
+     *
+     * @param string $disposition `attachment` or `inline`
+     * @param string $fileName the file name presented to the browser
+     * @return string the header value
+     * @since 1.19
+     */
+    public static function getContentDispositionHeaderValue(string $disposition, string $fileName): string
+    {
+        $fallbackName = str_replace(
+            ['%', '/', '\\', '"', "\x7F"],
+            ['_', '_', '_', '\\"', '_'],
+            Inflector::transliterate($fileName, Inflector::TRANSLITERATE_LOOSE),
+        );
+        $utfName = rawurlencode(str_replace(['%', '/', '\\'], '', $fileName));
+
+        $header = "$disposition; filename=\"$fallbackName\"";
+        if ($utfName !== $fallbackName) {
+            $header .= "; filename*=utf-8''$utfName";
+        }
+
+        return $header;
     }
 
     /**
      * Creates a file with options
-     * 
-     * @since 1.2
-     * @param \humhub\modules\file\models\File $file
+     *
+     * @param File $file
      * @return string the rendered HTML link
+     * @since 1.2
      */
     public static function createLink(File $file, $options = [], $htmlOptions = [])
     {
-        $label = (isset($htmlOptions['label'])) ? $htmlOptions['label'] : Html::encode($file->fileName);
+        $label = $htmlOptions['label'] ?? Html::encode($file->file_name);
 
-        $fileHandlers = FileHandlerCollection::getByType([FileHandlerCollection::TYPE_VIEW, FileHandlerCollection::TYPE_EXPORT, FileHandlerCollection::TYPE_EDIT, FileHandlerCollection::TYPE_IMPORT], $file);
+        $fileHandlers = FileHandlerCollection::getByType(
+            [
+                FileHandlerCollection::TYPE_VIEW,
+                FileHandlerCollection::TYPE_EXPORT,
+                FileHandlerCollection::TYPE_EDIT,
+                FileHandlerCollection::TYPE_IMPORT,
+            ],
+            $file,
+        );
         if (count($fileHandlers) === 1 && $fileHandlers[0] instanceof DownloadFileHandler) {
             $htmlOptions['target'] = '_blank';
-            $htmlOptions = array_merge($htmlOptions,  FileDownload::getFileDataAttributes($file));
+            $htmlOptions = array_merge($htmlOptions, FileDownload::getFileDataAttributes($file));
             return Html::a($label, $file->getUrl(), $htmlOptions);
         }
 
-        $htmlOptions = array_merge($htmlOptions, ['data-target' => '#globalModal']);
+        $htmlOptions = array_merge($htmlOptions, ['data-bs-target' => '#globalModal']);
 
-        return Html::a($label, Url::to(['/file/view', 'guid' => $file->guid]), $htmlOptions);
+        $urlOptions = ['/file/view', 'guid' => $file->guid];
+
+        return Html::a($label, Url::to($urlOptions), $htmlOptions);
     }
 
     /**
      * Determines the content container of a File record
-     * 
-     * @since 1.2
+     *
      * @param File $file
-     * @return \humhub\modules\content\components\ContentContainerActiveRecord the content container or null
+     * @return ContentContainerActiveRecord the content container or null
+     * @since 1.2
      */
     public static function getContentContainer(File $file)
     {
@@ -105,10 +159,10 @@ class FileHelper extends \yii\helpers\FileHelper
     /**
      * Returns general file infos as array
      * These information are mainly used by the frontend JavaScript application to handle files.
-     * 
-     * @since 1.2
+     *
      * @param File $file the file
      * @return array the file infos
+     * @since 1.2
      */
     public static function getFileInfos(File $file)
     {
@@ -128,8 +182,36 @@ class FileHelper extends \yii\helpers\FileHelper
             'url' => $file->getUrl(),
             'relUrl' => $file->getUrl(null, false),
             'openLink' => FileHelper::createLink($file),
-            'thumbnailUrl' => $thumbnailUrl
+            'thumbnailUrl' => $thumbnailUrl,
         ];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function getExtensionsByMimeType($mimeType, $magicFile = null)
+    {
+        $extensionsByMimeType = parent::getExtensionsByMimeType($mimeType, $magicFile);
+
+        /* @var Module $module */
+        $module = Yii::$app->getModule('file');
+        if (isset($module->additionalMimeTypes) && is_array($module->additionalMimeTypes)) {
+            foreach ($module->additionalMimeTypes as $additionalExtension => $additionalMimeType) {
+                if ($additionalMimeType === $mimeType) {
+                    $extensionsByMimeType[] = $additionalExtension;
+                }
+            }
+        }
+
+        return $extensionsByMimeType;
+    }
+
+    public static function getTempFile()
+    {
+        $tempDir = Yii::getAlias('@runtime/temp');
+        FileHelper::createDirectory($tempDir);
+
+        return tempnam($tempDir, 'tmf');
     }
 
 }

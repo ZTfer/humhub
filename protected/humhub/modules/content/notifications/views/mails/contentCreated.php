@@ -4,29 +4,33 @@
 /* @var $viewable humhub\modules\content\notifications\ContentCreated */
 /* @var $url string */
 /* @var $date string */
-/* @var $isNew boolean */
-/* @var $isNew boolean */
+/* @var $isNew bool */
 /* @var $originator \humhub\modules\user\models\User */
-/* @var source yii\db\ActiveRecord */
-/* @var contentContainer \humhub\modules\content\components\ContentContainerActiveRecord */
-/* @var space humhub\modules\space\models\Space */
-/* @var record \humhub\modules\notification\models\Notification */
-/* @var html string */
-/* @var text string */
+/* @var $source yii\db\ActiveRecord */
+/* @var $contentContainer ContentContainerActiveRecord */
+/* @var $space humhub\modules\space\models\Space */
+
+/* @var $record Notification */
+
+use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\notification\models\Notification;
+use humhub\widgets\mails\MailButtonList;
+
 ?>
-<?php $this->beginContent('@notification/views/layouts/mail.php', $_params_); ?>
+<?php $this->beginContent('@notification/views/layouts/mail.php') ?>
 
-    <?= humhub\widgets\mails\MailContentEntry::widget([
-        'originator' => $originator,
-        'content' => $viewable->source,
-        'date' => $date,
-        'space' => $space
-    ]) ?>
+<?= humhub\widgets\mails\MailContentEntry::widget([
+    'originator' => $originator,
+    'receiver' => $record->user,
+    'content' => $viewable->source,
+    'date' => $date,
+    'space' => $space
+]) ?>
 
-    <?= \humhub\widgets\mails\MailButtonList::widget([
-        'buttons' => [
-            humhub\widgets\mails\MailButton::widget(['url' => $url, 'text' => Yii::t('ContentModule.notifications', 'View Online')])
-        ]
-    ]) ?>
+<?= MailButtonList::widget([
+    'buttons' => [
+        humhub\widgets\mails\MailButton::widget(['url' => $url, 'text' => Yii::t('ContentModule.notifications', 'View Online')])
+    ]
+]) ?>
 
 <?php $this->endContent();

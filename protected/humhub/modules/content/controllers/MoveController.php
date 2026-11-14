@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: kingb
@@ -8,9 +9,8 @@
 
 namespace humhub\modules\content\controllers;
 
-
 use HttpException;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\content\components\ContentContainerController;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\models\forms\MoveContentForm;
@@ -34,7 +34,7 @@ class MoveController extends ContentContainerController
                 'success' => true,
                 'id' => $id,
                 'target' => $form->getTargetContainer()->id,
-                'message' => Yii::t('ContentModule.base', 'Content has been moved to {spacename}', ['spacename' => Html::encode($form->getTargetContainer()->getDisplayName())])
+                'message' => Yii::t('ContentModule.base', 'Content has been moved to {spacename}', ['spacename' => Html::encode($form->getTargetContainer()->getDisplayName())]),
             ]);
         }
 

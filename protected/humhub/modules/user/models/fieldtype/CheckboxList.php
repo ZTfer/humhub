@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -8,10 +9,10 @@
 
 namespace humhub\modules\user\models\fieldtype;
 
+use humhub\helpers\Html;
 use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
 use Yii;
-use yii\helpers\Html;
 
 /**
  * CheckboxList profile field for selecting multiple options.
@@ -20,6 +21,11 @@ use yii\helpers\Html;
  */
 class CheckboxList extends BaseType
 {
+    /**
+     * @inheritdoc
+     */
+    public $type = 'checkboxlist';
+
     /**
      * All possible options.
      * One entry per line.
@@ -30,15 +36,41 @@ class CheckboxList extends BaseType
     public $options;
 
     /**
+     * @inerhitdoc
+     */
+    public $canBeDirectoryFilter = true;
+
+    /**
      * Allow other selection
-     * @var boolean
+     * @var bool
      */
     public $allowOther;
 
     /**
      * @var string
      */
-    public $other_value;
+    public $other;
+
+    /**
+     * Delimiter used to join/split multi values when stored in the profile column.
+     *
+     * This is intentionally a class constant, not a configurable property: nothing in
+     * the admin UI exposes changing it, there is no migration path for already stored
+     * values if it were changed, and other consumers (e.g. {@see \humhub\modules\user\components\PeopleQuery})
+     * rely on it being fixed.
+     *
+     * @since 1.18.4
+     */
+    public const MULTI_VALUE_DELIMITER = "\n";
+
+    /**
+     * Returns the name of the profile column that stores the "Other:" value entered by
+     * users for a CheckboxList field with the given internal name.
+     */
+    public static function getOtherColumnName(string $internalName): string
+    {
+        return $internalName . '_other_selection';
+    }
 
     /**
      * @inheritdoc
@@ -46,7 +78,8 @@ class CheckboxList extends BaseType
     public function rules()
     {
         return [
-            [['options', 'other'], 'safe'],
+            [['options'], 'validateListOptions'],
+            [['other'], 'safe'],
             [['allowOther'], 'integer'],
         ];
     }
@@ -59,7 +92,7 @@ class CheckboxList extends BaseType
     public function getFormDefinition($definition = [])
     {
         return parent::getFormDefinition([
-            get_class($this) => [
+            static::class => [
                 'type' => 'form',
                 'title' => Yii::t('UserModule.profile', 'Select field options'),
                 'elements' => [
@@ -67,15 +100,15 @@ class CheckboxList extends BaseType
                         'type' => 'textarea',
                         'label' => Yii::t('UserModule.profile', 'Possible values'),
                         'class' => 'form-control autosize',
-                        'hint' => Yii::t('UserModule.profile', 'One option per line. Key=>Value Format (e.g. yes=>Yes)')
+                        'hint' => Yii::t('UserModule.profile', 'One option per line. Key=>Value Format (e.g. yes=>Yes)'),
                     ],
                     'allowOther' => [
                         'type' => 'checkbox',
                         'label' => Yii::t('UserModule.profile', 'Allow other selection'),
                         'class' => 'form-control',
-                        'hint' => Yii::t('UserModule.profile', 'This will add an additional input element for custom values')
-                    ]
-                ]
+                        'hint' => Yii::t('UserModule.profile', 'This will add an additional input element for custom values'),
+                    ],
+                ],
             ]]);
     }
 
@@ -86,10 +119,10 @@ class CheckboxList extends BaseType
     {
         $columnName = $this->profileField->internal_name;
         if (!Profile::columnExists($columnName)) {
-            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), $columnName . '_other_selection', 'VARCHAR(255)');
+            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), self::getOtherColumnName($columnName), 'VARCHAR(255)');
             Yii::$app->db->createCommand($query)->execute();
 
-            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), $columnName, 'VARCHAR(255)');
+            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), $columnName, 'TEXT');
             Yii::$app->db->createCommand($query)->execute();
         }
 
@@ -100,33 +133,28 @@ class CheckboxList extends BaseType
     {
         // Try create column name
         if (Profile::columnExists($this->profileField->internal_name)) {
-            $sql = "ALTER TABLE profile DROP `" . $this->profileField->internal_name . "_other_selection`;";
+            $sql = "ALTER TABLE profile DROP `" . self::getOtherColumnName($this->profileField->internal_name) . "`;";
             Yii::$app->db->createCommand($sql)->execute();
 
             $sql = "ALTER TABLE profile DROP `" . $this->profileField->internal_name . "`;";
             Yii::$app->db->createCommand($sql)->execute();
         }
 
-        return parent::delete();
+        parent::delete();
     }
 
     /**
-     * Return the Form Element to edit the value of the Field
+     * @inheritdoc
      */
-    public function getFieldFormDefinition()
+    public function getFieldFormDefinition(?User $user = null, array $options = []): array
     {
-        $result = [
-            $this->profileField->internal_name => [
-                'type' => 'checkboxlist',
-                'delimiter' => "\n",
-                'class' => 'form-control',
-                'items' => $this->getSelectItems(),
-                'readonly' => (!$this->profileField->editable),
-            ]
-        ];
+        $result = parent::getFieldFormDefinition($user, array_merge([
+            'delimiter' => self::MULTI_VALUE_DELIMITER,
+            'items' => $this->getSelectItems(),
+        ], $options));
 
         if ($this->allowOther) {
-            $result[$this->profileField->internal_name . '_other_selection'] = [
+            $result[self::getOtherColumnName($this->profileField->internal_name)] = [
                 'type' => 'text',
                 'class' => 'form-control',
                 'label' => false,
@@ -140,29 +168,17 @@ class CheckboxList extends BaseType
     public function beforeProfileSave($values)
     {
         if (is_array($values)) {
-            return implode("\n", $values);
+            return implode(self::MULTI_VALUE_DELIMITER, $values);
         }
         return $values;
     }
 
     /**
-     * Returns a list of possible options
-     *
-     * @return array
+     * @inheritdoc
      */
-    public function getSelectItems()
+    public function getSelectItems(): array
     {
-        $items = [];
-
-        foreach (explode("\n", $this->options) as $option) {
-            if (strpos($option, "=>") !== false) {
-                list($key, $value) = explode("=>", $option);
-                $items[trim($key)] = Yii::t($this->profileField->getTranslationCategory(), trim($value));
-            } else {
-                $items[trim($option)] = Yii::t($this->profileField->getTranslationCategory(), trim($option));
-            }
-
-        }
+        $items = parent::getSelectItems();
 
         if ($this->allowOther) {
             $items['other'] = Yii::t('UserModule.profile', 'Other:');
@@ -172,36 +188,30 @@ class CheckboxList extends BaseType
     }
 
     /**
-     * Returns value of option
-     *
-     * @param User $user
-     * @param Boolean $raw Output Key
-     * @return String
+     * @inheritdoc
      */
-    public function getUserValue($user, $raw = true)
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
         $internalName = $this->profileField->internal_name;
-        $internalNameOther = $internalName . '_other_selection';
+        $internalNameOther = self::getOtherColumnName($internalName);
 
         $value = $user->profile->$internalName;
-        if (!$raw) {
-
+        if (!$raw && $value !== null) {
             $options = $this->getSelectItems();
             $translatedValues = [];
             if (is_string($value)) {
-                $value = explode("\n", $value);
+                $value = explode(self::MULTI_VALUE_DELIMITER, $value);
             }
             foreach ($value as $v) {
                 if ($v === 'other' && !empty($user->profile->$internalNameOther)) {
-                    $translatedValues[] = Html::encode($user->profile->$internalNameOther);
+                    $translatedValues[] = $user->profile->$internalNameOther;
                 } elseif (isset($options[$v])) {
-                    $translatedValues[] = Html::encode(Yii::t($this->profileField->getTranslationCategory(), $options[$v]));
+                    $translatedValues[] = Yii::t($this->profileField->getTranslationCategory(), $options[$v]);
                 }
             }
-
-            return implode(', ', $translatedValues);
+            $value = implode(', ', $translatedValues);
         }
 
-        return $value;
+        return $encode ? Html::encode($value) : $value;
     }
 }

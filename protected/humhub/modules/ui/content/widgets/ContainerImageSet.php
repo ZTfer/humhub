@@ -37,7 +37,7 @@ class ContainerImageSet extends BaseImage
             $this->hiddenImageHeight = $this->hiddenImageWidth;
         }
 
-        if($this->items && !is_array($this->items)) {
+        if ($this->items && !is_array($this->items)) {
             $this->items = [$this->items];
         }
     }
@@ -51,23 +51,21 @@ class ContainerImageSet extends BaseImage
             'hiddenItems' => $hiddenItems,
             'max' => $this->max,
             'options' => $this->getAvailableOptions(),
-            'hiddenItemsOptions' => $this->getOptionsForHiddenItems()
+            'hiddenItemsOptions' => $this->getOptionsForHiddenItems(),
         ]);
     }
 
     private function getAvailableOptions()
     {
         $excludedParams = ['items', 'max', 'tooltipText', 'hiddenImageWidth', 'hiddenImageHeight'];
-        return array_filter(get_object_vars($this), function ($key) use ($excludedParams) {
-            return ! in_array($key, $excludedParams);
-        }, ARRAY_FILTER_USE_KEY);
+        return array_filter(get_object_vars($this), fn($key) => !in_array($key, $excludedParams), ARRAY_FILTER_USE_KEY);
     }
 
     private function getOptionsForHiddenItems()
     {
         return [
             'width' => $this->hiddenImageWidth,
-            'height' => $this->hiddenImageHeight
+            'height' => $this->hiddenImageHeight,
         ];
     }
 }

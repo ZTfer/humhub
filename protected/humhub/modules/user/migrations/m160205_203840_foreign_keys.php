@@ -1,11 +1,9 @@
 <?php
 
-use yii\db\Schema;
-use yii\db\Migration;
+use humhub\components\Migration;
 
 class m160205_203840_foreign_keys extends Migration
 {
-
     public function up()
     {
         // Cleanup orphaned records
@@ -36,7 +34,7 @@ class m160205_203840_foreign_keys extends Migration
         }
 
         try {
-            $this->alterColumn('user_module', 'user_id', $this->integer()->null());
+            $this->safeAlterColumn('user_module', 'user_id', $this->integer()->null());
             $this->update('user_module', ['user_id' => new yii\db\Expression('NULL')], ['user_id' => 0]);
             $this->addForeignKey('fk_user_module-user_id', 'user_module', 'user_id', 'user', 'id', 'CASCADE', 'CASCADE');
         } catch (Exception $ex) {

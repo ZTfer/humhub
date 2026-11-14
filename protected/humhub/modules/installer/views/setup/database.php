@@ -1,63 +1,48 @@
 <?php
 
-use humhub\compat\CActiveForm;
-use humhub\libs\Html;
+use humhub\helpers\Html;
+use humhub\modules\installer\forms\DatabaseForm;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
 
+/* @var DatabaseForm $model */
+/* @var string $errorMessage */
 ?>
 
 <div id="database-form" class="panel panel-default animated fadeIn">
     <div class="panel-heading">
-        <?php echo Yii::t('InstallerModule.base', '<strong>Database</strong> Configuration'); ?>
+        <?= Yii::t('InstallerModule.base', '<strong>Database</strong> Configuration'); ?>
     </div>
 
     <div class="panel-body">
-        <p>
-            <?php echo Yii::t('InstallerModule.base', 'Below you have to enter your database connection details. If you’re not sure about these, please contact your system administrator.'); ?>
-        </p>
+        <p><?= Yii::t('InstallerModule.base', 'Below you have to enter your database connection details. If you’re not sure about these, please contact your system administrator.'); ?></p>
 
-        <?php $form = CActiveForm::begin(); ?>
+        <?php $form = ActiveForm::begin(); ?>
 
+        <?= $form->field($model, 'hostname')->textInput(['readonly' => $model->isFixed('hostname')]) ?>
         <hr/>
-        <div class="form-group">
-            <?php echo $form->labelEx($model, 'hostname'); ?>
-            <?php echo $form->textField($model, 'hostname', ['class' => 'form-control', 'id' => 'hostname']); ?>
-            <p class="help-block"><?php echo Yii::t('InstallerModule.base', 'Hostname of your MySQL Database Server (e.g. localhost if MySQL is running on the same machine)'); ?></p>
-            <?php echo $form->error($model, 'hostname'); ?>
-        </div>
+        <?= $form->field($model, 'port')->textInput(['readonly' => $model->isFixed('port')]) ?>
         <hr/>
-        <div class="form-group">
-            <?php echo $form->labelEx($model, 'username'); ?>
-            <?php echo $form->textField($model, 'username', ['class' => 'form-control']); ?>
-            <p class="help-block"><?php echo Yii::t('InstallerModule.base', 'Your MySQL username'); ?></p>
-            <?php echo $form->error($model, 'username'); ?>
-        </div>
+        <?= $form->field($model, 'username')->textInput(['readonly' => $model->isFixed('username')]) ?>
         <hr/>
-        <div class="form-group">
-            <?php echo $form->labelEx($model, 'password'); ?>
-            <?php echo $form->passwordField($model, 'password', ['class' => 'form-control']); ?>
-            <p class="help-block"><?php echo Yii::t('InstallerModule.base', 'Your MySQL password.'); ?></p>
-            <?php echo $form->error($model, 'password'); ?>
-        </div>
+        <?= $form->field($model, 'password')->passwordInput(['readonly' => $model->isFixed('password')]) ?>
         <hr/>
-        <div class="form-group">
-            <?php echo $form->labelEx($model, 'database'); ?>
-            <?php echo $form->textField($model, 'database', ['class' => 'form-control']); ?>
-            <p class="help-block"><?php echo Yii::t('InstallerModule.base', 'The name of the database you want to run HumHub in.'); ?></p>
-            <?php echo $form->error($model, 'database'); ?>
-        </div>
+        <?= $form->field($model, 'database')->textInput(['readonly' => $model->isFixed('database')]) ?>
+        <?= $form->field($model, 'create')->checkbox() ?>
 
-        <?php if ($errorMessage) { ?>
+        <?php if ($errorMessage): ?>
             <div class="alert alert-danger">
-                <strong><?php echo Yii::t('InstallerModule.base', 'Ohh, something went wrong!'); ?></strong><br/>
-                <?php echo Html::encode($errorMessage); ?>
+                <strong><?= Yii::t('InstallerModule.base', 'Ohh, something went wrong!'); ?></strong><br/>
+                <?= Html::encode($errorMessage); ?>
             </div>
-        <?php } ?>
+        <?php endif; ?>
+        <hr/>
 
-        <hr>
+        <?= Button::primary(Yii::t('InstallerModule.base', 'Next'))
+            ->loader(Yii::t('InstallerModule.base', 'Initializing database...'))
+            ->submit() ?>
 
-        <?php echo Html::submitButton(Yii::t('InstallerModule.base', 'Next'), ['class' => 'btn btn-primary', 'data-loader' => "modal", 'data-message' => Yii::t('InstallerModule.base', 'Initializing database...')]); ?>
-
-        <?php CActiveForm::end(); ?>
+        <?php ActiveForm::end(); ?>
     </div>
 </div>
 
@@ -69,9 +54,9 @@ use humhub\libs\Html;
     })
 
     // Shake panel after wrong validation
-    <?php if ($model->hasErrors()) { ?>
+    <?php if ($model->hasErrors()): ?>
     $('#database-form').removeClass('fadeIn');
     $('#database-form').addClass('shake');
-    <?php } ?>
+    <?php endif; ?>
 
 </script>

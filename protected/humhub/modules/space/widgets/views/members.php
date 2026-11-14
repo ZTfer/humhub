@@ -1,48 +1,72 @@
 <?php
 
-use humhub\libs\Html;
-use humhub\widgets\PanelMenu;
-use humhub\modules\user\widgets\Image;
+use humhub\helpers\Html;
 use humhub\modules\space\models\Space;
-?>
+use humhub\modules\user\models\User;
+use humhub\modules\user\widgets\Image;
+use humhub\widgets\bootstrap\Link;
+use humhub\widgets\PanelMenu;
 
+/* @var User[] $users */
+/* @var bool $showListButton */
+/* @var string $urlMembersList */
+/* @var array $privilegedUserIds */
+/* @var int $totalMemberCount */
+/* @var array $showListOptions */
+
+?>
 <div class="panel panel-default members" id="space-members-panel">
-    <?= PanelMenu::widget(['id' => 'space-members-panel']); ?>
-    <div class="panel-heading"><?= Yii::t('SpaceModule.base', '<strong>Space</strong> members'); ?> (<?= $totalMemberCount ?>)</div>
+    <?= PanelMenu::widget([
+        'extraMenus' => Html::tag('li', Link::to(Yii::t('SpaceModule.base', 'Show as List'))->icon('list')->options($showListOptions)),
+    ]) ?>
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <button class="btn-panel-title-action" <?= Html::renderTagAttributes($showListOptions) ?>>
+                <?= Yii::t('SpaceModule.base', '<strong>Space</strong> members') ?> (<?= $totalMemberCount ?>)
+            </button>
+        </h3>
+    </div>
     <div class="panel-body">
-        <?php foreach ($users as $user) : ?>
-            <?php
-            if (in_array($user->id, $privilegedUserIds[Space::USERGROUP_OWNER])) {
-                // Show Owner image & tooltip
-                echo Image::widget([
-                    'user' => $user, 'width' => 32, 'showTooltip' => true,
-                    'tooltipText' => Yii::t('SpaceModule.base', 'Owner:') . "\n" . Html::encode($user->displayName),
-                    'imageOptions' => ['style' => 'border:1px solid ' . $this->theme->variable('success')]
-                ]);
-            } elseif (in_array($user->id, $privilegedUserIds[Space::USERGROUP_ADMIN])) {
-                // Show Admin image & tooltip
-                echo Image::widget([
-                    'user' => $user, 'width' => 32, 'showTooltip' => true,
-                    'tooltipText' => Yii::t('SpaceModule.base', 'Administrator:') . "\n" . Html::encode($user->displayName),
-                    'imageOptions' => ['style' => 'border:1px solid ' . $this->theme->variable('success')]
-                ]);
-            } elseif (in_array($user->id, $privilegedUserIds[Space::USERGROUP_MODERATOR])) {
-                // Show Moderator image & tooltip
-                echo Image::widget([
-                    'user' => $user, 'width' => 32, 'showTooltip' => true,
-                    'tooltipText' => Yii::t('SpaceModule.base', 'Moderator:') . "\n" . Html::encode($user->displayName),
-                    'imageOptions' => ['style' => 'border:1px solid ' . $this->theme->variable('info')]
-                ]);
-            } else {
-                // Standard member
-                echo Image::widget(['user' => $user, 'width' => 32, 'showTooltip' => true]);
-            }
-            ?>
-        <?php endforeach; ?>
+        <div class="d-flex gap-2 flex-wrap">
+            <?php foreach ($users as $user) : ?>
+                <?php
+                $imageWidgetConfig = [
+                    'user' => $user, 'width' => 32,
+                    'showTooltip' => true,
+                    'showSelfOnlineStatus' => true,
+                ];
+                if (in_array($user->id, $privilegedUserIds[Space::USERGROUP_OWNER])) {
+                    // Show Owner image & tooltip
+                    echo Image::widget(array_merge($imageWidgetConfig, [
+                        'tooltipText' => Yii::t('SpaceModule.base', 'Owner:') . "\n" . Html::encode($user->displayName),
+                        'imageOptions' => ['style' => 'border:1px solid var(--success)'],
+                    ]));
+                } elseif (in_array($user->id, $privilegedUserIds[Space::USERGROUP_ADMIN])) {
+                    // Show Admin image & tooltip
+                    echo Image::widget(array_merge($imageWidgetConfig, [
+                        'tooltipText' => Yii::t('SpaceModule.base', 'Administrator:') . "\n" . Html::encode($user->displayName),
+                        'imageOptions' => ['style' => 'border:1px solid var(--success)'],
+                    ]));
+                } elseif (in_array($user->id, $privilegedUserIds[Space::USERGROUP_MODERATOR])) {
+                    // Show Moderator image & tooltip
+                    echo Image::widget(array_merge($imageWidgetConfig, [
+                        'tooltipText' => Yii::t('SpaceModule.base', 'Moderator:') . "\n" . Html::encode($user->displayName),
+                        'imageOptions' => ['style' => 'border:1px solid var(--info)'],
+                    ]));
+                } else {
+                    // Standard member
+                    echo Image::widget($imageWidgetConfig);
+                }
+                ?>
+            <?php endforeach; ?>
+        </div>
 
         <?php if ($showListButton) : ?>
-            <br>
-            <a href="<?= $urlMembersList; ?>" data-target="#globalModal" class="btn btn-default btn-sm"><?= Yii::t('SpaceModule.base', 'Show all'); ?></a>
+            <a href="<?= $urlMembersList ?>"
+               data-bs-target="#globalModal"
+               class="btn btn-light btn-sm mt-2">
+                <?= Yii::t('SpaceModule.base', 'Show all') ?>
+            </a>
         <?php endif; ?>
 
     </div>

@@ -1,10 +1,12 @@
 humhub.module('comment', function (module, require, $) {
     var Content = require('content').Content;
     var Widget = require('ui.widget').Widget;
-    var object = require('util').object;
     var client = require('client');
     var loader = require('ui.loader');
     var additions = require('ui.additions');
+    var i18n = require('i18n');
+
+    module.requiredI18nCategories = ['CommentModule.base'];
 
     var Form = Widget.extend();
 
@@ -17,8 +19,8 @@ humhub.module('comment', function (module, require, $) {
                 that.getInput().val('').trigger('autosize.resize');
                 richText.$.trigger('clear');
                 that.getUpload().reset();
-                that.$.find('.form-group').removeClass('has-error');
-                that.$.find('.help-block-error').html('');
+                that.$.find('.is-invalid').removeClass('is-invalid');
+                that.$.find('.invalid-feedback').html('');
             },
             400: function (response) {
                 that.replace(response.html);
@@ -52,33 +54,26 @@ humhub.module('comment', function (module, require, $) {
 
         $elements.hide().css('opacity', 1).fadeIn('fast');
 
-        this.$.find('hr').show();
+        this.$.find('hr').css('display', 'inherit');
     };
 
     Form.prototype.incrementCommentCount = function (count) {
         try {
-            // First check if this is a sub comment form
-            var $root = this.$.closest('[data-action-component="comment.Comment"]');
-            if (!$root.length) {
-                $root = this.$.closest('.stream-entry-addons');
-            }
+            // Update the reply counter of the parent comment (for sub comments)
+            // and the total comment counter of the wall entry
+            var $roots = this.$.closest('[data-action-component="comment.Comment"]')
+                .add(this.$.closest('.stream-entry-addons'));
 
-            if (!$root.length) {
-                return;
-            }
+            $roots.each(function () {
+                var $commentCount = $(this).find('.wall-entry-controls:first .comment-count');
+                if (!$commentCount.length) {
+                    return;
+                }
 
-            var $controls = $root.find('.wall-entry-controls:first');
-            if (!$controls.length) {
-                return;
-            }
-
-            var $commentCount = $controls.find('.comment-count');
-            if ($commentCount.length) {
-                var currentCount = $commentCount.data('count');
-                currentCount += count;
+                var currentCount = $commentCount.data('count') + count;
                 $commentCount.text(' (' + currentCount + ')').show();
                 $commentCount.data('count', currentCount);
-            }
+            });
         } catch (e) {
             module.log.error(e, false);
         }
@@ -121,21 +116,51 @@ humhub.module('comment', function (module, require, $) {
         return Widget.instance(this.$.find('div.humhub-ui-richtext:first'));
     };
 
-    Comment.prototype.delete = function () {
-        var $form = this.$.parent().siblings('.comment_create');
-        var hideHr = !this.isNestedComment() && $form.length && !this.$.siblings('.media').length;
+    Comment.prototype.delete = function (evt) {
+        var form = Widget.instance(this.$.parent().siblings('.comment_create'));
+        var hideHr = !this.isNestedComment() && form.$.length && !this.$.siblings('.single-comment').length;
 
-        this.super('delete', {modal: module.config.modal.delteConfirm}).then(function ($confirm) {
+        // Deleting a comment also removes its sub comments from the total count
+        var subComments = this.isNestedComment()
+            ? 0
+            : (this.$.find('.wall-entry-controls:first .comment-count').data('count') || 0);
+
+        this.$.data('content-delete-url', evt.$trigger.data('content-delete-url'));
+
+        this.super('delete', {modal: {
+            header: i18n.t('CommentModule.base', '<strong>Confirm</strong> comment deleting'),
+            body: i18n.t('CommentModule.base', 'Do you really want to delete this comment?'),
+            confirmText: i18n.t('CommentModule.base', 'Delete'),
+            cancelText: i18n.t('CommentModule.base', 'Cancel')
+        }}).then(function ($confirm) {
             if ($confirm) {
-                module.log.success('success.delete');
-                if (hideHr) {
-                    $form.find('hr').hide();
-                }
+                module.log.success(i18n.t('CommentModule.base', 'Comment has been deleted'));
+                hideHr && form.$.find('hr').css('display', 'none');
+                form.incrementCommentCount(-1 - subComments);
             }
         }).catch(function (err) {
             module.log.error(err, true);
         });
     };
+
+    Comment.prototype.adminDelete = function (evt) {
+        var $form = this.$.parent().siblings('.comment_create');
+        var hideHr = !this.isNestedComment() && $form.length && !this.$.siblings('.single-comment').length;
+
+        this.$.data('content-delete-url', evt.$trigger.data('content-delete-url'));
+        this.$.data('admin-delete-modal-url', evt.$trigger.data('admin-delete-modal-url'));
+
+        this.super('adminDelete').then(function ($confirm) {
+            if ($confirm) {
+                module.log.success(i18n.t('CommentModule.base', 'Comment has been deleted'));
+                if (hideHr) {
+                    $form.find('hr').css('display', 'none');
+                }
+            }
+        }).catch(function (err) {
+            module.log.error(err, true);
+        });
+    }
 
     Comment.prototype.isNestedComment = function () {
         return this.$.closest('.nested-comments-root').length !== 0;
@@ -186,7 +211,6 @@ humhub.module('comment', function (module, require, $) {
     Comment.prototype.loader = function ($show) {
         var $loader = this.$.find('.comment-entry-loader:first');
         if ($show === false) {
-            this.$.find('.preferences:first').show();
             loader.reset($loader);
             return;
         }
@@ -198,17 +222,17 @@ humhub.module('comment', function (module, require, $) {
                 width: '60px'
             }
         });
-
-        this.$.find('.preferences:first').hide();
     };
 
-    var showAll = function (evt) {
-        client.post(evt, {dataType: 'html'}).then(function (response) {
-            var $container = evt.$trigger.parent();
-            $container.html(response.html);
-            additions.applyTo($container);
+    Comment.prototype.showBlocked = function (evt) {
+        var that = this;
+        that.loader();
+        client.html(evt).then(function (response) {
+            that.replace(response.html);
         }).catch(function (err) {
             module.log.error(err, true);
+        }).finally(function () {
+            that.loader(false);
         });
     };
 
@@ -223,31 +247,28 @@ humhub.module('comment', function (module, require, $) {
         client.post(evt, {dataType: 'html'}).then(function (response) {
             var $container = evt.$trigger.closest('.comment');
             var $html = $(response.html);
-            $container.prepend($html);
+            evt.$trigger.data('direction') === 'previous'
+                ? $container.prepend($html)
+                : $container.append($html);
             evt.$trigger.closest('.showMore').remove();
             additions.applyTo($html);
+
+            // The focused link was just removed, move the focus to the loaded
+            // continuation link or the first loaded comment instead
+            var $focus = $html.filter('.showMore').find('a').first();
+            if (!$focus.length) {
+                $focus = $html.filter('.single-comment').first().attr('tabindex', '-1');
+            }
+            $focus.trigger('focus');
+
+            // Highlight currently searching keywords in the loaded comments
+            const contentSearchKeyword = $('.container-contents .form-search input[name=keyword]');
+            if (contentSearchKeyword.length) {
+                additions.highlightWords($html, contentSearchKeyword.val());
+            }
         }).catch(function (err) {
             module.log.error(err, true);
             loader.unset(evt.$trigger);
-        });
-    };
-
-    var init = function () {
-        $(document).on('mouseover', '.comment .media', function () {
-            var $this = $(this);
-            var element = $this.find('.preferences:first');
-            if (!loader.is($this.find('.comment-entry-loader'))) {
-                element.show();
-            }
-        });
-        $(document).on('mouseout', '.comment .media', function () {
-            // find dropdown menu
-            var element = $(this).find('.preferences:first');
-
-            // hide dropdown if it's not open
-            if (!element.find('li').hasClass('open')) {
-                element.hide();
-            }
         });
     };
 
@@ -264,8 +285,8 @@ humhub.module('comment', function (module, require, $) {
 
         var $form = target.children('.comment_create');
 
-        if (!target.find('.comment .media').length && !target.closest('[data-action-component="comment.Comment"]').length) {
-            $form.find('hr').hide();
+        if (!target.find('.comment .single-comment').length && !target.closest('[data-action-component="comment.Comment"]').length) {
+            $form.find('hr').css('display', 'none');
         }
 
         $form.show();
@@ -274,8 +295,12 @@ humhub.module('comment', function (module, require, $) {
             target.slideToggle();
         }
 
-        if(!visible) {
+        if (!visible && !window.comments_collapsed) {
             target.find('.humhub-ui-richtext').trigger('focus');
+        }
+
+        if (!visible && window.comments_collapsed && !target.find('.comment > .single-comment').length) {
+            target.find('[data-action-click="comment.showMore"]').trigger('click');
         }
     }
 
@@ -291,28 +316,26 @@ humhub.module('comment', function (module, require, $) {
             //toggle parent comment
             target = evt.$target.closest('.comment').closest('.comment-container');
             toggleComment(target, false);
-            var richtext = Widget.instance(target.find('.ProsemirrorEditor:last'));
-            var mentioning = require('ui.richtext.prosemirror').buildMentioning(evt.$target.closest('.media').find('.media-heading a'));
+            var richtext = Widget.instance(target.find('.comment_create:last .ProsemirrorEditor:first'));
+            var mentioning = require('ui.richtext.prosemirror').buildMentioning(evt.$target.closest('.single-comment').find('.comment-heading a'));
             richtext.editor.init(mentioning);
             richtext.$.trigger('focus');
         }
     };
 
     var scrollActive = function (evt) {
-        evt.$trigger.closest('.comment-create-input-group').addClass('scrollActive');
+        evt.$trigger.closest('.richtext-create-input-group').addClass('scrollActive');
     };
 
     var scrollInactive = function (evt) {
-        evt.$trigger.closest('.comment-create-input-group').removeClass('scrollActive');
+        evt.$trigger.closest('.richtext-create-input-group').removeClass('scrollActive');
     };
 
     module.export({
-        init: init,
         Comment: Comment,
         Form: Form,
         scrollActive: scrollActive,
         scrollInactive: scrollInactive,
-        showAll: showAll,
         showMore: showMore,
         toggleComment: toggleCommentHandler
     });

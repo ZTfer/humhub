@@ -9,7 +9,7 @@
 namespace humhub\modules\content\assets;
 
 use humhub\components\assets\AssetBundle;
-use humhub\modules\ui\view\components\View;
+use humhub\components\View;
 
 /**
  * Asset for core content resources.
@@ -29,15 +29,15 @@ class ContentAsset extends AssetBundle
      */
     public $jsPosition = View::POS_HEAD;
 
-     /**
+    /**
      * @inheritdoc
      */
     public $sourcePath = '@content/resources';
 
-     /**
+    /**
      * @inheritdoc
      */
     public $js = [
-        'js/humhub.content.js'
+        'js/humhub.content.js',
     ];
 }

@@ -1,7 +1,8 @@
 <?php
 
-use yii\helpers\Html;
+use humhub\helpers\Html;
 use yii\helpers\Url;
+
 ?>
 
 <div class="panel panel-default animated fadeIn">
@@ -22,4 +23,6 @@ use yii\helpers\Url;
 
 </div>
 
-<?php echo humhub\widgets\LanguageChooser::widget(); ?>
+<div class="text-center">
+    <?php echo humhub\widgets\LanguageChooser::widget(); ?>
+</div>

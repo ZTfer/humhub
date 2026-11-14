@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -9,8 +10,8 @@
 namespace tests\codeception\unit\modules\content\widgets;
 
 use humhub\libs\EmojiMap;
-use humhub\libs\Html;
 use humhub\modules\content\widgets\richtext\converter\RichTextToHtmlConverter;
+use humhub\modules\content\widgets\richtext\converter\RichTextToShortHtmlConverter;
 use humhub\modules\content\widgets\richtext\converter\RichTextToShortTextConverter;
 use humhub\modules\content\widgets\richtext\extensions\mentioning\MentioningExtension;
 use humhub\modules\content\widgets\richtext\RichText;
@@ -18,7 +19,8 @@ use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
-
+use Throwable;
+use yii\base\InvalidConfigException;
 
 class RichTextShortTextConverterTest extends HumHubDbTestCase
 {
@@ -27,221 +29,286 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
      */
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertLinkToShortText()
     {
         $this->assertConversionResult(
             'Test [Link](https://www.humhub.com/de)',
-            "Test Link");
+            "Test Link",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertTextWithMaxLength()
     {
         $this->assertConversionResult(
             'Test **text** truncation',
-            "Test...", ['maxLength' => 5]);
+            "Test...",
+            ['maxLength' => 5],
+        );
+    }
+
+    public function testConvertMultiByteTextWithMaxLength()
+    {
+        $this->assertConversionResult(
+            '相*ウ*ヨ報<br />夫チエ**景東署**シイ連苦ワ径特サニコワ政深ちぎ見敗ぜあじも内庫ゅしづぽ児意泉ねッを黒能わぱふ緩昇ろじ帯北悩びぞば。',
+            "相ウヨ報 夫チエ景東...",
+            [RichTextToShortTextConverter::OPTION_MAX_LENGTH => 10],
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertMultiParagraphWithMaxLength()
     {
         $this->assertConversionResult(
             "Test **bold text** truncation\n\nNew Paragraph",
-            "Test bold text truncation New...", ['maxLength' => 30]);
+            "Test bold text truncation New...",
+            ['maxLength' => 30],
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertLinkWithSpecialCharToShortText()
     {
         $this->assertConversionResult(
             'Test [Link &< Link](https://www.humhub.com/de)',
-            "Test Link &amp;&lt; Link");
+            "Test Link &amp;&lt; Link",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertRelativeLinkToShortText()
     {
         $this->assertConversionResult(
             'Test [Link](/p/site)',
-            "Test Link");
+            "Test Link",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertRelativeLinkWithSpecialCharToShortText()
     {
         $this->assertConversionResult(
             'Test [Link &< Link](/p/site)',
-            "Test Link &amp;&lt; Link");
+            "Test Link &amp;&lt; Link",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testEmptyLinkLabelToShortText()
     {
         $this->assertConversionResult(
             'Test [](/p/site)',
-            "Test");
+            "Test",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testInvalidProtocolLinkToShortText()
     {
         $this->assertConversionResult(
             'Test [Invalid Url](javascript:alert(1))',
-            "Test Invalid Url");
+            "Test Invalid Url",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testLinkWithMarkedText()
     {
         $this->assertConversionResult(
             'Test [**Bold** Url](http://localhost/p/site)',
-            "Test Bold Url");
+            "Test Bold Url",
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertLinkifiedLink()
     {
         $this->assertConversionResult(
             'Test http://localhost/p/site',
-            "Test http://localhost/p/site");
+            "Test http://localhost/p/site",
+        );
     }
 
     public function testConvertMailtoLink()
     {
         $this->assertConversionResult(
             'Test [Test Mail](mailto:test@test.com)',
-            'Test Test Mail');
+            'Test Test Mail',
+        );
     }
 
     /*
      * Images
      */
 
-    public function testConvertImageAsLink()
-    {
-        $this->assertConversionResult(
-            'Test ![Alt Text](https://www.humhub.com/static/img/logo.png)',
-            "Test https://www.humhub.com/static/img/logo.png");
-    }
-
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageToShortText()
     {
         $this->assertConversionResult(
             'Test ![Alt Text](https://www.humhub.com/static/img/logo.png)',
-            "Test https://www.humhub.com/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithSpecialCharToShortText()
     {
         $this->assertConversionResult(
             'Test ![Alt & < Text](https://www.humhub.com/static/img/logo.png)',
-            "Test https://www.humhub.com/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertRelativeImageToShortText()
     {
         $this->assertConversionResult(
             'Test ![Alt Text](/static/img/logo.png)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertRelativeImageWithSpecialCharToShortText()
     {
         $this->assertConversionResult(
             'Test ![Alt & < Text](/static/img/logo.png)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithTitleText()
     {
         $this->assertConversionResult(
             'Test ![Image Label](http://localhost/static/img/logo.png "Image Title")',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithSizeToShortText()
     {
         $this->assertConversionResult(
             'Test ![Scaled Image](http://localhost/static/img/logo.png "img6.jpg" =150x)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithSizeAndNoTitleToShortText()
     {
         $this->assertConversionResult(
             'Test ![Scaled Image](http://localhost/static/img/logo.png =150x)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithImageAlignmentRight()
     {
         $this->assertConversionResult(
             'Test ![Scaled Image>](http://localhost/static/img/logo.png =150x)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithImageAlignmentLeft()
     {
         $this->assertConversionResult(
             'Test ![Scaled Image<](http://localhost/static/img/logo.png =150x)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
     }
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function testConvertImageWithImageAlignmentCenter()
     {
         $this->assertConversionResult(
             'Test ![Scaled Image><](http://localhost/static/img/logo.png =150x)',
-            "Test http://localhost/static/img/logo.png");
+            'Test [Image]',
+        );
+    }
+
+    /*
+     * Videos
+     */
+
+    public function testConvertVideoToShortText()
+    {
+        $this->assertConversionResult(
+            'Test ![Video Title](https://www.humhub.com/static/sample.mp4 video)',
+            'Test [Video]',
+        );
+    }
+
+    public function testConvertVideoWithAllOptionsToShortText()
+    {
+        $this->assertConversionResult(
+            'Test ![Video Title><](https://www.humhub.com/static/sample.mp4 video controls autoplay muted loop =300x200)',
+            'Test [Video]',
+        );
+    }
+
+    /*
+     * Audios
+     */
+
+    public function testConvertAudioToShortText()
+    {
+        $this->assertConversionResult(
+            'Test ![Audio Title](https://www.humhub.com/static/sample.mp3 audio)',
+            'Test [Audio]',
+        );
+    }
+
+    public function testConvertAudioWithAllOptionsToShortText()
+    {
+        $this->assertConversionResult(
+            'Test ![Audio Title><](https://www.humhub.com/static/sample.mp3 audio controls autoplay muted loop)',
+            'Test [Audio]',
+        );
     }
 
     /*
@@ -252,7 +319,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "Paragraph1\n\nParagraph2",
-            "Paragraph1 Paragraph2");
+            "Paragraph1 Paragraph2",
+        );
     }
 
     /*
@@ -263,7 +331,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "Test emoji :smile:",
-            "Test emoji " . EmojiMap::MAP['smile'] . "");
+            "Test emoji " . EmojiMap::getUnicode('smile'),
+        );
     }
 
     /*
@@ -275,24 +344,27 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
 
         $this->assertConversionResult(
             'Test mention ' . MentioningExtension::buildMentioning($user),
-            "Test mention @" . $user->getDisplayName());
+            "Test mention @" . $user->getDisplayName(),
+        );
     }
 
     public function testMentionNotFound()
     {
         $this->assertConversionResult(
             'Test non existing mention [Non Existing](mention:xyz "...")',
-            "Test non existing mention @Non Existing");
+            "Test non existing mention @Non Existing",
+        );
     }
 
     public function testMentionInActiveUser()
     {
         $user = User::findOne(['id' => 2]);
-        $user->updateAttributes(['status' => User::STATUS_DISABLED]);
+        $user->updateAttributes(['status' => User::STATUS_DEACTIVATED]);
 
         $this->assertConversionResult(
             'Test mention ' . MentioningExtension::buildMentioning($user),
-            "Test mention @" . $user->getDisplayName() . "");
+            "Test mention @" . $user->getDisplayName() . "",
+        );
     }
 
     public function testMentionEmptyText()
@@ -301,7 +373,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
 
         $this->assertConversionResult(
             'Test mention [](mention:' . $user->guid . ')',
-            "Test mention @" . $user->getDisplayName());
+            "Test mention @" . $user->getDisplayName(),
+        );
     }
 
     /*
@@ -317,25 +390,27 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
             'hash_sha1' => 'xxx',
             'title' => 'Test File',
             'mime_type' => 'text/plain',
-            'size' => 302176
+            'size' => 302176,
         ]);
 
         try {
             $file->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Need to catch since hash saving will fail
         }
 
         $this->assertConversionResult(
             'Test file [Test File](file-guid:xyz)',
-            "Test file Test File");
+            "Test file Test File",
+        );
     }
 
     public function testFileNotFound()
     {
         $this->assertConversionResult(
             'Test file [Test File](file-guid:doesNotExist)',
-            "Test file Test File");
+            "Test file Test File",
+        );
     }
 
     public function testImageFile()
@@ -348,18 +423,19 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
             'hash_sha1' => 'xxx',
             'title' => 'Test Image',
             'mime_type' => 'image/jpeg',
-            'size' => 302176
+            'size' => 302176,
         ]);
 
         try {
             $file->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Need to catch since hash saving will fail
         }
 
         $this->assertConversionResult(
             'Test file ![Test File](file-guid:xyz)',
-            "Test file " . Html::encode($file->getUrl()));
+            'Test file [Image]',
+        );
     }
 
     public function testImageFileWithRightAlign()
@@ -372,18 +448,19 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
             'hash_sha1' => 'xxx',
             'title' => 'Test Image',
             'mime_type' => 'image/jpeg',
-            'size' => 302176
+            'size' => 302176,
         ]);
 
         try {
             $file->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Need to catch since hash saving will fail
         }
 
         $this->assertConversionResult(
             'Test file ![Test File>](file-guid:xyz)',
-            "Test file " . Html::encode($file->getUrl()));
+            'Test file [Image]',
+        );
     }
 
     public function testImageFileWithLeftAlign()
@@ -396,18 +473,19 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
             'hash_sha1' => 'xxx',
             'title' => 'Test Image',
             'mime_type' => 'image/jpeg',
-            'size' => 302176
+            'size' => 302176,
         ]);
 
         try {
             $file->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Need to catch since hash saving will fail
         }
 
         $this->assertConversionResult(
             'Test file ![Test File<](file-guid:xyz)',
-            "Test file " . Html::encode($file->getUrl()));
+            'Test file [Image]',
+        );
     }
 
     public function testImageFileWithCenterAlign()
@@ -420,24 +498,26 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
             'hash_sha1' => 'xxx',
             'title' => 'Test Image',
             'mime_type' => 'image/jpeg',
-            'size' => 302176
+            'size' => 302176,
         ]);
 
         try {
             $file->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Need to catch since hash saving will fail
         }
         $this->assertConversionResult(
             'Test file ![Test File><](file-guid:xyz)',
-            "Test file " . Html::encode($file->getUrl()));
+            'Test file [Image]',
+        );
     }
 
     public function testImageFileNotFound()
     {
         $this->assertConversionResult(
             'Test file ![Test File><](file-guid:doesNotExist)',
-            "Test file Test File");
+            'Test file [Image]',
+        );
     }
 
     public function testDataImage()
@@ -445,7 +525,7 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // DATA images currently not supported
         $this->assertConversionResult(
             '![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==)',
-            ''
+            '[Image]',
         );
     }
 
@@ -457,7 +537,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             '[https://www.youtube.com/watch?v=xxxy](oembed:https://www.youtube.com/watch?v=xxxy)',
-            'https://www.youtube.com/watch?v=xxxy');
+            'https://www.youtube.com/watch?v=xxxy',
+        );
     }
 
     /*
@@ -467,42 +548,48 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             'This is **bold**',
-            "This is bold");
+            "This is bold",
+        );
     }
 
     public function testConvertMarkBold2()
     {
         $this->assertConversionResult(
             'This is __bold__',
-            "This is bold");
+            "This is bold",
+        );
     }
 
     public function testConvertMarkItalic1()
     {
         $this->assertConversionResult(
             'This is _italic_',
-            "This is italic");
+            "This is italic",
+        );
     }
 
     public function testConvertMarkItalic2()
     {
         $this->assertConversionResult(
             'This is *italic*',
-            "This is italic");
+            "This is italic",
+        );
     }
 
     public function testConvertMarkInlineCode()
     {
         $this->assertConversionResult(
             'This is `inline code`',
-            "This is inline code");
+            "This is inline code",
+        );
     }
 
     public function testConvertMarkStrike()
     {
         $this->assertConversionResult(
             'This is ~~strikethrough text~~',
-            "This is strikethrough text");
+            "This is strikethrough text",
+        );
     }
 
     /*
@@ -512,49 +599,69 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "This is a list\n\n1. First Element\n2. Second Element",
-            "This is a list 1. First Element 2. Second Element");
+            "This is a list 1. First Element 2. Second Element",
+        );
+    }
+
+    public function testConvertOrderedListWithCustomNumbers()
+    {
+        $this->assertConversionResult(
+            "This is a list\n\n21. November - First line\n22. November - Second line\n23. November - Third line",
+            'This is a list 21. November - First line 22. November - Second line 23. November - Third line',
+        );
+
+        $this->assertConversionResult(
+            "This is a list\n\n29. November - First line\n24. November - Second line\n15. November - Third line",
+            'This is a list 29. November - First line 24. November - Second line 15. November - Third line',
+        );
     }
 
     public function testConvertOrderedSubList()
     {
         $this->assertConversionResult(
             "This is a list\n\n1 First Element\n   1 First Sub Element\n2 Second Element",
-            "This is a list 1 First Element 1 First Sub Element 2 Second Element");
+            "This is a list 1 First Element 1 First Sub Element 2 Second Element",
+        );
     }
 
     public function testConvertOrderedMultipleSubItems()
     {
         $this->assertConversionResult(
             "This is a list\n\n1 First Element\n   1 First Sub Element\n   2 Second Sub Element\n2 Second Element",
-            "This is a list 1 First Element 1 First Sub Element 2 Second Sub Element 2 Second Element");
+            "This is a list 1 First Element 1 First Sub Element 2 Second Sub Element 2 Second Element",
+        );
     }
 
     public function testConvertUnorderedList()
     {
         $this->assertConversionResult(
             "This is a list\n\n- First Element\n- Second Element",
-            "This is a list - First Element - Second Element");
+            "This is a list - First Element - Second Element",
+        );
     }
 
     public function testConvertUnorderedSubList()
     {
         $this->assertConversionResult(
             "This is a list\n\n- First Element\n   - First Sub Element\n- Second Element",
-            "This is a list - First Element - First Sub Element - Second Element");
+            "This is a list - First Element - First Sub Element - Second Element",
+        );
     }
 
     public function testConvertUnorderedMultipleSubItems()
     {
         $this->assertConversionResult(
             "This is a list\n\n- First Element\n   - First Sub Element\n   - Second Sub Element\n- Second Element",
-            "This is a list - First Element - First Sub Element - Second Sub Element - Second Element");
+            "This is a list - First Element - First Sub Element - Second Sub Element - Second Element",
+        );
     }
 
     public function testConvertUnorderedMultipleLevelSubItems()
     {
         $this->assertConversionResult(
             "This is a list\n\n- First Element\n   - First Sub Element\n      - Second **Level Sub** Element\n- Second Element",
-            "This is a list - First Element - First Sub Element - Second Level Sub Element - Second Element");
+            "This is a list - First Element - First Sub Element - Second Level Sub Element - Second Element",
+        );
     }
 
     /*
@@ -563,15 +670,17 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     public function testConvertTable()
     {
         $this->assertConversionResult(
-            "| Tables        | Are           | Cool  |\n| ------------- |:-------------:| -----:|\n| col 3 is      | right-aligned | $1600 |"
-            , "[Table]");
+            "| Tables        | Are           | Cool  |\n| ------------- |:-------------:| -----:|\n| col 3 is      | right-aligned | $1600 |",
+            "[Table]",
+        );
     }
 
     public function testConvertTableWithInlineMark()
     {
         $this->assertConversionResult(
             "| Tables        | Are           | Cool  |\n| ------------- |:-------------:| -----:|\n| col 3 is      | **right**-aligned | $1600 |",
-            "[Table]");
+            "[Table]",
+        );
     }
 
     /*
@@ -582,7 +691,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "Test special chars like & or <test>>",
-            "Test special chars like &amp; or &lt;test&gt;&gt;");
+            "Test special chars like &amp; or &lt;test&gt;&gt;",
+        );
     }
 
     /*
@@ -593,14 +703,16 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "> This is a quote",
-            "This is a quote");
+            "This is a quote",
+        );
     }
 
     public function testConvertBlockNestedQuote()
     {
         $this->assertConversionResult(
             "> This is a quote \n>\n> > within a quote",
-            "This is a quote within a quote");
+            "This is a quote within a quote",
+        );
     }
 
     /*
@@ -610,14 +722,16 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "```\n<b>This is a code block</b>\n```",
-            "[Code Block]");
+            "[Code Block]",
+        );
     }
 
     public function testConvertBlockCodeBlockWithLanguage()
     {
         $this->assertConversionResult(
             "```html\n<b>This is a code block</b>\n```",
-            "[Code Block]");
+            "[Code Block]",
+        );
     }
 
     /*
@@ -628,14 +742,16 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "# First order headline",
-            "First order headline");
+            "First order headline",
+        );
     }
 
     public function testConvertBlockHeadlineSecondLevel()
     {
         $this->assertConversionResult(
             "## First order headline",
-            "First order headline");
+            "First order headline",
+        );
     }
 
     /*
@@ -646,7 +762,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "<div>This is html</div>",
-            "&lt;div&gt;This is html&lt;/div&gt;");
+            "&lt;div&gt;This is html&lt;/div&gt;",
+        );
     }
 
     public function testConvertInlineHtml()
@@ -654,7 +771,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "This is <em>bold text</em>",
-            "This is &lt;em&gt;bold text&lt;/em&gt;");
+            "This is &lt;em&gt;bold text&lt;/em&gt;",
+        );
     }
 
     /*
@@ -665,31 +783,37 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "Test\\\nBreak",
-            "Test Break");
+            "Test Break",
+        );
     }
 
     public function testHardBreakWithPreserveOption()
     {
         $this->assertConversionResult(
             "Test\\\nBreak",
-            "Test\nBreak", [RichTextToShortTextConverter::OPTION_PRESERVE_SPACES => true]);
+            "Test\nBreak",
+            [RichTextToShortTextConverter::OPTION_PRESERVE_SPACES => true],
+        );
     }
 
     public function testHardBreakWithPreserveAndNL2BROption()
     {
         $this->assertConversionResult(
             "Test\\\nBreak",
-            "Test<br>\nBreak", [
+            "Test<br>\nBreak",
+            [
                 RichTextToShortTextConverter::OPTION_PRESERVE_SPACES => true,
-                RichTextToShortTextConverter::OPTION_NL2BR => true
-            ]);
+                RichTextToShortHtmlConverter::OPTION_NL2BR => true,
+            ],
+        );
     }
 
     public function testHardBreakWithoutNewLine()
     {
         $this->assertConversionResult(
             "Test\\\n",
-            "Test");
+            "Test",
+        );
     }
 
     public function testHtmlBreak()
@@ -697,14 +821,17 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "This is <br> was a hard line break",
-            "This is was a hard line break");
+            "This is was a hard line break",
+        );
     }
 
     public function testHtmlBreakWithPreserveOption()
     {
         $this->assertConversionResult(
             "This is <br> was a hard line break",
-            "This is \n was a hard line break", [RichTextToShortTextConverter::OPTION_PRESERVE_SPACES => true]);
+            "This is \n was a hard line break",
+            [RichTextToShortTextConverter::OPTION_PRESERVE_SPACES => true],
+        );
     }
 
     public function testMultipleHtmlBreak()
@@ -712,7 +839,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             'This is <br> was a hard <br /> line break',
-            "This is was a hard line break");
+            "This is was a hard line break",
+        );
     }
 
     public function testConvertBreakInHtmlBlock()
@@ -720,7 +848,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "<div>This is <br> html</div>",
-            "&lt;div&gt;This is html&lt;/div&gt;");
+            "&lt;div&gt;This is html&lt;/div&gt;",
+        );
     }
 
     /*
@@ -731,7 +860,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "Paragraph1\n\nParagraph2\n\nParagraph3 with\nnew line",
-            "Paragraph1 Paragraph2 Paragraph3 with new line");
+            "Paragraph1 Paragraph2 Paragraph3 with new line",
+        );
     }
 
     public function testCodeBlockAfterParagraph()
@@ -739,7 +869,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "Paragraph1\n\n```\ncode block\n```",
-            "Paragraph1 [Code Block]");
+            "Paragraph1 [Code Block]",
+        );
     }
 
     public function testParagraphAfterCodeBlock()
@@ -747,7 +878,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "```\ncode block\n```\n\nParagraph1",
-            "[Code Block] Paragraph1");
+            "[Code Block] Paragraph1",
+        );
     }
 
     /*
@@ -758,7 +890,8 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
     {
         $this->assertConversionResult(
             "---",
-            "");
+            "",
+        );
     }
 
 
@@ -767,11 +900,15 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
         // Tags are not stripped since the richtext does not support html and interprets html as normal text
         $this->assertConversionResult(
             "```\ncode block\n```\n\nParagraph1",
-            "[Code Block] Paragraph1", [RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test1']);
+            "[Code Block] Paragraph1",
+            [RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test1'],
+        );
 
         $this->assertConversionResult(
             "IgnoreSinceCached...",
-            "[Code Block] Paragraph1", [RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test1']);
+            "[Code Block] Paragraph1",
+            [RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test1'],
+        );
     }
 
     public function testCacheWithDifferentMaxLength()
@@ -779,17 +916,21 @@ class RichTextShortTextConverterTest extends HumHubDbTestCase
 
         $this->assertConversionResult(
             "This **is a long** text we will truncate",
-            "This is a...", [
-            RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test2',
-            RichTextToShortTextConverter::OPTION_MAX_LENGTH => 11
-            ]);
+            "This is a...",
+            [
+                RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test2',
+                RichTextToShortTextConverter::OPTION_MAX_LENGTH => 9,
+            ],
+        );
 
         $this->assertConversionResult(
             "IgnoreSinceCached...",
-            "This is a long text...", [
-            RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test2',
-            RichTextToShortTextConverter::OPTION_MAX_LENGTH => 19
-            ]);
+            "This is a long text...",
+            [
+                RichTextToShortTextConverter::OPTION_CACHE_KEY => 'test2',
+                RichTextToShortTextConverter::OPTION_MAX_LENGTH => 19,
+            ],
+        );
     }
 
     public function testMixedConverterCachedResult()

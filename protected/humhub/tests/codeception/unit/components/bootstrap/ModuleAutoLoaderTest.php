@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -8,7 +9,7 @@
 namespace humhub\tests\codeception\unit;
 
 use Codeception\Test\Unit;
-use humhub\components\bootstrap\ModuleAutoLoader;
+use humhub\services\ModuleDiscoveryService;
 use Yii;
 
 /**
@@ -17,31 +18,29 @@ use Yii;
 class ModuleAutoLoaderTest extends Unit
 {
     /** @var array list of expected core modules */
-    const EXPECTED_CORE_MODULES = [
-        'activity',
-        'admin',
-        'comment',
-        'content',
-        'dashboard',
-        'directory',
-        'file',
-        'friendship',
-        'installer',
-        'ldap',
-        'like',
-        'live',
-        'marketplace',
-        'notification',
-        'post',
-        'queue',
-        'search',
-        'space',
-        'stream',
-        'topic',
-        'tour',
-        'ui',
-        'user',
-        'web'
+    public const EXPECTED_CORE_MODULES = [
+        'humhub\modules\activity\Module' => 'activity',
+        'humhub\modules\admin\Module' => 'admin',
+        'humhub\modules\comment\Module' => 'comment',
+        'humhub\modules\content\Module' => 'content',
+        'humhub\modules\dashboard\Module' => 'dashboard',
+        'humhub\modules\file\Module' => 'file',
+        'humhub\modules\friendship\Module' => 'friendship',
+        'humhub\modules\installer\Module' => 'installer',
+        'humhub\modules\ldap\Module' => 'ldap',
+        'humhub\modules\like\Module' => 'like',
+        'humhub\modules\live\Module' => 'live',
+        'humhub\modules\marketplace\Module' => 'marketplace',
+        'humhub\modules\notification\Module' => 'notification',
+        'humhub\modules\post\Module' => 'post',
+        'humhub\modules\queue\Module' => 'queue',
+        'humhub\modules\space\Module' => 'space',
+        'humhub\modules\stream\Module' => 'stream',
+        'humhub\modules\topic\Module' => 'topic',
+        'humhub\modules\tour\Module' => 'tour',
+        'humhub\modules\ui\Module' => 'ui',
+        'humhub\modules\user\Module' => 'user',
+        'humhub\modules\web\Module' => 'web',
     ];
 
     /**
@@ -55,8 +54,8 @@ class ModuleAutoLoaderTest extends Unit
     public function testCoreModuleLoading()
     {
         $modules = array_column(
-            ModuleAutoLoader::locateModules(),
-            'id'
+            ModuleDiscoveryService::locateModuleConfigs(),
+            'id',
         );
 
         /* assert that every core module is found by module loader. expected result of array_diff is an empty array. */
@@ -64,17 +63,14 @@ class ModuleAutoLoaderTest extends Unit
     }
 
     /**
-     * Test that an invalid path for module loading leads to an exception
+     * Test that an invalid path for module loading is silently skipped
      */
     public function testInvalidModulePath()
     {
         array_push(Yii::$app->params['moduleAutoloadPaths'], '/dev/null');
 
-        try {
-            ModuleAutoLoader::locateModules();
-            $this->fail('no expection when invalid path for moduleAutoloadPaths');
-        } catch (\ErrorException $e) {
-        }
+        $modules = ModuleDiscoveryService::locateModuleConfigs();
+        static::assertIsArray($modules);
 
         array_pop(Yii::$app->params['moduleAutoloadPaths']);
     }
@@ -89,7 +85,7 @@ class ModuleAutoLoaderTest extends Unit
         return [
             ['@humhub/modules', count(self::EXPECTED_CORE_MODULES)],
             ['@humhub/invalid', 0],
-            ['@invalid/folder', 0]
+            ['@invalid/folder', 0],
         ];
     }
 }

@@ -19,9 +19,8 @@ use humhub\modules\user\models\User as ModelUser;
  */
 class CheckPasswordValidator extends Validator
 {
-
     /**
-     * @var User the user
+     * @var ModelUser the user
      */
     public $user;
 
@@ -43,11 +42,11 @@ class CheckPasswordValidator extends Validator
 
     /**
      * Checks if current user has a password set.
-     * 
-     * @param User $user the user or null for current
-     * @return boolean
+     *
+     * @param ModelUser $user the user or null for current
+     * @return bool
      */
-    public static function hasPassword(ModelUser $user = null)
+    public static function hasPassword(?ModelUser $user = null): bool
     {
         if ($user === null) {
             $user = Yii::$app->user->getIdentity();
@@ -57,7 +56,7 @@ class CheckPasswordValidator extends Validator
             return false;
         }
 
-        return ($user->currentPassword !== null);
+        return !empty($user->currentPassword->password);
     }
 
 }

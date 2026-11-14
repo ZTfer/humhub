@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -8,23 +9,28 @@
 
 namespace humhub\modules\topic\controllers;
 
+use humhub\modules\topic\models\forms\TopicSettingsForm;
 use humhub\modules\user\models\User;
-use humhub\widgets\ModalClose;
+use humhub\widgets\modal\ModalClose;
 use humhub\modules\content\components\ContentContainerController;
+use humhub\modules\space\models\Space;
 use humhub\modules\topic\models\Topic;
 use humhub\modules\topic\permissions\ManageTopics;
 use Yii;
 use yii\data\ActiveDataProvider;
-use yii\web\HttpException;
+use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 
 class ManageController extends ContentContainerController
 {
-    public function getAccessRules()
+    /**
+     * @inheritdoc
+     */
+    protected function getAccessRules()
     {
         return [
             ['login'],
-            ['permission' => ManageTopics::class],
-            ['json' => ['delete']]
+            ['json' => ['delete']],
         ];
     }
 
@@ -32,9 +38,29 @@ class ManageController extends ContentContainerController
     {
         parent::init();
 
-        if($this->contentContainer instanceof User) {
+        if ($this->contentContainer instanceof User) {
             $this->subLayout = "@humhub/modules/user/views/account/_layout";
         }
+    }
+
+    public function beforeAction($action)
+    {
+        if (!Topic::isAllowedToCreate($this->contentContainer)) {
+            throw new ForbiddenHttpException();
+        }
+
+        if ($this->contentContainer instanceof Space
+            && !$this->contentContainer->can(ManageTopics::class)) {
+            throw new ForbiddenHttpException();
+        }
+
+        if ($this->contentContainer instanceof User
+            && !$this->contentContainer->is(Yii::$app->user->getIdentity())
+            && !Yii::$app->user->getIdentity()?->canManageAllContent()) {
+            throw new ForbiddenHttpException();
+        }
+
+        return parent::beforeAction($action);
     }
 
     public function actionIndex()
@@ -49,17 +75,31 @@ class ManageController extends ContentContainerController
             $this->view->error($model->getFirstError('name'));
         }
 
+        if ($this->contentContainer instanceof Space) {
+            $topicSettings = new TopicSettingsForm(['contentContainer' => $this->contentContainer]);
+            if ($topicSettings->load(Yii::$app->request->post()) && $topicSettings->save()) {
+                $this->view->saved();
+                $this->redirect('manage');
+            }
+        }
+
+        $title = $this->contentContainer instanceof User
+            ? Yii::t('UserModule.account', '<strong>Account</strong> Settings')
+            : Yii::t('TopicModule.base', '<strong>Topic</strong> Overview');
+
         return $this->render('overview', [
             'contentContainer' => $this->contentContainer,
             'dataProvider' => $this->getTopicProvider(),
-            'addModel' => new Topic()
+            'addModel' => new Topic(),
+            'topicSettings' => $topicSettings ?? null,
+            'title' => $title,
         ]);
     }
 
     private function getTopicProvider()
     {
         return new ActiveDataProvider([
-            'query' =>  Topic::findByContainer($this->contentContainer)->orderBy('sort_order, name'),
+            'query' => Topic::findByContainer($this->contentContainer)->orderBy('sort_order, name'),
             'pagination' => [
                 'pageSize' => 20,
             ],
@@ -70,27 +110,33 @@ class ManageController extends ContentContainerController
     {
         $this->forcePostRequest();
 
-        $topic = Topic::findOne(['id' => $id]);
-        if ($topic) {
-            $topic->delete();
-            return ['success' => true, 'message' => Yii::t('TopicModule.base', 'Topic has been deleted!')];
+        $topic = Topic::find()
+            ->where(['id' => $id, 'contentcontainer_id' => $this->contentContainer->contentcontainer_id])
+            ->one();
+
+        if (!$topic) {
+            throw new NotFoundHttpException();
         }
 
-        return ['success' => false];
+        $topic->delete();
+
+        return ['success' => true, 'message' => Yii::t('TopicModule.base', 'Topic has been deleted!')];
     }
 
     public function actionEdit($id)
     {
-        $topic = Topic::findOne(['id' => $id]);
+        $topic = Topic::find()
+            ->where(['id' => $id, 'contentcontainer_id' => $this->contentContainer->contentcontainer_id])
+            ->one();
 
         if (!$topic) {
-            throw new HttpException(404);
+            throw new NotFoundHttpException();
         }
 
         if ($topic->load(Yii::$app->request->post()) && $topic->save()) {
             return ModalClose::widget([
                 'saved' => true,
-                'reload' => true
+                'reload' => true,
             ]);
         }
 

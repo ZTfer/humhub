@@ -1,10 +1,12 @@
 <?php
-return array (
-  'Author' => '',
+return [
+  'Author' => 'Forfatter',
   'Content' => 'Indhold',
-  'Content Type' => '',
-  'Scope' => 'Område',
+  'Content Type' => 'Indholdstype',
+  'Date from' => 'Dato fra',
+  'Date to' => 'Dato til',
+  'Scope' => 'Omfang',
   'Sorting' => 'Sortering',
-  'Topic' => '',
+  'Topic' => 'Emne',
   'Visibility' => 'Synlighed',
-);
+];

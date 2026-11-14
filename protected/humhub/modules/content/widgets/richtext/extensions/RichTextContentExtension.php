@@ -1,8 +1,6 @@
 <?php
 
-
 namespace humhub\modules\content\widgets\richtext\extensions;
-
 
 use humhub\modules\content\widgets\richtext\ProsemirrorRichText;
 use yii\base\Model;
@@ -30,13 +28,13 @@ abstract class RichTextContentExtension extends Model implements RichTextExtensi
      * @param RichTextExtensionMatch $match
      * @return string
      */
-    public abstract function initMatch(array $match) : RichTextExtensionMatch;
+    abstract public function initMatch(array $match): RichTextExtensionMatch;
 
     /**
      * @param array $match
      * @return string
      */
-    public abstract function getRegex() : string;
+    abstract public function getRegex(): string;
 
     /**
      * @param $text
@@ -51,7 +49,7 @@ abstract class RichTextContentExtension extends Model implements RichTextExtensi
      * @param $text
      * @return string
      */
-    public static function replace($text, callable $callback) : string
+    public static function replace($text, callable $callback): string
     {
         return static::instance()->replaceExtension($text, $callback);
     }
@@ -62,7 +60,7 @@ abstract class RichTextContentExtension extends Model implements RichTextExtensi
      */
     protected function scanExtension($text)
     {
-        preg_match_all($this->getRegex(), $text, $matches, PREG_SET_ORDER);
+        preg_match_all($this->getRegex(), (string) $text, $matches, PREG_SET_ORDER);
 
         $result = [];
         foreach ($matches as $match) {
@@ -78,9 +76,7 @@ abstract class RichTextContentExtension extends Model implements RichTextExtensi
      */
     protected function replaceExtension($text, callable $callback)
     {
-        return preg_replace_callback($this->getRegex(), function($match) use ($callback) {
-            return $callback($this->initMatch($match));
-        }, $text);
+        return preg_replace_callback($this->getRegex(), fn($match) => $callback($this->initMatch($match)), (string) $text);
     }
 
     public function onPostProcess(string $text, ActiveRecord $record, ?string $attribute, array &$result): string
@@ -88,11 +84,13 @@ abstract class RichTextContentExtension extends Model implements RichTextExtensi
         return $text;
     }
 
-    public function onBeforeOutput(ProsemirrorRichText $richtext, string $output): string {
+    public function onBeforeOutput(ProsemirrorRichText $richtext, string $output): string
+    {
         return $output;
     }
 
-    public function onAfterOutput(ProsemirrorRichText $richtext, string $output): string {
+    public function onAfterOutput(ProsemirrorRichText $richtext, string $output): string
+    {
         return $output;
     }
 }

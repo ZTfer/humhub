@@ -1,13 +1,12 @@
 <?php
 
-
 namespace humhub\modules\stream\actions;
-
 
 use humhub\modules\stream\models\StreamQuery;
 use humhub\modules\stream\models\StreamSuppressQuery;
 use Yii;
 use yii\base\Exception;
+use yii\web\Response;
 
 /**
  * This class is used to build up a stream array or json response used in stream actions.
@@ -33,11 +32,6 @@ class StreamResponse
     private $result = [];
 
     /**
-     * @var StreamQuery the StreamQuery used to fetch the entries
-     */
-    private $streamQuery;
-
-    /**
      * @var int
      */
     private $lastContentId;
@@ -56,9 +50,8 @@ class StreamResponse
      * StreamResponse constructor.
      * @param StreamQuery $streamQuery
      */
-    public function __construct(StreamQuery $streamQuery)
+    public function __construct(private readonly StreamQuery $streamQuery)
     {
-        $this->streamQuery = $streamQuery;
     }
 
     /**
@@ -73,20 +66,20 @@ class StreamResponse
      */
     public function addEntry($entry, $injectIndex = false)
     {
-        if($entry instanceof StreamEntryResponse) {
+        if ($entry instanceof StreamEntryResponse) {
             $entry = $entry->asArray();
         }
 
         $entryId = $entry['id'];
         $this->entries[$entryId] = $entry;
 
-        if(is_int($injectIndex)) {
-            array_splice( $this->entryOrder, $injectIndex, 0, $entryId );
+        if (is_int($injectIndex)) {
+            array_splice($this->entryOrder, $injectIndex, 0, $entryId);
         } else {
             $this->entryOrder[] = $entryId;
         }
 
-        if($injectIndex === false) {
+        if ($injectIndex === false) {
             $this->lastContentId = $entry['id'];
         }
     }
@@ -120,12 +113,16 @@ class StreamResponse
             $this->result['lastContentId'] = $this->streamQuery->getLastContentId();
         }
 
-        if($this->error) {
+        if ($this->error) {
             $this->result['error'] = $this->error;
         }
 
-        if($this->errorCode) {
+        if ($this->errorCode) {
             $this->result['errorCode'] = $this->errorCode;
+        }
+
+        if ($this->streamQuery->hasErrors()) {
+            $this->result['filterErrors'] = $this->streamQuery->getErrors();
         }
 
         return $this->result;
@@ -133,7 +130,7 @@ class StreamResponse
 
     /**
      * Returns the stream action result as json response.
-     * @return \yii\web\Response
+     * @return Response
      * @throws Exception
      */
     public function asJson()
@@ -142,7 +139,7 @@ class StreamResponse
     }
 
     /**
-     * @param $isLast boolean sets the isLast flag of the response
+     * @param $isLast bool sets the isLast flag of the response
      */
     private function isLast($isLast)
     {

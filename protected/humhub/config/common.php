@@ -8,66 +8,111 @@
 
 use humhub\components\i18n\PhpMessageSource;
 
-Yii::setAlias('@webroot', realpath(__DIR__ . '/../../../'));
-Yii::setAlias('@app', '@webroot/protected');
-Yii::setAlias('@humhub', '@app/humhub');
-Yii::setAlias('@config', '@app/config');
-Yii::setAlias('@themes', '@webroot/themes');
+// TODO: Remove this line, should be already handled by BootstrapService
+Yii::setAlias('@humhub', $_ENV['HUMHUB_ALIASES__HUMHUB'] ?? realpath(__DIR__ . '/../'));
 
 // Workaround: PHP 7.3 compatible ZF2 ArrayObject class
-Yii::$classMap['Zend\Stdlib\ArrayObject'] = '@humhub/compat/ArrayObject.php';
+Yii::$classMap[\Zend\Stdlib\ArrayObject::class] = '@humhub/compat/ArrayObject.php';
+
+// Bootstrap 5 Migration
+Yii::$classMap['yii\bootstrap\BootstrapAsset'] = '@humhub/compat/bootstrap/BootstrapAsset.php';
+Yii::$classMap['yii\bootstrap\ActiveForm'] = '@humhub/compat/bootstrap/ActiveForm.php';
+Yii::$classMap['yii\bootstrap\Alert'] = '@humhub/compat/bootstrap/Alert.php';
+Yii::$classMap['yii\bootstrap\Button'] = '@humhub/compat/bootstrap/Button.php';
+Yii::$classMap['yii\bootstrap\Modal'] = '@humhub/compat/bootstrap/Modal.php';
+Yii::$classMap['yii\bootstrap\Html'] = '@humhub/compat/bootstrap/Html.php';
+Yii::$classMap['yii\bootstrap\Nav'] = '@humhub/compat/bootstrap/Nav.php';
+Yii::$classMap['yii\bootstrap\Widget'] = '@humhub/compat/bootstrap/Widget.php';
 
 // Workaround: If OpenSSL extension is not available (#3852)
 if (!defined('PKCS7_DETACHED')) {
     define('PKCS7_DETACHED', 64);
 }
 
+// Secrets in the context dump of log entries are masked for every target by `humhub\components\log\Dispatcher`.
+$logTargetConfig = [
+    'levels' => ['error', 'warning'],
+    'except' => [
+        'yii\web\HttpException:400',
+        'yii\web\HttpException:401',
+        'yii\web\HttpException:403',
+        'yii\web\HttpException:404',
+        'yii\web\HttpException:405',
+        'yii\web\User::getIdentityAndDurationFromCookie',
+        'yii\web\User::renewAuthStatus',
+    ],
+    'logVars' => ['_GET', '_SERVER'],
+];
+
 $config = [
     'name' => 'HumHub',
-    'version' => '1.8.1',
+    'version' => '1.19.4',
+    'minRecommendedPhpVersion' => '8.2',
+    'minSupportedPhpVersion' => '8.2',
     'basePath' => dirname(__DIR__) . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR,
-    'bootstrap' => ['log', 'humhub\components\bootstrap\ModuleAutoLoader', 'queue', 'humhub\modules\ui\view\bootstrap\ThemeLoader'],
+    'bootstrap' => [
+        'log',
+        'systemRevision',
+        'humhub\components\bootstrap\ModuleAutoLoader',
+        'humhub\components\bootstrap\ComponentLoader',
+        'queue',
+        'humhub\components\bootstrap\ThemeLoader',
+    ],
+    'runtimePath' => '@app/runtime',
     'sourceLanguage' => 'en',
     'aliases' => [
+        '@webroot' => realpath(__DIR__ . '/../../../'),
         '@bower' => '@vendor/bower-asset',
         '@npm' => '@vendor/npm-asset',
-        '@filestore' => '@webroot/uploads/file',
+        '@config' => '@app/config',
+        '@themes' => '@webroot/themes',
     ],
     'components' => [
         'moduleManager' => [
-            'class' => \humhub\components\ModuleManager::class
+            'class' => \humhub\components\ModuleManager::class,
+        ],
+        'gateManager' => [
+            'class' => \humhub\components\gates\GateManager::class,
         ],
         'notification' => [
             'class' => \humhub\modules\notification\components\NotificationManager::class,
             'targets' => [
                 \humhub\modules\notification\targets\WebTarget::class => [
-                    'renderer' => ['class' => \humhub\modules\notification\renderer\WebRenderer::class]
+                    'renderer' => ['class' => \humhub\modules\notification\renderer\WebRenderer::class],
                 ],
                 \humhub\modules\notification\targets\MailTarget::class => [
-                    'renderer' => ['class' => \humhub\modules\notification\renderer\MailRenderer::class]
+                    'renderer' => ['class' => \humhub\modules\notification\renderer\MailRenderer::class],
                 ],
-                \humhub\modules\notification\targets\MobileTarget::class => []
-            ]
+                \humhub\modules\notification\targets\MobileTarget::class => [],
+            ],
         ],
-        'log' => [
-            'traceLevel' => YII_DEBUG ? 3 : 0,
-            'targets' => [
-                [
-                    'class' => \yii\log\FileTarget::class,
-                    'levels' => ['error', 'warning'],
-                    'except' => ['yii\web\HttpException:400', 'yii\web\HttpException:401', 'yii\web\HttpException:403', 'yii\web\HttpException:404', 'yii\web\HttpException:405'],
-                    'logVars' => ['_GET', '_SERVER'],
+        'fs' => [
+            'class' => 'humhub\components\fs\FilesystemManager',
+            'mounts' => [
+                'assets' => [
+                    'class' => 'humhub\components\fs\LocalMountConfig',
+                    'path' => '@webroot/assets',
+                    'baseUrl' => '@web/assets',
                 ],
-                [
-                    'class' => \yii\log\DbTarget::class,
-                    'levels' => ['error', 'warning'],
-                    'except' => ['yii\web\HttpException:400', 'yii\web\HttpException:401', 'yii\web\HttpException:403', 'yii\web\HttpException:404', 'yii\web\HttpException:405'],
-                    'logVars' => ['_GET', '_SERVER'],
+                'data' => [
+                    'class' => 'humhub\components\fs\LocalMountConfig',
+                    'path' => '@webroot/uploads',
                 ],
             ],
         ],
-        'search' => [
-            'class' => \humhub\modules\search\engine\ZendLuceneSearch::class,
+        'log' => [
+            'class' => \humhub\components\log\Dispatcher::class,
+            'traceLevel' => YII_DEBUG ? 3 : 0,
+            'targets' => [
+                \yii\log\FileTarget::class => \yii\helpers\ArrayHelper::merge(
+                    ['class' => \yii\log\FileTarget::class],
+                    $logTargetConfig,
+                ),
+                \yii\log\DbTarget::class => \yii\helpers\ArrayHelper::merge(
+                    ['class' => \yii\log\DbTarget::class],
+                    $logTargetConfig,
+                ),
+            ],
         ],
         'settings' => [
             'class' => \humhub\components\SettingsManager::class,
@@ -78,33 +123,39 @@ $config = [
             'translations' => [
                 'base' => [
                     'class' => PhpMessageSource::class,
-                    'basePath' => '@humhub/messages'
+                    'basePath' => '@humhub/messages',
                 ],
                 'error' => [
                     'class' => PhpMessageSource::class,
-                    'basePath' => '@humhub/messages'
+                    'basePath' => '@humhub/messages',
                 ],
                 'humhub.yii' => [
                     'class' => PhpMessageSource::class,
-                    'basePath' => '@humhub/messages'
+                    'basePath' => '@humhub/messages',
+                ],
+                'SearchModule.*' => [
+                    // Temporary: During conversion of the search module
+                    'class' => PhpMessageSource::class,
+                    'basePath' => '@humhub/messages',
                 ],
                 'custom' => [
                     'class' => PhpMessageSource::class,
-                    'basePath' => '@humhub/messages'
+                    'basePath' => '@humhub/messages',
                 ],
             ],
         ],
         'formatter' => [
             'class' => \humhub\components\i18n\Formatter::class,
         ],
-        /**
-         * Deprecated
-         */
-        'formatterApp' => [
-            'class' => \yii\i18n\Formatter::class,
-        ],
         'cache' => [
-            'class' => \yii\caching\DummyCache::class,
+            'class' => \yii\caching\FileCache::class,
+        ],
+        'systemRevision' => [
+            'class' => \humhub\components\bootstrap\SystemRevision::class,
+        ],
+        'runtimeCache' => [
+            'class' => \yii\caching\ArrayCache::class,
+            'serializer' => false,
         ],
         'mailer' => [
             'class' => \humhub\components\mail\Mailer::class,
@@ -112,21 +163,38 @@ $config = [
             'view' => [
                 'class' => \yii\web\View::class,
                 'theme' => [
-                    'class' => \humhub\modules\ui\view\components\Theme::class,
-                    'name' => 'HumHub'
+                    'class' => \humhub\components\Theme::class,
+                    'name' => \humhub\components\Theme::CORE_THEME_NAME,
+                    'basePath' => '@humhub/themes/' . \humhub\components\Theme::CORE_THEME_NAME,
                 ],
             ],
         ],
         'assetManager' => [
-            'class' => \humhub\components\AssetManager::class,
+            'class' => \humhub\components\assets\AssetManager::class,
             'appendTimestamp' => true,
-            'bundles' => require(__DIR__ . '/' . (YII_ENV_PROD || YII_ENV_TEST ? 'assets-prod.php' : 'assets-dev.php')),
+            'bundles' => (function () {
+                $file = __DIR__ . '/' . (YII_ENV_PROD || YII_ENV_TEST ? 'assets-prod.php' : 'assets-dev.php');
+                return file_exists($file) ? require $file : [];
+            })(),
+        ],
+        'img' => [
+            'class' => 'humhub\components\assets\AssetImageRegistry',
+            'definitions' => [
+                'logo' => ['file' => '/logo_image/logo.png'],
+                'icon' => [
+                    'file' => '/icon/icon.png',
+                    'defaultFile' => '@humhub/resources/img/default_icon.png',
+                ],
+                'loginBackground' => ['file' => '/login-bg/background.png'],
+                'mailHeader' => ['file' => '/mail-header/header.png'],
+            ],
         ],
         'view' => [
-            'class' => \humhub\modules\ui\view\components\View::class,
+            'class' => \humhub\components\View::class,
             'theme' => [
-                'class' => \humhub\modules\ui\view\components\Theme::class,
-                'name' => 'HumHub',
+                'class' => \humhub\components\Theme::class,
+                'name' => \humhub\components\Theme::CORE_THEME_NAME,
+                'basePath' => '@humhub/themes/' . \humhub\components\Theme::CORE_THEME_NAME,
             ],
         ],
         'db' => [
@@ -134,7 +202,7 @@ $config = [
             // Fix for MySQL 8.0.21+: https://github.com/yiisoft/yii2/issues/18207
             'schemaMap' => [
                 'mysqli' => 'humhub\components\db\MysqlSchema',
-                'mysql' => 'humhub\components\db\MysqlSchema'
+                'mysql' => 'humhub\components\db\MysqlSchema',
             ],
             'dsn' => 'mysql:host=localhost;dbname=humhub',
             'username' => '',
@@ -146,6 +214,10 @@ $config = [
         'authClientCollection' => [
             'class' => \humhub\modules\user\authclient\Collection::class,
             'clients' => [],
+        ],
+        'userSourceCollection' => [
+            'class' => \humhub\modules\user\source\UserSourceCollection::class,
+            'userSources' => [],
         ],
         'queue' => [
             'class' => \humhub\modules\queue\driver\MySQL::class,
@@ -160,14 +232,15 @@ $config = [
             ],
         ],
         'mutex' => [
-            'class' => \yii\mutex\MysqlMutex::class
+            'class' => \yii\mutex\MysqlMutex::class,
         ],
     ],
     'params' => [
         'installed' => false,
-        'databaseInstalled' => false,
+        'databaseDefaultStorageEngine' => 'InnoDB',
         'dynamicConfigFile' => '@config/dynamic.php',
         'moduleAutoloadPaths' => ['@app/modules', '@humhub/modules'],
+        'bsVersion' => 5, // Kartik Plugins
         'availableLanguages' => [
             'en-US' => 'English (US)',
             'en-GB' => 'English (UK)',
@@ -178,12 +251,13 @@ $config = [
             'pt' => 'Português',
             'pt-BR' => 'Português do Brasil',
             'es' => 'Español',
+            'es-419' => 'Español (latinoamericano)',
             'ca' => 'Català',
             'it' => 'Italiano',
             'th' => 'ไทย',
             'tr' => 'Türkçe',
             'ru' => 'Русский',
-            'uk' => 'українська',
+            'uk' => 'Українська',
             'el' => 'Ελληνικά',
             'ja' => '日本語',
             'hu' => 'Magyar',
@@ -194,25 +268,29 @@ $config = [
             'an' => 'Aragonés',
             'vi' => 'Tiếng Việt',
             'sv' => 'Svenska',
-            'cs' => 'čeština',
-            'da' => 'dansk',
+            'cs' => 'Čeština',
+            'da' => 'Dansk',
             'uz' => 'Ўзбек',
             'fa-IR' => 'فارسی',
-            'bg' => 'български',
-            'sk' => 'slovenčina',
-            'ro' => 'română',
+            'bg' => 'Български',
+            'sk' => 'Slovenčina',
+            'ro' => 'Română',
             'ar' => 'العربية/عربي‎‎',
             'ko' => '한국어',
             'id' => 'Bahasa Indonesia',
-            'lt' => 'lietuvių kalba',
+            'lt' => 'Lietuvių kalba',
             'ht' => 'Kreyòl ayisyen',
             'lv' => 'Latvijas',
             'sl' => 'Slovenščina',
             'hr' => 'Hrvatski',
             'am' => 'አማርኛ',
-            'fi' => 'suomalainen',
+            'fi' => 'Suomalainen',
             'he' => 'עברית',
-            'sq' => 'Shqip'
+            'sq' => 'Shqip',
+            'cy' => 'Cymraeg',
+            'sw' => 'Kiswahili',
+            'sr' => 'Сербисцх',
+            'eu' => 'Basque',
         ],
         'ldap' => [
             // LDAP date field formats
@@ -241,9 +319,8 @@ $config = [
             // Marketplace / New Version Check
             'apiEnabled' => true,
             'apiUrl' => 'https://api.humhub.com',
-        ],
-        'search' => [
-            'zendLucenceDataDir' => '@runtime/searchdb',
+            'goUrl' => 'https://go.humhub.com',
+            'disableAuthChoicesIos' => false,
         ],
         'curl' => [
             // Check SSL certificates on cURL requests
@@ -252,19 +329,22 @@ $config = [
         // Allowed languages limitation (optional)
         'allowedLanguages' => [],
         'defaultPermissions' => [],
-        'tour' => [
-            'acceptableNames' => ['interface', 'administration', 'profile', 'spaces']
-        ],
         'richText' => [
             'class' => \humhub\modules\content\widgets\richtext\ProsemirrorRichText::class,
         ],
         'twemoji' => [
-            'path' => '@web-static/img/twemoji/',
-            'size' => '72x72'
+            'path' => null,
+            'size' => '72x72',
         ],
         'enablePjax' => true,
         'dailyCronExecutionTime' => '18:00',
-    ]
+    ],
+    'container' => [
+        'definitions' => [
+            \yii\validators\RequiredValidator::class => \humhub\components\validators\RequiredValidator::class,
+            \yii\validators\TrimValidator::class => \humhub\components\validators\TrimValidator::class,
+        ],
+    ],
 ];
 
 return $config;

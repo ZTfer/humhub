@@ -1,14 +1,16 @@
 <?php
 
-use yii\bootstrap\Html;
+use humhub\helpers\Html;
+use humhub\modules\friendship\widgets\ManageMenu;
 use humhub\widgets\GridView;
+
 ?>
 <div class="panel-heading">
     <?php echo Yii::t('FriendshipModule.base', '<strong>Sent</strong> friend requests'); ?>
 </div>
 
 
-<?php echo \humhub\modules\friendship\widgets\ManageMenu::widget(['user' => $user]); ?>
+<?php echo ManageMenu::widget(['user' => $user]); ?>
 
 <div class="panel-body">
     <?php
@@ -22,21 +24,16 @@ use humhub\widgets\GridView;
                 'header' => Yii::t('base', 'Actions'),
                 'class' => 'yii\grid\ActionColumn',
                 'buttons' => [
-                    'update' => function () {
+                    'update' => function (): void {
                         return;
                     },
-                    'view' => function () {
+                    'view' => function (): void {
                         return;
                     },
-                    'delete' => function($url, $model) {
-                        return Html::a('Cancel', ['/friendship/request/delete', 'userId' => $model->id], ['class' => 'btn btn-danger btn-sm', 'data-method' => 'POST']);
-                    },
-                        ],
-                    ]],
-            ]);
-            ?>
+                    'delete' => fn($url, $model) => Html::a(Yii::t('base', 'Cancel'), ['/friendship/request/delete', 'userId' => $model->id], ['class' => 'btn btn-danger btn-sm', 'data-method' => 'POST']),
+                ],
+            ]],
+    ]);
+    ?>
 
 </div>
-
-
-

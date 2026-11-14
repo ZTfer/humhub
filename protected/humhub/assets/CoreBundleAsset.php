@@ -2,13 +2,11 @@
 
 namespace humhub\assets;
 
-use humhub\components\assets\WebStaticAssetBundle;
+use humhub\components\assets\AssetBundle;
 use humhub\modules\activity\assets\ActivityAsset;
 use humhub\modules\comment\assets\CommentAsset;
-use humhub\modules\content\assets\ContentAsset;
 use humhub\modules\content\assets\ContentContainerAsset;
 use humhub\modules\content\assets\ProseMirrorRichTextAsset;
-use humhub\modules\file\assets\FileAsset;
 use humhub\modules\like\assets\LikeAsset;
 use humhub\modules\live\assets\LiveAsset;
 use humhub\modules\notification\assets\NotificationAsset;
@@ -29,17 +27,21 @@ use humhub\modules\user\assets\UserPickerAsset;
  * > Note: this class should not depend on any style assets, otherwise an extra humhub-bundle.css will be created which
  * will triggers an extra asset request. All core style assets should be part of the `AppAsset` class.
  */
-class CoreBundleAsset extends WebStaticAssetBundle
+class CoreBundleAsset extends AssetBundle
 {
-    const BUNDLE_NAME = 'defer';
+    /**
+     * @inheritdoc
+     */
+    public $sourcePath = '@humhub/resources';
 
-    public $defaultDepends = false;
+    public const BUNDLE_NAME = 'defer';
 
-    const STATIC_DEPENDS = [
+    public const STATIC_DEPENDS = [
         AppAsset::class,
         JqueryHighlightAsset::class,
         JqueryAutosizeAsset::class,
         Select2Asset::class,
+        Select2SearchInputPlaceholderAsset::class,
         JqueryWidgetAsset::class,
         NProgressAsset::class,
         JqueryNiceScrollAsset::class,
@@ -52,6 +54,7 @@ class CoreBundleAsset extends WebStaticAssetBundle
         CoreExtensionAsset::class,
         ProsemirrorEditorAsset::class,
         ProseMirrorRichTextAsset::class,
+        JqueryCookieAsset::class,
         UserAsset::class,
         LiveAsset::class,
         NotificationAsset::class,
@@ -65,11 +68,7 @@ class CoreBundleAsset extends WebStaticAssetBundle
         LikeAsset::class,
         StreamAsset::class,
         ActivityAsset::class,
-        SpaceChooserAsset::class
-    ];
-
-    public $js = [
-        'js/humhub/legacy/jquery.loader.js'
+        SpaceChooserAsset::class,
     ];
 
     public $depends = self::STATIC_DEPENDS;

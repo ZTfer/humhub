@@ -9,25 +9,26 @@
 namespace humhub\modules\user\models;
 
 use humhub\components\ActiveRecord;
-use humhub\modules\search\libs\SearchHelper;
+use humhub\modules\user\models\fieldtype\BaseTypeVirtual;
+use yii\db\ActiveQuery;
 
 /**
  * This is the model class for table "group_admin".
  *
- * @property integer $id
- * @property integer $user_id
- * @property integer $group_id
+ * @property int $id
+ * @property int $user_id
+ * @property int $group_id
+ * @property bool $is_group_manager
  * @property string $created_at
- * @property integer $created_by
+ * @property int $created_by
  * @property string $updated_at
- * @property integer $updated_by
+ * @property int $updated_by
  * @property User $user
  * @property Group $group
  */
 class GroupUser extends ActiveRecord
 {
-
-    const SCENARIO_REGISTRATION = 'registration';
+    public const SCENARIO_REGISTRATION = 'registration';
 
     /**
      * @inheritdoc
@@ -46,7 +47,7 @@ class GroupUser extends ActiveRecord
             [['user_id', 'group_id'], 'required'],
             [['user_id', 'group_id'], 'integer'],
             [['group_id'], 'validateGroupId'],
-            [['user_id', 'group_id'], 'unique', 'targetAttribute' => ['user_id', 'group_id'], 'message' => 'The combination of User ID and Group ID has already been taken.']
+            [['user_id', 'group_id'], 'unique', 'targetAttribute' => ['user_id', 'group_id'], 'message' => 'The combination of User ID and Group ID has already been taken.'],
         ];
     }
 
@@ -81,15 +82,12 @@ class GroupUser extends ActiveRecord
      */
     public function afterSave($insert, $changedAttributes)
     {
-        if ($insert) {
-            if ($this->group !== null && $this->group->groupSpaces !== null) {
-                foreach ($this->group->groupSpaces as $groupSpace) {
-                    $groupSpace->space->addMember($this->user->id);
-                }
+        if ($insert && $this->group instanceof Group && $this->user instanceof User) {
+            foreach ($this->group->getAllGroupSpaces()->each() as $groupSpace) {
+                /* @var GroupSpace $groupSpace */
+                $groupSpace->space->addMember($this->user->id);
             }
-            if ($this->user !== null) {
-                $this->user->updateSearch();
-            }
+            BaseTypeVirtual::flushCache($this->user);
         }
 
         parent::afterSave($insert, $changedAttributes);
@@ -100,14 +98,17 @@ class GroupUser extends ActiveRecord
      */
     public function afterDelete()
     {
-        SearchHelper::queueUpdate($this->user);
+        if ($this->user instanceof User) {
+            BaseTypeVirtual::flushCache($this->user);
+        }
+
         parent::afterDelete();
     }
 
     /**
      * Returns all Group relation
      *
-     * @return \yii\db\ActiveQuery
+     * @return ActiveQuery
      */
     public function getGroup()
     {
@@ -117,7 +118,7 @@ class GroupUser extends ActiveRecord
     /**
      * Returns all User relation
      *
-     * @return \yii\db\ActiveQuery
+     * @return ActiveQuery
      */
     public function getUser()
     {
@@ -129,9 +130,9 @@ class GroupUser extends ActiveRecord
      */
     public function validateGroupId()
     {
-        if ($this->scenario == static::SCENARIO_REGISTRATION) {
+        if ($this->scenario == self::SCENARIO_REGISTRATION) {
             if ($this->group_id != '') {
-                $registrationGroups = Group::getRegistrationGroups();
+                $registrationGroups = Group::getRegistrationGroups($this->user);
                 foreach ($registrationGroups as $group) {
                     if ($this->group_id == $group->id) {
                         return;

@@ -5,23 +5,27 @@
  * @license https://www.humhub.com/licences
  */
 
-$i = 0;
+use humhub\helpers\Html;
+use humhub\modules\ui\menu\MenuLink;
+
+/* @var $this \humhub\components\View */
+/* @var $entries MenuLink[] */
+/* @var $options array */
+/* @var $menu \humhub\widgets\FooterMenu */
+
+
+/**
+ * NOTE: This template is used only in mobile view ports!
+ */
+
 ?>
 
-<?php if ($numItems > 0): ?>
-    <li class="divider visible-sm visible-xs"></li>
-
-    <?php foreach ($items as $item): ?>
-        <?php if ($item['label'] == '---'): ?>
-            <li class="divider visible-sm visible-xs"></li>
-        <?php else: ?>
-            <li class="visible-sm visible-xs">
-                <a <?= isset($item['id']) ? 'id="' . $item['id'] . '"' : '' ?>
-                    href="<?= $item['url']; ?>" <?= isset($item['pjax']) && $item['pjax'] === false ? 'data-pjax-prevent' : '' ?>>
-                    <small>
-                        <?= $item['icon'] . ' ' . $item['label']; ?>
-                    </small>
-                </a>
+<?php if (!empty($entries)): ?>
+    <li class="d-md-none"><hr class="dropdown-divider"></li>
+    <?php foreach ($entries as $entry): ?>
+        <?php if ($entry instanceof MenuLink): ?>
+            <li class="d-md-none footer-nav-entry">
+                <?= Html::a($entry->getIcon() . ' ' . ($entry->getLink()->encodeLabel ? Html::encode($entry->getLabel()) : $entry->getLabel()), $entry->getUrl(), $entry->getHtmlOptions()); ?>
             </li>
         <?php endif; ?>
     <?php endforeach; ?>

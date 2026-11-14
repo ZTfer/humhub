@@ -1,10 +1,10 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
  * @license https://www.humhub.com/licences
  */
-
 
 namespace humhub\tests\codeception\unit;
 
@@ -21,7 +21,7 @@ use yii\data\ArrayDataProvider;
  */
 class SpreadsheetExportTest extends Unit
 {
-    const TEST_FILE = 'test.csv';
+    public const TEST_FILE = 'test.csv';
 
     /**
      * @var \UnitTester
@@ -70,7 +70,7 @@ class SpreadsheetExportTest extends Unit
                         'name' => 'second',
                     ],
                 ],
-            ])
+            ]),
         ]);
 
         $result = $exporter->export();
@@ -80,8 +80,8 @@ class SpreadsheetExportTest extends Unit
         $this->assertFileExists(self::TEST_FILE, 'Result file does not exist.');
 
         $data = file_get_contents(self::TEST_FILE);
-        $this->assertContains('"Id","Name"', $data, 'Header not present in content.');
-        $this->assertContains('"1","first"', $data, 'Data not present in content.');
-        $this->assertContains('"2","second"', $data, 'Data not present in content.');
+        $this->assertStringContainsString('"Id","Name"', $data, 'Header not present in content.');
+        $this->assertStringContainsString('"1","first"', $data, 'Data not present in content.');
+        $this->assertStringContainsString('"2","second"', $data, 'Data not present in content.');
     }
 }

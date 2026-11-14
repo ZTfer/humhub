@@ -1,44 +1,35 @@
 <?php
 
-/**
- * @link https://www.humhub.org/
- * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
- * @license https://www.humhub.com/licences
- */
-
 namespace humhub\modules\comment\controllers;
 
 use humhub\components\access\ControllerAccess;
 use humhub\components\Controller;
-use humhub\libs\Helpers;
-use humhub\modules\comment\models\forms\CommentForm;
-use humhub\modules\comment\Module;
-use humhub\modules\comment\widgets\Form;
-use humhub\modules\content\components\ContentActiveRecord;
-use humhub\modules\content\models\Content;
-use Yii;
-use yii\data\Pagination;
-use yii\web\HttpException;
-use yii\helpers\Url;
+use humhub\helpers\Html;
+use humhub\modules\comment\helpers\IdHelper;
+use humhub\modules\comment\models\AdminDeleteCommentForm;
 use humhub\modules\comment\models\Comment;
+use humhub\modules\comment\notifications\CommentDeleted;
+use humhub\modules\comment\services\CommentListService;
+use humhub\modules\comment\widgets\AdminDeleteModal;
 use humhub\modules\comment\widgets\Comment as CommentWidget;
+use humhub\modules\comment\widgets\Form;
 use humhub\modules\comment\widgets\ShowMore;
+use humhub\modules\content\models\Content;
+use humhub\modules\file\handler\FileHandlerCollection;
+use Yii;
+use yii\helpers\Url;
+use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 
-/**
- * CommentController provides all comment related actions.
- *
- * @package humhub.modules_core.comment.controllers
- * @property Module $module
- * @since 0.5
- */
 class CommentController extends Controller
 {
-    /**
-     * @return array
-     */
-    public function getAccessRules()
+    public ?Comment $comment = null;
+    private ?Content $content = null;
+
+    public ?Comment $parentComment = null;
+
+    protected function getAccessRules()
     {
         return [
             [ControllerAccess::RULE_LOGGED_IN_ONLY => ['post', 'edit', 'delete']],
@@ -46,107 +37,132 @@ class CommentController extends Controller
         ];
     }
 
-    /**
-     * @var Comment|ContentActiveRecord The model to comment
-     */
-    public $target;
-
-
-    /**
-     * @inheritDoc
-     */
     public function beforeAction($action)
     {
-        $modelClass = Yii::$app->request->get('objectModel', Yii::$app->request->post('objectModel'));
-        $modelPk = (int) Yii::$app->request->get('objectId', Yii::$app->request->post('objectId'));
-
-        Helpers::CheckClassType($modelClass, [Comment::class, ContentActiveRecord::class]);
-        $this->target = $modelClass::findOne(['id' => $modelPk]);
-
-        if (!$this->target) {
-            throw new NotFoundHttpException('Could not find underlying content or content addon record!');
+        if (!parent::beforeAction($action)) {
+            return false;
         }
 
-        if (!$this->target->content->canView()) {
+        $commentId = (int)Yii::$app->request->get('id', Yii::$app->request->post('id'));
+        $parentCommentId = (int)Yii::$app->request->get(
+            'parentCommentId',
+            Yii::$app->request->post('parentCommentId'),
+        );
+        $contentId = (int)Yii::$app->request->get('contentId', Yii::$app->request->post('contentId'));
+
+        if ($commentId) {
+            $this->comment = Comment::findOne(['id' => $commentId]);
+            $this->content = $this->comment?->content;
+            $this->parentComment = $this->comment?->parentComment;
+        } elseif ($parentCommentId) {
+            $this->parentComment = Comment::findOne(['id' => $parentCommentId]);
+            $this->content = $this->parentComment?->content;
+        } elseif ($contentId) {
+            $this->content = Content::findOne(['id' => $contentId]);
+        }
+
+        if (!$this->content) {
+            throw new NotFoundHttpException();
+        }
+
+        if (!$this->content->canView()) {
             throw new ForbiddenHttpException();
         }
 
-        return parent::beforeAction($action);
+        return true;
     }
 
-
-    /**
-     * Returns a List of all Comments belong to this Model
-     */
     public function actionShow()
     {
-        //TODO: Dont use query logic in controller layer...
+        $commentId = (int)Yii::$app->request->get('commentId');
+        $direction = Yii::$app->request->get('direction', CommentListService::LIST_DIR_PREV);
+        $pageSize = (int)Yii::$app->request->get('pageSize', $this->module->commentsBlockLoadSize);
+        if ($pageSize > $this->module->commentsBlockLoadSize) {
+            $pageSize = $this->module->commentsBlockLoadSize;
+        }
 
-        $query = Comment::find();
-        $query->orderBy('created_at DESC');
-        $query->where(['object_model' => get_class($this->target), 'object_id' => $this->target->getPrimaryKey()]);
+        $comments = (new CommentListService($this->content, $this->parentComment))->getSiblings(
+            $commentId,
+            $pageSize,
+            $direction,
+        );
 
-        $pagination = new Pagination([
-            'totalCount' => Comment::GetCommentCount(get_class($this->target), $this->target->getPrimaryKey()),
-            'pageSize' => $this->module->commentsBlockLoadSize
-        ]);
-
-        $query->offset($pagination->offset)->limit($pagination->limit);
-        $comments = array_reverse($query->all());
-
-        $output = ShowMore::widget(['pagination' => $pagination, 'object' => $this->target]);
+        $output = '';
+        if ($direction === CommentListService::LIST_DIR_PREV) {
+            $output .= ShowMore::widget([
+                'content' => $this->content,
+                'parentComment' => $this->parentComment,
+                'pageSize' => $pageSize,
+                'commentId' => isset($comments[0]) ? $comments[0]->id : null,
+                'direction' => $direction,
+            ]);
+        }
         foreach ($comments as $comment) {
-            $output .= CommentWidget::widget(['comment' => $comment]);
+            $output .= $this->renderCommentWithSeparator($comment);
+        }
+        if ($direction === CommentListService::LIST_DIR_NEXT && count($comments) > 1) {
+            $output .= ShowMore::widget([
+                'content' => $this->content,
+                'parentComment' => $this->parentComment,
+                'pageSize' => $pageSize,
+                'commentId' => $comments[count($comments) - 1]->id,
+                'direction' => $direction,
+            ]);
         }
 
         if (Yii::$app->request->get('mode') === 'popup') {
-            return $this->renderAjax('showPopup', ['object' => $this->target, 'output' => $output, 'id' => $this->target->content->getUniqueId()]);
+            return $this->renderAjax(
+                'showPopup',
+                [
+                    'content' => $this->content,
+                    'output' => $output,
+                    'id' => IdHelper::getId($this->content, $this->parentComment),
+                ],
+            );
         } else {
             return $this->renderAjaxContent($output);
         }
     }
 
-    /**
-     * Handles AJAX Post Request to submit new Comment
-     */
     public function actionPost()
     {
-        if (!$this->module->canComment($this->target)) {
+        if (!$this->module->canComment($this->content)) {
             throw new ForbiddenHttpException();
         }
 
-        return Comment::getDb()->transaction(function ($db) {
+        $model = new Comment();
+        $model->content_id = $this->content->id;
+        $model->parent_comment_id = $this->parentComment?->id;
 
-            $form = new CommentForm($this->target);
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            return $this->renderAjaxContent($this->renderCommentWithSeparator($model));
+        }
 
-            if ($form->load(Yii::$app->request->post()) && $form->save()) {
-                return $this->renderAjaxContent(CommentWidget::widget(['comment' => $form->comment]));
-            }
+        Yii::$app->response->statusCode = 400;
 
-            Yii::$app->response->statusCode = 400;
-
-            return $this->renderAjaxContent(Form::widget([
-                'object' => $this->target,
-                'model' => $form->comment
-            ]));
-        });
+        return $this->renderAjaxContent(Form::widget([
+            'content' => $this->content,
+            'parentComment' => $this->parentComment,
+            'model' => $model,
+            'isHidden' => false,
+        ]));
     }
 
 
-    public function actionEdit($id)
+    public function actionEdit()
     {
-        $comment = $this->getComment($id);
+        if ($this->comment === null) {
+            throw new NotFoundHttpException();
+        }
 
-        if (!$comment->canEdit()) {
+        if (!$this->comment->canEdit()) {
             throw new ForbiddenHttpException();
         }
 
-        $form = new CommentForm($this->target, $comment);
-
-        if ($form->load(Yii::$app->request->post()) && $form->save()) {
+        if ($this->comment->load(Yii::$app->request->post()) && $this->comment->save()) {
             return $this->renderAjaxContent(CommentWidget::widget([
-                'comment' => $form->comment,
-                'justEdited' => true
+                'comment' => $this->comment,
+                'justEdited' => true,
             ]));
         }
 
@@ -154,75 +170,102 @@ class CommentController extends Controller
             Yii::$app->response->statusCode = 400;
         }
 
-        $submitUrl = Url::to(['/comment/comment/edit',
-            'id' => $comment->id,
-            'objectModel' => $comment->object_model,
-            'objectId' => $comment->object_id
-        ]);
-
         return $this->renderAjax('edit', [
-            'comment' => $comment,
-            'objectModel' => $comment->object_model,
-            'objectId' => $comment->object_id,
-            'submitUrl' => $submitUrl
+            'comment' => $this->comment,
+            'submitUrl' => Url::to(['/comment/comment/edit', 'id' => $this->comment->id]),
+            'fileHandlers' => FileHandlerCollection::getByType(
+                [FileHandlerCollection::TYPE_IMPORT, FileHandlerCollection::TYPE_CREATE],
+            ),
         ]);
     }
 
-    /**
-     * @param $id
-     * @return mixed
-     * @throws ForbiddenHttpException
-     * @throws NotFoundHttpException
-     */
-    public function actionLoad($id)
+    public function actionLoad()
     {
-        $comment = $this->getComment($id);
-
-        if (!$comment->canRead()) {
-            throw new ForbiddenHttpException();
-        }
-
-        return $this->renderAjaxContent(CommentWidget::widget(['comment' => $comment]));
-    }
-
-    /**
-     * @param $id
-     * @return \yii\web\Response
-     * @throws ForbiddenHttpException
-     * @throws HttpException
-     * @throws NotFoundHttpException
-     * @throws \Throwable
-     * @throws \yii\db\StaleObjectException
-     */
-    public function actionDelete($id)
-    {
-        $this->forcePostRequest();
-
-        $comment = $this->getComment($id);
-
-        if(!$comment->canDelete()) {
-            throw new ForbiddenHttpException();
-        }
-
-        $comment->delete();
-
-        return $this->asJson(['success' => true]);
-    }
-
-    /**
-     * @param $id
-     * @return Comment
-     * @throws NotFoundHttpException
-     */
-    private function getComment($id)
-    {
-        $comment = Comment::findOne(['id' => $id]);
-
-        if(!$comment) {
+        if ($this->comment === null) {
             throw new NotFoundHttpException();
         }
 
-        return $comment;
+        if (!$this->comment->canView()) {
+            throw new ForbiddenHttpException();
+        }
+
+        return $this->renderAjaxContent(CommentWidget::widget([
+            'comment' => $this->comment,
+            'showBlocked' => Yii::$app->request->get('showBlocked'),
+        ]));
+    }
+
+    public function actionDelete()
+    {
+        $this->forcePostRequest();
+
+        if ($this->comment === null) {
+            throw new NotFoundHttpException();
+        }
+
+        if (!$this->comment->canDelete()) {
+            throw new ForbiddenHttpException();
+        }
+
+        $form = new AdminDeleteCommentForm();
+
+        if ($form->load(Yii::$app->request->post()) && $form->validate()) {
+            if (!$form->validate()) {
+                throw new BadRequestHttpException();
+            }
+
+            if ($form->notify) {
+                $commentDeleted = CommentDeleted::instance()
+                    ->from(Yii::$app->user->getIdentity())
+                    ->about($this->comment->content->getPolymorphicRelation())
+                    ->payload(
+                        [
+                            'commentText' => (new CommentDeleted())->getContentPreview($this->comment, 30),
+                            'reason' => $form->message,
+                        ],
+                    );
+                $commentDeleted->saveRecord($this->comment->createdBy);
+
+                $commentDeleted->record->updateAttributes([
+                    'send_web_notifications' => 1,
+                ]);
+            }
+        }
+
+        return $this->asJson(['success' => $this->comment->delete()]);
+    }
+
+    public function actionGetAdminDeleteModal($id)
+    {
+        Yii::$app->response->format = 'json';
+
+        if ($this->comment === null) {
+            throw new NotFoundHttpException();
+        }
+
+        if (!$this->comment->canDelete()) {
+            throw new ForbiddenHttpException();
+        }
+
+        return [
+            'header' => Yii::t('CommentModule.base', '<strong>Delete</strong> comment?'),
+            'body' => AdminDeleteModal::widget([
+                'model' => new AdminDeleteCommentForm(),
+            ]),
+            'confirmText' => Yii::t('CommentModule.base', 'Confirm'),
+            'cancelText' => Yii::t('CommentModule.base', 'Cancel'),
+        ];
+    }
+
+    /**
+     * Renders a comment prefixed with the same separator the comment list places
+     * between entries (see comments.php), so comments inserted via AJAX keep the
+     * spacing. CSS hides the separator when it ends up first in the list.
+     */
+    private function renderCommentWithSeparator(Comment $comment): string
+    {
+        return Html::tag('hr', '', ['class' => 'comment-separator'])
+            . CommentWidget::widget(['comment' => $comment]);
     }
 
 }

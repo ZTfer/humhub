@@ -1,4 +1,5 @@
 <?php
+
 namespace humhub\tests\codeception\unit\models;
 
 use humhub\models\UrlOembed;
@@ -12,14 +13,19 @@ class UrlOembedTest extends HumHubDbTestCase
     {
         parent::_before();
         UrlOembedMock::setClient(new UrlOembedClientMock());
-        UrlOembedMock::setProviders(['test.de' => UrlOembedMock::TEST_PROVIDER_URL_PREFIX.'%url%']);
+        UrlOembedMock::setProviders([
+            'Test.de' => [
+                'pattern' => '/test\.de/',
+                'endpoint' => UrlOembedMock::TEST_PROVIDER_URL_PREFIX . '%url%',
+            ],
+        ]);
         UrlOembedMock::flush();
     }
 
     public function testProviderUrl()
     {
         $oembed = new UrlOembedMock(['url' => UrlOembedMock::TEST_VIDEO_URL_A]);
-        $this->assertEquals(UrlOembedMock::TEST_PROVIDER_URL_PREFIX.urlencode( UrlOembedMock::TEST_VIDEO_URL_A), $oembed->getProviderUrl());
+        $this->assertEquals(UrlOembedMock::TEST_PROVIDER_URL_PREFIX . urlencode(UrlOembedMock::TEST_VIDEO_URL_A), $oembed->getProviderUrl());
     }
 
     public function testInvalidProviderUrl()
@@ -38,7 +44,7 @@ class UrlOembedTest extends HumHubDbTestCase
     {
         $result = UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A);
         $this->assertNotNull($result);
-        $this->assertContains(UrlOembedMock::TEST_VIDEO_A_PREVIEW, $result);
+        $this->assertStringContainsString(UrlOembedMock::TEST_VIDEO_A_PREVIEW, $result);
         $this->assertEquals(1, $this->getOembedRecordCount());
     }
 
@@ -52,36 +58,36 @@ class UrlOembedTest extends HumHubDbTestCase
     public function testGetOembedFetchLimit()
     {
         UrlOembedMock::$maxUrlFetchLimit = 3;
-        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=1');
-        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=2');
-        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=3');
+        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=1');
+        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=2');
+        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=3');
 
-        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=4');
-        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=5');
-        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=6');
+        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=4');
+        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=5');
+        UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=6');
 
         $this->assertEquals(3, UrlOembedMock::getFetchUrlCount());
         $this->assertEquals(3, $this->getOembedRecordCount());
 
-        $this->assertTrue(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A.'&a=1'));
-        $this->assertTrue(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A.'&a=2'));
-        $this->assertTrue(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A.'&a=3'));
+        $this->assertTrue(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A . '&a=1'));
+        $this->assertTrue(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A . '&a=2'));
+        $this->assertTrue(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A . '&a=3'));
 
-        $this->assertFalse(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A.'&a=4'));
-        $this->assertFalse(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A.'&a=5'));
-        $this->assertFalse(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A.'&a=6'));
+        $this->assertFalse(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A . '&a=4'));
+        $this->assertFalse(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A . '&a=5'));
+        $this->assertFalse(UrlOembedMock::isCached(UrlOembedMock::TEST_VIDEO_URL_A . '&a=6'));
     }
 
     public function testPreloadFetchLimit()
     {
         UrlOembedMock::$maxUrlFetchLimit = 3;
 
-        $text = UrlOembedMock::TEST_VIDEO_URL_A.'&a=1 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=2 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=3 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=4 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=5 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=6 ';
+        $text = UrlOembedMock::TEST_VIDEO_URL_A . '&a=1 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=2 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=3 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=4 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=5 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=6 ';
 
         UrlOembedMock::preload($text);
         $this->assertEquals(3, UrlOembedMock::getFetchUrlCount());
@@ -91,18 +97,18 @@ class UrlOembedTest extends HumHubDbTestCase
     {
         UrlOembedMock::$maxUrlFetchLimit = 6;
 
-        $text = UrlOembedMock::TEST_VIDEO_URL_A.'&a=1 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=2 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=3 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=4 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=5 '.
-            UrlOembedMock::TEST_VIDEO_URL_A.'&a=6 ';
+        $text = UrlOembedMock::TEST_VIDEO_URL_A . '&a=1 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=2 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=3 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=4 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=5 '
+            . UrlOembedMock::TEST_VIDEO_URL_A . '&a=6 ';
 
         UrlOembedMock::preload($text);
 
-        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=1'));
-        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=2'));
-        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=3'));
+        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=1'));
+        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=2'));
+        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=3'));
 
         $this->assertEquals(6, $this->getOembedRecordCount());
         $this->assertEquals(6, UrlOembedMock::getFetchUrlCount());
@@ -111,11 +117,21 @@ class UrlOembedTest extends HumHubDbTestCase
 
         UrlOembedMock::flush();
 
-        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=1'));
-        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=2'));
-        $this->assertNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A.'&a=3'));
+        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=1'));
+        $this->assertNotNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=2'));
+        $this->assertNull(UrlOembedMock::getOEmbed(UrlOembedMock::TEST_VIDEO_URL_A . '&a=3'));
 
         $this->assertEquals(2, UrlOembedMock::getFetchLoadCount());
+    }
+
+    public function testConfirmationContentEncodesUrl()
+    {
+        $url = 'https:youtube.com<script>alert(1)</script>';
+        $html = UrlOembedMock::buildConfirmationContent($url);
+
+        // The requested url is attacker controllable and must be rendered inert
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
     private function getOembedRecordCount()
@@ -123,5 +139,19 @@ class UrlOembedTest extends HumHubDbTestCase
         return UrlOembedMock::find()->count();
     }
 
+    public function testRestrictAllowedDomains()
+    {
+        $this->becomeUser('User1');
 
+        UrlOembed::saveAllowedDomain('a.com');
+        UrlOembed::saveAllowedDomain('b.com');
+        UrlOembed::saveAllowedDomain('c.com');
+
+        // Unknown domains must not be added
+        UrlOembed::restrictAllowedDomains(['a.com', 'c.com', 'new.com']);
+        $this->assertEquals(['a.com', 'c.com'], UrlOembed::getAllowedDomains());
+
+        UrlOembed::restrictAllowedDomains([]);
+        $this->assertEquals([], UrlOembed::getAllowedDomains());
+    }
 }

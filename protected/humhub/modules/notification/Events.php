@@ -8,20 +8,24 @@
 
 namespace humhub\modules\notification;
 
+use Exception;
+use humhub\components\ActiveRecord;
+use humhub\components\behaviors\PolymorphicRelation;
 use humhub\components\Event;
 use humhub\modules\user\models\User;
 use humhub\modules\space\models\Space;
 use Yii;
 use humhub\modules\notification\models\Notification;
+use yii\base\BaseObject;
+use yii\helpers\Console;
 
 /**
  * Events provides callbacks for all defined module events.
  *
  * @author luke
  */
-class Events extends \yii\base\BaseObject
+class Events extends BaseObject
 {
-
     /**
      * On User delete, also delete all posts
      *
@@ -80,6 +84,7 @@ class Events extends \yii\base\BaseObject
                 if ($space === null) {
                     if ($integrityChecker->showFix("Deleting notification id " . $notification->id . " workspace seems to no longer exist!")) {
                         $notification->delete();
+                        continue;
                     }
                 }
             }
@@ -89,12 +94,14 @@ class Events extends \yii\base\BaseObject
                 if ($notification->source_class != "" && $notification->getSourceObject() == null) {
                     if ($integrityChecker->showFix("Deleting notification id " . $notification->id . " source class set but seems to no longer exist!")) {
                         $notification->delete();
+                        continue;
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Exception) {
                 // Handles errors for getSourceObject() calls
                 if ($integrityChecker->showFix("Deleting notification id " . $notification->id . " source class set but seems to no longer exist!")) {
                     $notification->delete();
+                    continue;
                 }
             }
 
@@ -102,6 +109,7 @@ class Events extends \yii\base\BaseObject
             if ($notification->user == null) {
                 if ($integrityChecker->showFix("Deleting notification id " . $notification->id . " target user seems to no longer exist!")) {
                     $notification->delete();
+                    continue;
                 }
             }
 
@@ -109,6 +117,7 @@ class Events extends \yii\base\BaseObject
             if (!class_exists($notification->class)) {
                 if ($integrityChecker->showFix("Deleting notification id " . $notification->id . " without valid class!")) {
                     $notification->delete();
+                    continue;
                 }
             }
 
@@ -116,6 +125,7 @@ class Events extends \yii\base\BaseObject
             if ($notification->module == "") {
                 if ($integrityChecker->showFix("Deleting notification id " . $notification->id . " without valid module!")) {
                     $notification->delete();
+                    continue;
                 }
             }
 
@@ -124,8 +134,6 @@ class Events extends \yii\base\BaseObject
                     $notification->delete();
                 }
             }
-
-
         }
     }
 
@@ -137,24 +145,45 @@ class Events extends \yii\base\BaseObject
      */
     public static function onCronDailyRun($event)
     {
+        /* @var Module $module */
+        $module = Yii::$app->getModule('notification');
+
         $controller = $event->sender;
 
-        $controller->stdout("Deleting old notifications... ");
-        /**
-         * Delete seen notifications which are older than 2 months
-         */
-        $deleteTime = time() - (60 * 60 * 24 * 31 * 2); // Notifcations which are older as ~ 2 Months
-        foreach (Notification::find()->where(['seen' => 1])->andWhere(['<', 'created_at', date('Y-m-d', $deleteTime)])->each() as $notification) {
-            $notification->delete();
-        }
-        $controller->stdout('done.' . PHP_EOL, \yii\helpers\Console::FG_GREEN);
+        $controller->stdout('Deleting old notifications... ');
+
+        // Delete seen notifications which are older than 2 months
+        self::deleteNotifications(true, $module->deleteSeenNotificationsMonths);
+
+        // Delete unseen notifications which are older than 3 months
+        self::deleteNotifications(false, $module->deleteUnseenNotificationsMonths);
+
+        $controller->stdout('done.' . PHP_EOL, Console::FG_GREEN);
+    }
+
+    /**
+     * Delete notifications after X months
+     *
+     * @param bool $seen
+     * @param int $months
+     * @return int Number of deleted notifications
+     */
+    private static function deleteNotifications(bool $seen, int $months): int
+    {
+        return Notification::deleteAll(['AND',
+            ['seen' => (int)$seen],
+            ['<', 'created_at', date('Y-m-d', mktime(0, 0, 0, date('m') - $months))],
+        ]);
     }
 
     public static function onActiveRecordDelete($event)
     {
+        /* @var ActiveRecord $record */
+        $record = $event->sender;
+
         models\Notification::deleteAll([
-            'source_class' => $event->sender->className(),
-            'source_pk' => $event->sender->getPrimaryKey(),
+            'source_class' => PolymorphicRelation::getObjectModel($record),
+            'source_pk' => $record->getPrimaryKey(),
         ]);
     }
 
@@ -164,5 +193,4 @@ class Events extends \yii\base\BaseObject
             $event->sender->addWidget(widgets\UpdateNotificationCount::class);
         }
     }
-
 }

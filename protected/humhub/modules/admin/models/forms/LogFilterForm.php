@@ -1,10 +1,9 @@
 <?php
 
-
 namespace humhub\modules\admin\models\forms;
 
-
 use DateTime;
+use Exception;
 use humhub\libs\DateHelper;
 use humhub\modules\admin\models\Log;
 use Yii;
@@ -22,18 +21,18 @@ class LogFilterForm extends Model
     /**
      * default pagination  size
      */
-    const PAGE_SIZE = 10;
+    public const PAGE_SIZE = 10;
 
 
     /**
      * default category filter for including all
      */
-    const FILTER_CATEGORY_NONE = 'none';
+    public const FILTER_CATEGORY_NONE = 'none';
 
     /**
      * special category filter for merging yii/* filter categories
      */
-    const FILTER_CATEGORY_OTHER = 'other';
+    public const FILTER_CATEGORY_OTHER = 'other';
 
     /**
      * @var string single category filter
@@ -64,19 +63,6 @@ class LogFilterForm extends Model
      * @var ActiveQuery
      */
     private $query;
-
-    /**
-     * @inheritDoc
-     */
-    public function init()
-    {
-        if($this->levels === null) {
-            $this->levels = [Logger::LEVEL_ERROR];
-        }
-
-        parent::init();
-    }
-
 
     /**
      * @inheritdoc
@@ -110,7 +96,7 @@ class LogFilterForm extends Model
         $this->pagination = new Pagination([
             'totalCount' => $countQuery->count(),
             'pageSize' => static::PAGE_SIZE,
-            'params' => $this->getUrlParams()
+            'params' => $this->getUrlParams(),
         ]);
 
         $this->query->offset($this->pagination->offset)->limit($this->pagination->limit);
@@ -126,7 +112,7 @@ class LogFilterForm extends Model
         $result = ArrayHelper::merge(Yii::$app->request->get(), [
             'category' => $this->category,
             'day' => $this->day,
-            'term' => $this->term
+            'term' => $this->term,
         ]);
 
         $result['levels'] = $this->levels;
@@ -136,7 +122,8 @@ class LogFilterForm extends Model
     /**
      * @return string the current page url with filters
      */
-    public function getUrl() {
+    public function getUrl()
+    {
         return $this->pagination->createUrl($this->pagination->getPage(true), static::PAGE_SIZE);
     }
 
@@ -145,7 +132,7 @@ class LogFilterForm extends Model
      */
     private function filterTerm()
     {
-        if(empty($this->term)) {
+        if (empty($this->term)) {
             return;
         }
 
@@ -153,7 +140,7 @@ class LogFilterForm extends Model
             ['or',
                 ['LIKE', 'message', $this->term],
                 ['LIKE', 'category', $this->term],
-            ]
+            ],
         );
     }
 
@@ -163,7 +150,7 @@ class LogFilterForm extends Model
      */
     private function filterLevels()
     {
-        if(empty($this->levels)) {
+        if (empty($this->levels)) {
             return;
         }
 
@@ -178,11 +165,11 @@ class LogFilterForm extends Model
      */
     private function filterCategory()
     {
-        if(empty($this->category) || $this->category === static::FILTER_CATEGORY_NONE) {
+        if (empty($this->category) || $this->category === static::FILTER_CATEGORY_NONE) {
             return;
         }
 
-        if($this->category === static::FILTER_CATEGORY_OTHER) {
+        if ($this->category === static::FILTER_CATEGORY_OTHER) {
             $this->query->andWhere(['LIKE', 'category', 'yii\\']);
             return;
         }
@@ -196,22 +183,22 @@ class LogFilterForm extends Model
     private function filterDay()
     {
         try {
-            if(empty($this->day)) {
+            if (empty($this->day)) {
                 return;
             }
 
             $dayDT = new DateTime(DateHelper::parseDateTime($this->day), DateHelper::getSystemTimeZone());
 
             $endDT = clone $dayDT;
-            $endDT->setTime(23,59,59);
+            $endDT->setTime(23, 59, 59);
             $end = $endDT->getTimestamp();
 
-            $start = $dayDT->setTime(0,0,0)->getTimestamp();
+            $start = $dayDT->setTime(0, 0, 0)->getTimestamp();
 
             $this->query->andWhere(['<=', 'log_time', $end]);
             $this->query->andWhere(['>=', 'log_time', $start]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Yii::error($e, 'admin');
         }
     }
@@ -233,7 +220,7 @@ class LogFilterForm extends Model
 
         $result = [];
         foreach ($levelsArr as $logArr) {
-            if(!isset($logArr['level']) || !static::getLevelLabel($logArr['level'])) {
+            if (!isset($logArr['level']) || !static::getLevelLabel($logArr['level'])) {
                 continue;
             }
 
@@ -241,6 +228,13 @@ class LogFilterForm extends Model
             $result[$level] = static::getLevelLabel($level);
         }
 
+        if (is_array($this->levels)) {
+            foreach ($this->levels as $defaultLevel) {
+                if (!isset($result[$defaultLevel]) && ($defaultLevelTitle = static::getLevelLabel($defaultLevel))) {
+                    $result[$defaultLevel] = $defaultLevelTitle;
+                }
+            }
+        }
 
         return $result;
     }
@@ -251,17 +245,13 @@ class LogFilterForm extends Model
      */
     public static function getLevelLabel($level)
     {
-        switch ($level) {
-            case Logger::LEVEL_INFO:
-                return Yii::t('AdminModule.information', 'Info');
-            case Logger::LEVEL_WARNING:
-                return Yii::t('AdminModule.information', 'Warning');
-            case Logger::LEVEL_ERROR:
-                return Yii::t('AdminModule.information', 'Error');
-            case Logger::LEVEL_TRACE:
-                return Yii::t('AdminModule.information', 'Trace');
-        }
-        return null;
+        return match ($level) {
+            Logger::LEVEL_INFO => Yii::t('AdminModule.information', 'Info'),
+            Logger::LEVEL_WARNING => Yii::t('AdminModule.information', 'Warning'),
+            Logger::LEVEL_ERROR => Yii::t('AdminModule.information', 'Error'),
+            Logger::LEVEL_TRACE => Yii::t('AdminModule.information', 'Trace'),
+            default => null,
+        };
     }
 
 
@@ -272,9 +262,9 @@ class LogFilterForm extends Model
     {
         $categoryArr = Log::find()->select('category')->distinct()->asArray()->all();
 
-        $result = [static::FILTER_CATEGORY_NONE => Yii::t('AdminModule.information','Select category..')];
+        $result = [static::FILTER_CATEGORY_NONE => Yii::t('AdminModule.information', 'Select category..')];
         foreach ($categoryArr as $logArr) {
-            if(!isset($logArr['category']) || strpos($logArr['category'], 'yii\\') === 0) {
+            if (!isset($logArr['category']) || str_starts_with($logArr['category'], 'yii\\')) {
                 continue;
             }
 

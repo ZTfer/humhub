@@ -1,4 +1,5 @@
 <?php
+
 // @codingStandardsIgnoreFile
 // @codeCoverageIgnoreStart
 
@@ -8,18 +9,22 @@
  * @author tiger
  */
 
+use Codeception\Configuration;
+use Codeception\Coverage\Filter;
+use Codeception\Util\FileSystem;
+
 if (isset($_COOKIE['CODECEPTION_CODECOVERAGE'])) {
-    $cookie = json_decode($_COOKIE['CODECEPTION_CODECOVERAGE'], true);
+    $cookie = json_decode((string) $_COOKIE['CODECEPTION_CODECOVERAGE'], true);
 
     // fix for improperly encoded JSON in Code Coverage cookie with WebDriver.
     // @see https://github.com/Codeception/Codeception/issues/874
     if (!is_array($cookie)) {
-        $cookie = json_decode($cookie, true);
+        $cookie = json_decode((string) $cookie, true);
     }
 
     if ($cookie) {
         foreach ($cookie as $key => $value) {
-            $_SERVER["HTTP_X_CODECEPTION_" . strtoupper($key)] = $value;
+            $_SERVER["HTTP_X_CODECEPTION_" . strtoupper((string) $key)] = $value;
         }
     }
 }
@@ -27,9 +32,9 @@ if (isset($_COOKIE['CODECEPTION_CODECOVERAGE'])) {
 if (!function_exists('__c3_error')) {
     function __c3_error($message)
     {
-        $errorLogFile = defined('C3_CODECOVERAGE_ERROR_LOG_FILE') ?
-            C3_CODECOVERAGE_ERROR_LOG_FILE :
-            C3_CODECOVERAGE_MEDIATE_STORAGE . DIRECTORY_SEPARATOR . 'error.txt';
+        $errorLogFile = defined('C3_CODECOVERAGE_ERROR_LOG_FILE')
+            ? C3_CODECOVERAGE_ERROR_LOG_FILE
+            : C3_CODECOVERAGE_MEDIATE_STORAGE . DIRECTORY_SEPARATOR . 'error.txt';
         if (is_writable($errorLogFile)) {
             file_put_contents($errorLogFile, $message);
         } else {
@@ -38,7 +43,7 @@ if (!function_exists('__c3_error')) {
         if (!headers_sent()) {
             header('X-Codeception-CodeCoverage-Error: ' . str_replace("\n", ' ', $message), true, 500);
         }
-        setcookie('CODECEPTION_CODECOVERAGE_ERROR', $message);
+        setcookie('CODECEPTION_CODECOVERAGE_ERROR', (string) $message);
     }
 }
 
@@ -47,7 +52,7 @@ if (!array_key_exists('HTTP_X_CODECEPTION_CODECOVERAGE', $_SERVER)) {
 }
 
 // Autoload Codeception classes
-if (!class_exists('\\Codeception\\Codecept')) {
+if (!class_exists(\Codeception\Codecept::class)) {
     if (file_exists(__DIR__ . '/codecept.phar')) {
         require_once 'phar://' . __DIR__ . '/codecept.phar/autoload.php';
     } elseif (stream_resolve_include_path(__DIR__ . '/vendor/autoload.php')) {
@@ -64,19 +69,19 @@ if (!class_exists('\\Codeception\\Codecept')) {
 }
 
 // phpunit codecoverage shimming
-if (!class_exists('PHP_CodeCoverage') and class_exists('SebastianBergmann\CodeCoverage\CodeCoverage')) {
-    class_alias('SebastianBergmann\CodeCoverage\CodeCoverage', 'PHP_CodeCoverage');
-    class_alias('SebastianBergmann\CodeCoverage\Report\Text', 'PHP_CodeCoverage_Report_Text');
-    class_alias('SebastianBergmann\CodeCoverage\Report\PHP', 'PHP_CodeCoverage_Report_PHP');
-    class_alias('SebastianBergmann\CodeCoverage\Report\Clover', 'PHP_CodeCoverage_Report_Clover');
-    class_alias('SebastianBergmann\CodeCoverage\Report\Crap4j', 'PHP_CodeCoverage_Report_Crap4j');
-    class_alias('SebastianBergmann\CodeCoverage\Report\Html\Facade', 'PHP_CodeCoverage_Report_HTML');
-    class_alias('SebastianBergmann\CodeCoverage\Report\Xml\Facade', 'PHP_CodeCoverage_Report_XML');
-    class_alias('SebastianBergmann\CodeCoverage\Exception', 'PHP_CodeCoverage_Exception');
+if (!class_exists('PHP_CodeCoverage') and class_exists(\SebastianBergmann\CodeCoverage\CodeCoverage::class)) {
+    class_alias(\SebastianBergmann\CodeCoverage\CodeCoverage::class, 'PHP_CodeCoverage');
+    class_alias(\SebastianBergmann\CodeCoverage\Report\Text::class, 'PHP_CodeCoverage_Report_Text');
+    class_alias(\SebastianBergmann\CodeCoverage\Report\PHP::class, 'PHP_CodeCoverage_Report_PHP');
+    class_alias(\SebastianBergmann\CodeCoverage\Report\Clover::class, 'PHP_CodeCoverage_Report_Clover');
+    class_alias(\SebastianBergmann\CodeCoverage\Report\Crap4j::class, 'PHP_CodeCoverage_Report_Crap4j');
+    class_alias(\SebastianBergmann\CodeCoverage\Report\Html\Facade::class, 'PHP_CodeCoverage_Report_HTML');
+    class_alias(\SebastianBergmann\CodeCoverage\Report\Xml\Facade::class, 'PHP_CodeCoverage_Report_XML');
+    class_alias(\SebastianBergmann\CodeCoverage\Exception::class, 'PHP_CodeCoverage_Exception');
 }
 // phpunit version
-if (!class_exists('PHPUnit_Runner_Version') && class_exists('PHPUnit\Runner\Version')) {
-    class_alias('PHPUnit\Runner\Version', 'PHPUnit_Runner_Version');
+if (!class_exists('PHPUnit_Runner_Version') && class_exists(\PHPUnit\Runner\Version::class)) {
+    class_alias(\PHPUnit\Runner\Version::class, 'PHPUnit_Runner_Version');
 }
 
 // Load Codeception Config
@@ -96,8 +101,8 @@ if (file_exists($configFile)) {
 }
 
 try {
-    \Codeception\Configuration::config($configFile);
-} catch (\Exception $e) {
+    Configuration::config($configFile);
+} catch (Exception $e) {
     __c3_error($e->getMessage());
 }
 
@@ -108,8 +113,8 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
 
     $memoryLimit = ini_get('memory_limit');
     $requiredMemory = '384M';
-    if ((substr($memoryLimit, -1) === 'M' && (int)$memoryLimit < (int)$requiredMemory)
-        || (substr($memoryLimit, -1) === 'K' && (int)$memoryLimit < (int)$requiredMemory * 1024)
+    if ((str_ends_with($memoryLimit, 'M') && (int)$memoryLimit < (int)$requiredMemory)
+        || (str_ends_with($memoryLimit, 'K') && (int)$memoryLimit < (int)$requiredMemory * 1024)
         || (ctype_digit($memoryLimit) && (int)$memoryLimit < (int)$requiredMemory * 1024 * 1024)
     ) {
         ini_set('memory_limit', $requiredMemory);
@@ -138,7 +143,7 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
                 unlink($path . '.tar.gz');
             }
 
-            $phar->compress(\Phar::GZ);
+            $phar->compress(Phar::GZ);
 
             // close the file so that we can rename it
             unset($phar);
@@ -168,7 +173,7 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
 
     function __c3_build_phpunit_report(PHP_CodeCoverage $codeCoverage, $path)
     {
-        $writer = new PHP_CodeCoverage_Report_XML(\PHPUnit_Runner_Version::id());
+        $writer = new PHP_CodeCoverage_Report_XML(PHPUnit_Runner_Version::id());
         $writer->process($codeCoverage, $path . 'phpunit');
 
         if (file_exists($path . '.tar')) {
@@ -185,7 +190,7 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
                 unlink($path . '.tar.gz');
             }
 
-            $phar->compress(\Phar::GZ);
+            $phar->compress(Phar::GZ);
 
             // close the file so that we can rename it
             unset($phar);
@@ -225,8 +230,8 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
             } else {
                 $phpCoverage = unserialize(file_get_contents($filename));
             }
-            
-            return array($phpCoverage, $file);
+
+            return [$phpCoverage, $file];
         } else {
             $phpCoverage = new PHP_CodeCoverage();
         }
@@ -234,23 +239,23 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
         if (isset($_SERVER['HTTP_X_CODECEPTION_CODECOVERAGE_SUITE'])) {
             $suite = $_SERVER['HTTP_X_CODECEPTION_CODECOVERAGE_SUITE'];
             try {
-                $settings = \Codeception\Configuration::suiteSettings($suite, \Codeception\Configuration::config());
+                $settings = Configuration::suiteSettings($suite, Configuration::config());
             } catch (Exception $e) {
                 __c3_error($e->getMessage());
             }
         } else {
-            $settings = \Codeception\Configuration::config();
+            $settings = Configuration::config();
         }
 
         try {
-            \Codeception\Coverage\Filter::setup($phpCoverage)
+            Filter::setup($phpCoverage)
                 ->whiteList($settings)
                 ->blackList($settings);
         } catch (Exception $e) {
             __c3_error($e->getMessage());
         }
 
-        return array($phpCoverage, $file);
+        return [$phpCoverage, $file];
     }
 
     function __c3_exit()
@@ -263,7 +268,7 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
 
     function __c3_clear()
     {
-        \Codeception\Util\FileSystem::doEmptyDir(C3_CODECOVERAGE_MEDIATE_STORAGE);
+        FileSystem::doEmptyDir(C3_CODECOVERAGE_MEDIATE_STORAGE);
     }
 }
 
@@ -276,20 +281,20 @@ if (!is_dir(C3_CODECOVERAGE_MEDIATE_STORAGE)) {
 // evaluate base path for c3-related files
 $path = realpath(C3_CODECOVERAGE_MEDIATE_STORAGE) . DIRECTORY_SEPARATOR . 'codecoverage';
 
-$requestedC3Report = (strpos($_SERVER['REQUEST_URI'], 'c3/report') !== false);
+$requestedC3Report = (str_contains((string) $_SERVER['REQUEST_URI'], 'c3/report'));
 
 $completeReport = $currentReport = $path . '.serialized';
 if ($requestedC3Report) {
     set_time_limit(0);
 
-    $route = ltrim(strrchr(rtrim($_SERVER['REQUEST_URI'], '/'), '/'), '/');
+    $route = ltrim(strrchr(rtrim((string) $_SERVER['REQUEST_URI'], '/'), '/'), '/');
 
     if ($route === 'clear') {
         __c3_clear();
         return __c3_exit();
     }
 
-    list($codeCoverage, ) = __c3_factory($completeReport);
+    [$codeCoverage, ] = __c3_factory($completeReport);
 
     switch ($route) {
         case 'html':
@@ -329,11 +334,11 @@ if ($requestedC3Report) {
             return __c3_exit();
     }
 } else {
-    list($codeCoverage, ) = __c3_factory(null);
+    [$codeCoverage, ] = __c3_factory(null);
     $codeCoverage->start(C3_CODECOVERAGE_TESTNAME);
     if (!array_key_exists('HTTP_X_CODECEPTION_CODECOVERAGE_DEBUG', $_SERVER)) {
         register_shutdown_function(
-            function () use ($codeCoverage, $currentReport) {
+            function () use ($codeCoverage, $currentReport): void {
                 $codeCoverage->stop();
                 if (!file_exists(dirname($currentReport))) { // verify directory exists
                     if (!mkdir(dirname($currentReport), 0777, true)) {
@@ -354,7 +359,7 @@ if ($requestedC3Report) {
                 // read/write to the file at the same time as this request (leading to a corrupt file). flock() is a
                 // blocking call, so it waits until an exclusive lock can be acquired before continuing.
 
-                list($existingCodeCoverage, $file) = __c3_factory($currentReport, true);
+                [$existingCodeCoverage, $file] = __c3_factory($currentReport, true);
                 $existingCodeCoverage->merge($codeCoverage);
 
                 if ($file === null) {
@@ -366,7 +371,7 @@ if ($requestedC3Report) {
                     flock($file, LOCK_UN);
                     fclose($file);
                 }
-            }
+            },
         );
     }
 }

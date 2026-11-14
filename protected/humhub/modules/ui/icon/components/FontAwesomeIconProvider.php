@@ -1,7 +1,8 @@
 <?php
+
 namespace humhub\modules\ui\icon\components;
 
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\ui\icon\widgets\Icon;
 
 /**
@@ -12,7 +13,6 @@ use humhub\modules\ui\icon\widgets\Icon;
  */
 class FontAwesomeIconProvider implements IconProvider
 {
-
     /**
      * @return string
      */
@@ -27,33 +27,33 @@ class FontAwesomeIconProvider implements IconProvider
      */
     public function render($icon, $options = [])
     {
-        $icon = Icon::get($icon,$options);
+        $icon = Icon::get($icon, $options);
 
         $options = $icon->htmlOptions;
 
-        Html::addCssClass($options, 'fa fa-'.$icon->name);
+        Html::addCssClass($options, 'fa fa-' . $icon->name);
 
-        if($icon->size) {
+        if ($icon->size) {
             Html::addCssClass($options, $this->getIconSizeClass($icon));
         }
 
-        if($icon->fixedWidth) {
+        if ($icon->fixedWidth) {
             Html::addCssClass($options, 'fa-fw');
         }
 
-        if($icon->listItem) {
+        if ($icon->listItem) {
             Html::addCssClass($options, 'fa-li');
         }
 
-        if($icon->right) {
+        if ($icon->right) {
             Html::addCssClass($options, 'fa-pull-right');
         }
 
-        if($icon->left) {
+        if ($icon->left) {
             Html::addCssClass($options, 'fa-pull-left');
         }
 
-        if($icon->border) {
+        if ($icon->border) {
             Html::addCssClass($options, 'fa-border');
         }
 
@@ -61,20 +61,19 @@ class FontAwesomeIconProvider implements IconProvider
 
         $ariaElement = '';
 
-        if($icon->tooltip) {
+        if ($icon->tooltip) {
             $options['role'] = 'img';
             Html::addTooltip($options, $icon->tooltip);
             $ariaLabel = $icon->ariaLabel ?? $icon->tooltip;
-            $ariaElement = Html::tag('span', $ariaLabel, ['class' => 'sr-only']);
+            $ariaElement = Html::tag('span', $ariaLabel, ['class' => 'visually-hidden']);
         }
 
-        if($icon->color) {
+        if ($icon->color) {
             Html::addCssStyle($options, ['color' => $icon->color]);
         }
 
 
-
-        return Html::beginTag('i', $options).Html::endTag('i') . $ariaElement;
+        return Html::beginTag('i', $options) . Html::endTag('i') . $ariaElement;
     }
 
     /**
@@ -84,13 +83,12 @@ class FontAwesomeIconProvider implements IconProvider
     public function renderList($listDefinition)
     {
         $items = [];
-        foreach ($listDefinition as $listItem)
-        {
+        foreach ($listDefinition as $listItem) {
             $text = reset($listItem);
             $iconName = key($listItem);
-            $options = (isset($listItem['options'])) ? $listItem['options'] : [];
+            $options = $listItem['options'] ?? [];
             $options['listItem'] = true;
-            $items[] = $this->render($iconName, $options).$text;
+            $items[] = $this->render($iconName, $options) . $text;
         }
 
         return Html::ul($items, ['class' => 'fa-ul', 'encode' => false]);
@@ -98,32 +96,20 @@ class FontAwesomeIconProvider implements IconProvider
 
     private function getIconSizeClass(Icon $icon)
     {
-        switch ($icon->size) {
-            case Icon::SIZE_SM:
-                return 'fa-sm';
-            case Icon::SIZE_LG:
-                return 'fa-lg';
-            case Icon::SIZE_2x:
-                return 'fa-2x';
-            case Icon::SIZE_3x:
-                return 'fa-3x';
-            case Icon::SIZE_4x:
-                return 'fa-4x';
-            case Icon::SIZE_5x:
-                return 'fa-5x';
-            case Icon::SIZE_6x:
-                return 'fa-6x';
-            case Icon::SIZE_7x:
-                return 'fa-7x';
-            case Icon::SIZE_8x:
-                return 'fa-8x';
-            case Icon::SIZE_9x:
-                return 'fa-9x';
-            case Icon::SIZE_10x:
-                return 'fa-10x';
-            default:
-                return null;
-        }
+        return match ($icon->size) {
+            Icon::SIZE_SM => 'fa-sm',
+            Icon::SIZE_LG => 'fa-lg',
+            Icon::SIZE_2x => 'fa-2x',
+            Icon::SIZE_3x => 'fa-3x',
+            Icon::SIZE_4x => 'fa-4x',
+            Icon::SIZE_5x => 'fa-5x',
+            Icon::SIZE_6x => 'fa-6x',
+            Icon::SIZE_7x => 'fa-7x',
+            Icon::SIZE_8x => 'fa-8x',
+            Icon::SIZE_9x => 'fa-9x',
+            Icon::SIZE_10x => 'fa-10x',
+            default => null,
+        };
     }
 
     /**

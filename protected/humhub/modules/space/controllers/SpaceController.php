@@ -10,14 +10,15 @@ namespace humhub\modules\space\controllers;
 
 use humhub\modules\content\components\ContentContainerController;
 use humhub\components\behaviors\AccessControl;
+use humhub\modules\content\widgets\WallCreateContentMenu;
 use humhub\modules\space\models\Space;
 use humhub\modules\space\widgets\Chooser;
 use humhub\modules\user\models\User;
 use humhub\modules\user\widgets\UserListBox;
 use humhub\modules\stream\actions\ContentContainerStream;
 use humhub\modules\space\widgets\Menu;
-use humhub\modules\post\permissions\CreatePost;
 use Yii;
+use yii\base\InvalidConfigException;
 use yii\web\HttpException;
 use yii\db\Expression;
 
@@ -35,7 +36,6 @@ use yii\db\Expression;
  */
 class SpaceController extends ContentContainerController
 {
-
     /**
      * @inheritdoc
      */
@@ -45,7 +45,7 @@ class SpaceController extends ContentContainerController
             'acl' => [
                 'class' => AccessControl::class,
                 'guestAllowedActions' => ['index', 'home', 'stream', 'about'],
-            ]
+            ],
         ];
     }
 
@@ -57,14 +57,14 @@ class SpaceController extends ContentContainerController
         return [
             'stream' => [
                 'class' => ContentContainerStream::class,
-                'contentContainer' => $this->contentContainer
+                'contentContainer' => $this->contentContainer,
             ],
         ];
     }
 
     /**
      * Generic Start Action for Profile
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function actionIndex()
     {
@@ -93,18 +93,17 @@ class SpaceController extends ContentContainerController
      * Default space homepage
      *
      * @return string the rendering result.
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function actionHome()
     {
         $space = $this->contentContainer;
-        $canCreatePosts = $space->permissionManager->can(new CreatePost());
-        $isMember = $space->isMember();
 
         return $this->render('home', [
-                    'space' => $space,
-                    'canCreatePosts' => $canCreatePosts,
-                    'isMember' => $isMember
+            'space' => $space,
+            'canCreateEntries' => WallCreateContentMenu::canCreateEntry($space),
+            'isMember' => $space->isMember(),
+            'isSingleContentRequest' => !empty(Yii::$app->request->getQueryParam('contentId')),
         ]);
     }
 
@@ -162,6 +161,10 @@ class SpaceController extends ContentContainerController
      */
     public function actionFollowerList()
     {
+        if ($this->space->getAdvancedSettings()->hideFollowers) {
+            throw new HttpException(403);
+        }
+
         $query = User::find();
         $query->leftJoin('user_follow', 'user.id=user_follow.user_id AND object_model=:userClass AND user_follow.object_id=:spaceId', [':userClass' => Space::class, ':spaceId' => $this->getSpace()->id]);
         $query->orderBy(['user_follow.id' => SORT_DESC]);

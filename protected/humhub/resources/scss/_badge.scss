@@ -1,0 +1,71 @@
+//
+// Badges
+// --------------------------------------------------
+
+@if not $prev-badge {
+    .badge-space {
+        margin-top: 6px;
+    }
+
+    .badge-space-chooser {
+        padding: 3px 5px;
+        margin-left: 1px;
+    }
+
+    .badge {
+        font-family: Arial, sans-serif;
+        text-transform: uppercase;
+        vertical-align: bottom;
+        white-space: nowrap;
+        text-shadow: none;
+        background-color: var(--hh-background3);
+        line-height: 1;
+
+        // Badges rendered as links (eg. Button::asBadge()->link(), tag lists on
+        // the people/space directory cards) - box-shadow follows the badge's own
+        // border-radius, so no need to redeclare it here.
+        &:is(a):focus-visible {
+            outline: 0;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        &.text-bg-accent {
+            color: var(--hh-accent-contrast) !important;
+        }
+        &.text-bg-primary {
+            color: var(--hh-primary-contrast) !important;
+        }
+        &.text-bg-secondary {
+            color: var(--hh-secondary-contrast) !important;
+        }
+        &.text-bg-info {
+            color: var(--hh-info-contrast) !important;
+        }
+        &.text-bg-success {
+            color: var(--hh-success-contrast) !important;
+        }
+        &.text-bg-warning {
+            color: var(--hh-warning-contrast) !important;
+        }
+        &.text-bg-danger {
+            color: var(--hh-danger-contrast) !important;
+        }
+        &.text-bg-light {
+            color: var(--hh-light-contrast) !important;
+        }
+        &.text-bg-dark {
+            color: var(--hh-dark-contrast) !important;
+        }
+
+        &.badge-new {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--bs-accent);
+
+            &:empty {
+                display: inline-block; // Overwrites BS5 `&:empty {display: none;}`
+            }
+        }
+    }
+}

@@ -11,7 +11,6 @@ namespace humhub\modules\admin\grid;
 use Yii;
 use humhub\libs\ActionColumn;
 use humhub\modules\user\models\User;
-use humhub\modules\admin\controllers\UserController;
 
 /**
  * UserActionColumn
@@ -20,7 +19,6 @@ use humhub\modules\admin\controllers\UserController;
  */
 class UserActionColumn extends ActionColumn
 {
-
     /**
      * @inheritdoc
      */
@@ -32,11 +30,12 @@ class UserActionColumn extends ActionColumn
         if ($model->status == User::STATUS_SOFT_DELETED) {
             $actions[Yii::t('AdminModule.user', 'Permanently delete')] = ['delete'];
         } else {
-            $actions[Yii::t('base', 'Edit')] = ['edit'];
-
-            if(Yii::$app->user->isAdmin() || !$model->isSystemAdmin()) {
+            // A non System-Administrator must never even be offered an Edit/Enable/Disable/
+            // Delete link for a System Administrator's account - it would just 403 on click.
+            if (Yii::$app->user->isAdmin() || !$model->isSystemAdmin()) {
+                $actions[Yii::t('base', 'Edit')] = ['edit'];
                 $actions[] = '---';
-                if ($model->status == User::STATUS_DISABLED) {
+                if ($model->status == User::STATUS_DEACTIVATED) {
                     $actions[Yii::t('AdminModule.user', 'Enable')] = ['enable', 'linkOptions' => ['data-method' => 'post', 'data-confirm' => Yii::t('AdminModule.user', 'Are you really sure that you want to enable this user?')]];
                 } elseif ($model->status == User::STATUS_ENABLED) {
                     $actions[Yii::t('AdminModule.user', 'Disable')] = ['disable', 'linkOptions' => ['data-method' => 'post', 'data-confirm' => Yii::t('AdminModule.user', 'Are you really sure that you want to disable this user?')]];
@@ -49,7 +48,7 @@ class UserActionColumn extends ActionColumn
 
             if ($model->status == User::STATUS_ENABLED) {
                 $actions[] = '---';
-                if (UserController::canImpersonate($model)) {
+                if (Yii::$app->user->impersonation->canStart($model)) {
                     $actions[Yii::t('AdminModule.user', 'Impersonate')] = ['impersonate', 'linkOptions' => ['data-method' => 'post', 'data-confirm' => Yii::t('AdminModule.user', 'Are you really sure that you want to impersonate this user?')]];
                 }
                 $actions[Yii::t('AdminModule.user', 'View profile')] = ['view-profile'];

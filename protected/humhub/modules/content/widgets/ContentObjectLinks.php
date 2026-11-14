@@ -32,7 +32,6 @@ use yii\helpers\ArrayHelper;
  */
 class ContentObjectLinks extends BaseStack
 {
-
     /**
      * @var ContentActiveRecord
      */
@@ -83,13 +82,13 @@ class ContentObjectLinks extends BaseStack
     /**
      * Initialize default widgets for Content links
      */
-    function initDefaultWidgets()
+    public function initDefaultWidgets()
     {
         if (!($this->object instanceof ContentActiveRecord)) {
             return;
         }
-        $this->addWidget(LikeLink::class, ['object' => $this->object], ['sortOrder' => 100]);
-        $this->addWidget(CommentLink::class, ['object' => $this->object], ['sortOrder' => 200]);
+        $this->addWidget(CommentLink::class, ['content' => $this->object->content], ['sortOrder' => 100]);
+        $this->addWidget(LikeLink::class, ['object' => $this->object], ['sortOrder' => 200]);
     }
 
     /**

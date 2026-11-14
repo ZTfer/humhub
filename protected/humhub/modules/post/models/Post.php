@@ -8,28 +8,27 @@
 
 namespace humhub\modules\post\models;
 
-use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\content\components\ContentActiveRecord;
+use humhub\modules\content\widgets\richtext\RichText;
+use humhub\modules\post\Module;
 use humhub\modules\post\permissions\CreatePost;
 use humhub\modules\post\widgets\WallEntry;
 use Yii;
-use humhub\libs\MarkdownPreview;
-use humhub\modules\content\widgets\richtext\RichText;
-use humhub\modules\content\components\ContentActiveRecord;
-use humhub\modules\search\interfaces\Searchable;
-use humhub\modules\user\models\User;
+use yii\helpers\Url;
 
 /**
  * This is the model class for table "post".
  *
- * @property integer $id
+ * @property int $id
+ * @property string|null $title
  * @property string $message
  * @property string $url
  * @property string $created_at
- * @property integer $created_by
+ * @property int $created_by
  * @property string $updated_at
- * @property integer $updated_by
+ * @property int $updated_by
  */
-class Post extends ContentActiveRecord implements Searchable
+class Post extends ContentActiveRecord
 {
     /**
      * @inheritdoc
@@ -47,6 +46,21 @@ class Post extends ContentActiveRecord implements Searchable
     public $canMove = CreatePost::class;
 
     /**
+     * Scenario - when validating with ajax
+     */
+    public const SCENARIO_AJAX_VALIDATION = 'ajaxValidation';
+
+    /**
+     * Scenario - when related content has attached files
+     */
+    public const SCENARIO_HAS_FILES = 'hasFiles';
+
+    /**
+     * @inheritdoc
+     */
+    protected $createPermission = CreatePost::class;
+
+    /**
      * @inheritdoc
      */
     public static function tableName()
@@ -59,11 +73,18 @@ class Post extends ContentActiveRecord implements Searchable
      */
     public function rules()
     {
-        return [
-            [['message'], 'required'],
+        $rules = [
+            [['message'], 'required', 'except' => [self::SCENARIO_AJAX_VALIDATION, self::SCENARIO_HAS_FILES]],
             [['message'], 'string'],
-            [['url'], 'string', 'max' => 255]
+            [['title'], 'string', 'max' => 255],
+            [['url'], 'string', 'max' => 255],
         ];
+
+        if (Yii::$app->getModule('post')->getTitleMode() === Module::TITLE_MODE_REQUIRED) {
+            $rules[] = [['title'], 'required'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -100,9 +121,9 @@ class Post extends ContentActiveRecord implements Searchable
     /**
      * @inheritdoc
      */
-    public function getLabels($result = [], $includeContentName = true)
+    public function getBadges($result = [], $includeContentName = true)
     {
-        return parent::getLabels($result, false);
+        return parent::getBadges($result, false);
     }
 
     /**
@@ -110,7 +131,7 @@ class Post extends ContentActiveRecord implements Searchable
      */
     public function getIcon()
     {
-        return 'fa-comment';
+        return 'fa-comment-o';
     }
 
     /**
@@ -118,7 +139,7 @@ class Post extends ContentActiveRecord implements Searchable
      */
     public function getContentDescription()
     {
-        return $this->message;
+        return !empty($this->title) ? $this->title : $this->message;
     }
 
     /**
@@ -126,29 +147,18 @@ class Post extends ContentActiveRecord implements Searchable
      */
     public function getSearchAttributes()
     {
-        $attributes = [
+        return [
             'message' => $this->message,
-            'url' => $this->url,
-            'user' => $this->getPostAuthorName()
         ];
-
-        $this->trigger(self::EVENT_SEARCH_ADD, new \humhub\modules\search\events\SearchAddEvent($attributes));
-
-        return $attributes;
     }
 
+
     /**
-     * @return string
+     * @inheritDoc
      */
-    private function getPostAuthorName()
+    public function getUrl()
     {
-        $user = User::findOne(['id' => $this->created_by]);
-
-        if ($user !== null && $user->isActive()) {
-            return $user->getDisplayName();
-        }
-
-        return '';
+        return Url::to(['/post/post/view', 'id' => $this->id, 'contentContainer' => $this->content->container]);
     }
 
 }

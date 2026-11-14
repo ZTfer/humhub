@@ -9,9 +9,6 @@
 namespace humhub\modules\like;
 
 use Yii;
-use humhub\modules\like\models\Like;
-use humhub\modules\space\models\Space;
-use humhub\modules\content\components\ContentActiveRecord;
 
 /**
  * This module provides like support for Content and Content Addons
@@ -21,14 +18,13 @@ use humhub\modules\content\components\ContentActiveRecord;
  */
 class Module extends \humhub\components\Module
 {
-
     /**
      * @inheritdoc
      */
     public $isCoreModule = true;
 
     /**
-     * @var boolean automatic follow liked content
+     * @var bool automatic follow liked content
      * @since 1.2.5
      */
     public $autoFollowLikedContent = false;
@@ -44,9 +40,9 @@ class Module extends \humhub\components\Module
      */
     public function getPermissions($contentContainer = null)
     {
-        if(isset($contentContainer)) {
+        if (isset($contentContainer)) {
             return [
-                new permissions\CanLike()
+                new permissions\CanLike(),
             ];
         }
 
@@ -71,29 +67,7 @@ class Module extends \humhub\components\Module
         }
 
         return [
-            'humhub\modules\like\notifications\NewLike'
+            'humhub\modules\like\notifications\NewLike',
         ];
     }
-
-    /**
-     * Checks if given content object can be liked
-     *
-     * @param Like|ContentActiveRecord $object
-     * @return boolean can like
-     */
-    public function canLike($object)
-    {
-        $content = $object->content;
-
-        if(!isset($content->container)) {
-            return false;
-        }
-
-        if (!$content->container->can(new permissions\CanLike())) {
-            return false;
-        }
-
-        return true;
-    }
-
 }

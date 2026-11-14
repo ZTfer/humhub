@@ -22,7 +22,6 @@ use humhub\modules\content\components\ContentContainerActiveRecord;
  */
 class StreamViewer extends JsWidget
 {
-
     /**
      * @var ContentContainerActiveRecord the content container if this stream belongs to one (optional)
      */
@@ -52,7 +51,7 @@ class StreamViewer extends JsWidget
     /**
      * Show default wall filters
      *
-     * @var boolean
+     * @var bool
      */
     public $showFilters = true;
 
@@ -124,18 +123,22 @@ class StreamViewer extends JsWidget
             'stream-empty-message' => $this->messageStreamEmpty,
             'stream-empty-class' => $this->messageStreamEmptyCss,
             'stream-empty-filter-message' => $this->messageStreamEmptyWithFilters,
-            'stream-empty-filter-class' => $this->messageStreamEmptyWithFiltersCss
+            'stream-empty-filter-class' => $this->messageStreamEmptyWithFiltersCss,
         ];
 
-        if (!empty(Yii::$app->request->getQueryParam('contentId'))) {
-            $result['stream-contentid'] = Yii::$app->request->getQueryParam('contentId');
+        $contentId = (int)Yii::$app->request->getQueryParam('contentId');
+        if ($contentId > 0) {
+            $result['stream-contentid'] = $contentId;
         }
 
-        if (Yii::$app->request->getQueryParam('topicId')) {
-            $topic = Topic::findOne((int) Yii::$app->request->getQueryParam('topicId'));
-            if ($topic) {
-                $result['stream-topic'] = ['id' => $topic->id, 'name' => $topic->name];
-            }
+        $commentId = (int)Yii::$app->request->getQueryParam('commentId');
+        if ($commentId > 0) {
+            $result['stream-commentid'] = $commentId;
+        }
+
+        $topicId = (int)Yii::$app->request->getQueryParam('topicId');
+        if ($topicId > 0 && $topic = Topic::findOne($topicId)) {
+            $result['stream-topic'] = ['id' => $topic->id, 'name' => $topic->name];
         }
 
         return $result;
@@ -171,16 +174,16 @@ class StreamViewer extends JsWidget
         }
 
         $filterNav = ($this->showFilters && !empty($this->streamFilterNavigation))
-            ? call_user_func($this->streamFilterNavigation.'::widget', [
+            ? call_user_func($this->streamFilterNavigation . '::widget', [
                 'definition' => $this->filters,
-                'componentId' => $this->getId(true)
+                'componentId' => $this->getId(true),
             ])
             : '';
 
         return $this->render($this->view, [
-                'filterNav' => $filterNav,
-                'contentContainer' => $this->contentContainer,
-                'options' => $this->getOptions(),
+            'filterNav' => $filterNav,
+            'contentContainer' => $this->contentContainer,
+            'options' => $this->getOptions(),
         ]);
     }
 }

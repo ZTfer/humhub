@@ -19,9 +19,8 @@ use yii\base\Widget;
  */
 class TimeAgo extends Widget
 {
-
     /**
-     * @var string Database (Y-m-d H:i:s) or Unix timestamp
+     * @var string|int Database (Y-m-d H:i:s) or Unix timestamp
      */
     public $timestamp;
 
@@ -46,25 +45,31 @@ class TimeAgo extends Widget
     public $staticTimeAgo;
 
     /**
+     * @var string Additional prefixed information (e.g. "Created on") for title tooltip overlay
+     * @since 1.9
+     */
+    public $titlePrefixInfo;
+
+    /**
      * @inheritdoc
      */
     public function init()
     {
         parent::init();
 
-        if($this->hideTimeAfter === null) {
+        if ($this->hideTimeAfter === null) {
             $this->hideTimeAfter = Yii::$app->params['formatter']['timeAgoHideTimeAfter'];
         }
 
-        if($this->timeAgoBefore === null) {
+        if ($this->timeAgoBefore === null) {
             $this->timeAgoBefore = Yii::$app->params['formatter']['timeAgoBefore'];
         }
 
-        if($this->staticTimeAgo === null) {
+        if ($this->staticTimeAgo === null) {
             $this->staticTimeAgo = Yii::$app->params['formatter']['timeAgoStatic'];
         }
 
-        // Make sure we get an timestamp in server tz
+        // Make sure we get a timestamp in server tz
         if (is_numeric($this->timestamp)) {
             $this->timestamp = date('Y-m-d H:i:s', $this->timestamp);
         }
@@ -76,7 +81,7 @@ class TimeAgo extends Widget
      */
     public function run()
     {
-        if($this->isRenderStatic()) {
+        if ($this->isRenderStatic()) {
             return $this->renderStatic();
         }
 
@@ -102,8 +107,8 @@ class TimeAgo extends Widget
      */
     private function renderStatic()
     {
-        $isoDate =  date("c", $this->timestamp);
-        return '<time class="tt time timeago" datetime="'.$isoDate.'" title="' .$this->getFullDateTime() . '">' . Yii::$app->formatter->asRelativeTime($this->timestamp) . '</time>';
+        $isoDate = date("c", $this->timestamp);
+        return '<time class="tt time timeago" datetime="' . $isoDate . '" title="' . $this->titlePrefixInfo . $this->getFullDateTime() . '">' . Yii::$app->formatter->asRelativeTime($this->timestamp) . '</time>';
     }
 
     /**
@@ -131,8 +136,8 @@ class TimeAgo extends Widget
             $date = $this->getFullDateTime();
         }
 
-        $isoDate =  date("c", $this->timestamp);
-        return '<time class="tt time timeago" datetime="'.$isoDate.'" title="' .$this->getFullDateTime() . '">' . $date . '</time>';
+        $isoDate = date("c", $this->timestamp);
+        return '<time class="tt time timeago" datetime="' . $isoDate . '" title="' . $this->titlePrefixInfo . $this->getFullDateTime() . '">' . $date . '</time>';
     }
 
     /**
@@ -154,8 +159,8 @@ class TimeAgo extends Widget
     public function renderTimeAgo()
     {
         // Convert timestamp to ISO 8601
-        $date =  date("c", $this->timestamp);
-        return '<time class="tt time timeago" data-ui-addition="timeago" datetime="'.$date.'" title="' .$this->getFullDateTime() . '">' . $this->getFullDateTime() . '</time>';
+        $date = date("c", $this->timestamp);
+        return '<time class="tt time timeago" data-ui-addition="timeago" datetime="' . $date . '" title="' . $this->titlePrefixInfo . $this->getFullDateTime() . '">' . $this->getFullDateTime() . '</time>';
     }
 
 

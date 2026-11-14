@@ -17,11 +17,20 @@ use humhub\components\assets\AssetBundle;
  */
 class FontAwesomeAsset extends AssetBundle
 {
-
     /**
      * @inheritdoc
      */
     public $sourcePath = '@npm/font-awesome';
+
+    /**
+     * @inheritdoc
+     */
+    public $publishOptions = [
+        'only' => [
+            'css/font-awesome.min.css',
+            'fonts/*',
+        ],
+    ];
 
     /**
      * @inheritdoc

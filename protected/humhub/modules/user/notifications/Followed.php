@@ -8,9 +8,9 @@
 
 namespace humhub\modules\user\notifications;
 
-use Yii;
-use yii\bootstrap\Html;
+use humhub\helpers\Html;
 use humhub\modules\notification\components\BaseNotification;
+use Yii;
 use yii\db\IntegrityException;
 
 /**
@@ -19,7 +19,6 @@ use yii\db\IntegrityException;
  */
 class Followed extends BaseNotification
 {
-
     /**
      * @inheritdoc
      */
@@ -48,7 +47,7 @@ class Followed extends BaseNotification
             throw new IntegrityException('Originator cannot be null.');
         }
 
-        return $this->originator->getUrl();
+        return $this->originator->getUrl(true);
     }
 
     /**

@@ -1,18 +1,16 @@
 <?php
 
-
 namespace humhub\tests\codeception\unit\models;
-
 
 use humhub\models\UrlOembed;
 
 class UrlOembedMock extends UrlOembed
 {
-    const TEST_PROVIDER_URL_PREFIX = 'https://www.test.de/oembed?url=';
+    public const TEST_PROVIDER_URL_PREFIX = 'https://www.test.de/oembed?url=';
 
-    const TEST_VIDEO_URL_A = 'https://www.test.de/videoA';
+    public const TEST_VIDEO_URL_A = 'https://www.test.de/videoA';
 
-    const TEST_VIDEO_A_PREVIEW = 'Test Video A';
+    public const TEST_VIDEO_A_PREVIEW = 'Test Video A';
 
     public static function getTestProviderUrl($url)
     {
@@ -33,6 +31,11 @@ class UrlOembedMock extends UrlOembed
     public static function isCached($url)
     {
         return array_key_exists($url, static::$cache);
+    }
+
+    public static function buildConfirmationContent(string $url): string
+    {
+        return static::confirmationContent($url);
     }
 
 }

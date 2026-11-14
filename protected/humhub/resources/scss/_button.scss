@@ -1,0 +1,85 @@
+//
+// Buttons
+// --------------------------------------------------
+
+// Bootstrap overwrite
+// Sizings, paddings, radius etc. are customized through Sass variables, see variables.scss.
+// Only selector-scoped customizations are declared here as `--bs-*` overrides.
+
+@if not $prev-button {
+    .btn {
+        --hh-btn-gap: 0.6rem;
+
+        display: inline-flex;
+        align-items: center;
+        gap: var(--hh-btn-gap);
+        justify-content: center;
+
+        // Keep the height of a regular button for buttons without any content (e.g. an empty `.dropdown-toggle`
+        // showing only the caret), which are otherwise collapsed by `display: inline-flex`.
+        &:empty {
+            min-height: calc(var(--bs-btn-font-size) * var(--bs-btn-line-height) + 2 * var(--bs-btn-padding-y) + 2 * var(--bs-btn-border-width));
+        }
+
+        // Icons (`line-height: 1`) must keep the line height of the button, as in the former `inline-block` layout,
+        // otherwise buttons with only an icon get shorter than buttons with a text.
+        > .fa {
+            line-height: inherit;
+        }
+
+        &.input {
+            outline: none;
+        }
+    }
+
+    // The flex gap already separates the caret
+    .btn.dropdown-toggle::after {
+        margin-left: 0;
+    }
+
+    // Keep the caret close to the icon, as before 1.19
+    .btn-icon-only.dropdown-toggle {
+        --hh-btn-gap: .255em;
+    }
+
+    .btn-sm, .btn-group-sm > .btn {
+        --hh-btn-gap: 0.4rem;
+    }
+
+    .btn-lg, .btn-group-lg > .btn {
+        --hh-btn-gap: 0.8rem;
+    }
+
+    .btn-group > .btn {
+        --bs-btn-padding-x: 0.8rem;
+
+        &.btn-icon-only {
+            --bs-btn-padding-x: 0.4rem;
+        }
+    }
+
+    .btn-group-sm > .btn {
+        --bs-btn-padding-x: 0.4rem;
+
+        &.btn-icon-only {
+            --bs-btn-padding-x: 0.3rem;
+        }
+    }
+
+    .btn-group-lg > .btn {
+        --bs-btn-padding-x: 1.2rem;
+
+        &.btn-icon-only {
+            --bs-btn-padding-x: 0.8rem;
+        }
+    }
+
+    // Outline buttons: use black color for texts if insufficient contrast relatively to background color main, as the background color is transparent
+    @each $color, $value in $theme-colors {
+        .btn-outline-#{$color} {
+            @if contrast-ratio($background-color-main, $value) < $min-contrast-ratio {
+                color: var(--text-color-highlight);
+            }
+        }
+    }
+}

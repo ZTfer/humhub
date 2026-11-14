@@ -3,17 +3,23 @@
 /* @var $viewable humhub\modules\comment\notifications\NewComment */
 /* @var $url string */
 /* @var $date string */
-/* @var $isNew boolean */
-/* @var $isNew boolean */
+/* @var $isNew bool */
+/* @var $isNew bool */
 /* @var $originator \humhub\modules\user\models\User */
 /* @var $source yii\db\ActiveRecord */
-/* @var $contentContainer \humhub\modules\content\components\ContentContainerActiveRecord */
+/* @var $contentContainer ContentContainerActiveRecord */
 /* @var $space humhub\modules\space\models\Space */
-/* @var $record \humhub\modules\notification\models\Notification */
+/* @var $record Notification */
 /* @var $html string */
+
 /* @var $text string */
+
+use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\notification\models\Notification;
+use humhub\helpers\MailStyleHelper;
+
 ?>
-<?php $this->beginContent('@notification/views/layouts/mail.php', $_params_); ?>
+<?php $this->beginContent('@notification/views/layouts/mail.php') ?>
 
 <?php $comment = $viewable->source; ?>
 <?php $contentRecord = $viewable->getCommentedRecord() ?>
@@ -24,34 +30,36 @@
             <?=
             humhub\widgets\mails\MailCommentEntry::widget([
                 'originator' => $originator,
+                'receiver' => $record->user,
                 'comment' => $comment,
-                'date' => $comment->updated_at,
+                'date' => $comment->created_at,
                 'space' => $space
             ]);
             ?>
         </td>
     </tr>
-     <tr>
+    <tr>
         <td height="20"></td>
     </tr>
-     <tr>
+    <tr>
         <td>
             <?=
             humhub\widgets\mails\MailHeadline::widget([
                 'level' => 3,
-                'text' => $contentRecord->getContentName().':',
+                'text' => $contentRecord->getContentName() . ':',
                 'style' => 'text-transform:capitalize;'
             ])
             ?>
         </td>
     </tr>
     <tr>
-        <td style="padding:10px; border:1px solid <?= Yii::$app->view->theme->variable('background-color-secondary') ?>; border-radius:4px;">
+        <td style="padding:10px; border:1px solid <?= MailStyleHelper::getBackgroundColorSecondary() ?>; border-radius:4px;">
             <?=
             humhub\widgets\mails\MailContentEntry::widget([
                 'originator' => $contentRecord->owner,
+                'receiver' => $record->user,
                 'content' => $contentRecord,
-                'date' => $contentRecord->content->updated_at,
+                'date' => $contentRecord->content->created_at,
                 'space' => $space
             ]);
             ?>

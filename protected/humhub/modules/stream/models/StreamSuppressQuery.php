@@ -8,7 +8,10 @@
 
 namespace humhub\modules\stream\models;
 
+use humhub\helpers\ArrayHelper;
+use humhub\modules\content\components\ContentActiveRecord;
 use humhub\modules\content\models\Content;
+use humhub\modules\stream\Module;
 use Yii;
 use yii\base\Exception;
 
@@ -24,9 +27,8 @@ use yii\base\Exception;
  */
 class StreamSuppressQuery extends StreamQuery
 {
-
     /**
-     * @var boolean marks query as executed
+     * @var bool marks query as executed
      */
     protected $isQueryExecuted = false;
 
@@ -41,7 +43,7 @@ class StreamSuppressQuery extends StreamQuery
     protected $lastContentId;
 
     /**
-     * @var boolean return
+     * @var bool return
      */
     protected $suppressionsOnly = false;
 
@@ -61,7 +63,7 @@ class StreamSuppressQuery extends StreamQuery
     public function rules()
     {
         return array_merge(parent::rules(), [
-            ['suppressionsOnly', 'boolean', 'strict' => true, 'falseValue' => 'false', 'trueValue' => 'true']
+            ['suppressionsOnly', 'boolean', 'strict' => true, 'falseValue' => 'false', 'trueValue' => 'true'],
         ]);
     }
 
@@ -85,7 +87,10 @@ class StreamSuppressQuery extends StreamQuery
      */
     protected function isSuppressionActive()
     {
-        return !($this->preventSuppression || $this->limit < 3 || $this->isSingleContentQuery());
+        /* @var $streamModule Module */
+        $streamModule = Yii::$app->getModule('stream');
+
+        return !($this->preventSuppression || $this->limit <= $streamModule->streamSuppressLimit || $this->isSingleContentQuery());
     }
 
     /**
@@ -98,7 +103,7 @@ class StreamSuppressQuery extends StreamQuery
             $this->isQueryExecuted = true;
             $result = parent::all();
 
-            if(!empty($result)) {
+            if (!empty($result)) {
                 $last = $result[count($result) - 1];
                 $this->lastContentId = $last->id;
             }
@@ -136,7 +141,7 @@ class StreamSuppressQuery extends StreamQuery
         $this->_query->limit = $originalLimit;
         $this->isQueryExecuted = true;
 
-        return $results;
+        return $this->postProcessAll($results);
     }
 
     /**
@@ -182,7 +187,7 @@ class StreamSuppressQuery extends StreamQuery
      * @param array $results a reference of the current results
      * @param Content $content the content object to check
      *
-     * @return boolean is suppressed item
+     * @return bool is suppressed item
      */
     protected function isSuppressed(&$results, $content)
     {
@@ -191,7 +196,7 @@ class StreamSuppressQuery extends StreamQuery
             return false;
         }
 
-        /* @var $streamModule \humhub\modules\stream\Module */
+        /* @var $streamModule Module */
         $streamModule = Yii::$app->getModule('stream');
 
         // Check if content type is suppressable
@@ -202,7 +207,7 @@ class StreamSuppressQuery extends StreamQuery
         // Checks if previous two contents have the same content class model
         $c = count($results) - 1;
         if ($c >= 1 && $results[$c - 1]->object_model === $results[$c]->object_model && $content->object_model === $results[$c]->object_model) {
-            $this->addSuppression($results[$c], $content);
+            $this->addSuppression($results[$c], $content, ArrayHelper::getColumn($results, 'id'));
             return true;
         }
 
@@ -215,20 +220,21 @@ class StreamSuppressQuery extends StreamQuery
      * @param Content $parentContent
      * @param Content $content
      */
-    public function addSuppression($parentContent, $content)
+    public function addSuppression($parentContent, $content, $parentContentIds = [])
     {
         if (!isset($this->suppressions[$parentContent->id]['parentContent'])) {
             $this->suppressions[$parentContent->id]['parentContent'] = $parentContent;
             $this->suppressions[$parentContent->id]['contentIds'] = [];
         }
         $this->suppressions[$parentContent->id]['contentIds'][] = $content->id;
+        $this->suppressions[$parentContent->id]['parentContentIds'][] = $parentContentIds;
     }
 
     /**
      * Returns suppressed content ids
      *
      * @return array
-     * @throws \yii\base\Exception
+     * @throws Exception
      */
     public function getSuppressions()
     {
@@ -238,7 +244,7 @@ class StreamSuppressQuery extends StreamQuery
 
         $results = [];
         foreach ($this->suppressions as $parentContentId => $infos) {
-            /* @var $contentInstance \humhub\modules\content\components\ContentActiveRecord  */
+            /* @var $contentInstance ContentActiveRecord */
             $contentInstance = $infos['parentContent']->getPolymorphicRelation();
             if ($contentInstance === null) {
                 Yii::error('Could not load content instance with id: ' . $parentContentId, 'stream');
@@ -247,7 +253,8 @@ class StreamSuppressQuery extends StreamQuery
 
             $results[$parentContentId] = [
                 'contentName' => $contentInstance->getContentName(),
-                'message' => Yii::t('StreamModule.base', 'Show {i} more.', ['i' => count($infos['contentIds'])])
+                'keys' => $infos['parentContentIds'],
+                'message' => Yii::t('StreamModule.base', 'Show {i} more.', ['i' => count($infos['contentIds'])]),
             ];
         }
 

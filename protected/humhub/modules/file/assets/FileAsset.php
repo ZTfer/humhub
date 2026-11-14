@@ -9,7 +9,7 @@
 namespace humhub\modules\file\assets;
 
 use humhub\components\assets\AssetBundle;
-use humhub\modules\ui\view\components\View;
+use humhub\components\View;
 
 /**
  * Fle related assets.
@@ -38,6 +38,6 @@ class FileAsset extends AssetBundle
      * @inheritdoc
      */
     public $js = [
-        'js/humhub.file.js'
+        'js/humhub.file.js',
     ];
 }

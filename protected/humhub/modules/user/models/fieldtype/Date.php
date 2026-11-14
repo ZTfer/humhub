@@ -8,8 +8,12 @@
 
 namespace humhub\modules\user\models\fieldtype;
 
-use Yii;
+use DateTimeZone;
+use humhub\helpers\Html;
 use humhub\libs\DbDateValidator;
+use humhub\modules\user\models\Profile;
+use humhub\modules\user\models\User;
+use Yii;
 
 /**
  * Date Field
@@ -18,6 +22,10 @@ use humhub\libs\DbDateValidator;
  */
 class Date extends BaseType
 {
+    /**
+     * @inheritdoc
+     */
+    public $type = 'datetime';
 
     /**
      * @inheritdoc
@@ -25,8 +33,8 @@ class Date extends BaseType
     public function save()
     {
         $columnName = $this->profileField->internal_name;
-        if (!\humhub\modules\user\models\Profile::columnExists($columnName)) {
-            $query = Yii::$app->db->getQueryBuilder()->addColumn(\humhub\modules\user\models\Profile::tableName(), $columnName, 'DATE');
+        if (!Profile::columnExists($columnName)) {
+            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), $columnName, 'DATE');
             Yii::$app->db->createCommand($query)->execute();
         }
 
@@ -46,45 +54,50 @@ class Date extends BaseType
         ];
         return parent::getFieldRules($rules);
     }
-    
+
     /**
      * @inheritdoc
      */
     public function getFormDefinition($definition = [])
     {
         return count($definition) > 0 ? parent::getFormDefinition($definition) : [];
-    } 
-
-    /**
-     * @inheritdoc
-     */
-    public function getFieldFormDefinition()
-    {
-        return [$this->profileField->internal_name => [
-                'type' => 'datetime',
-                'format' => Yii::$app->formatter->dateInputFormat,
-                'class' => 'form-control',
-                'readonly' => (!$this->profileField->editable),
-                'dateTimePickerOptions' => [
-                    'pickTime' => false
-                ]
-        ]];
     }
 
     /**
      * @inheritdoc
      */
-    public function getUserValue($user, $raw = true)
+    public function getFieldFormDefinition(?User $user = null, array $options = []): array
+    {
+        return parent::getFieldFormDefinition($user, array_merge([
+            'format' => Yii::$app->formatter->dateInputFormat,
+            'dateTimePickerOptions' => [
+                'pickTime' => false,
+            ],
+        ], $options));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
         $internalName = $this->profileField->internal_name;
-        $date = $user->profile->$internalName;
+        $value = $user->profile->$internalName ?? '';
+        $date = \DateTime::createFromFormat(
+            'Y-m-d',
+            $value,
+            new DateTimeZone(Yii::$app->formatter->timeZone),
+        );
 
-        if ($date == "" || $date == "0000-00-00")
-            return "";
+        if ($date === false) {
+            return '';
+        }
 
-        return \yii\helpers\Html::encode($date);
+        if (!$raw) {
+            $value = Yii::$app->formatter->asDate($date, 'long');
+        }
+
+        return $encode ? Html::encode($value) : $value;
     }
 
 }
-
-?>

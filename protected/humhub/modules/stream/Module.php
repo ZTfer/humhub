@@ -8,6 +8,9 @@
 
 namespace humhub\modules\stream;
 
+use humhub\modules\activity\models\Activity;
+use humhub\modules\post\models\Post;
+
 /**
  * Stream Module provides stream (wall) backend and frontend
  *
@@ -16,7 +19,6 @@ namespace humhub\modules\stream;
  */
 class Module extends \humhub\components\Module
 {
-
     /**
      * @var array content classes to excludes from streams
      */
@@ -30,10 +32,18 @@ class Module extends \humhub\components\Module
     /**
      * @var array default content classes which are not suppressed when in a row
      */
-    public $defaultStreamSuppressQueryIgnore = [\humhub\modules\post\models\Post::class, \humhub\modules\activity\models\Activity::class];
+    public $defaultStreamSuppressQueryIgnore = [
+        Post::class,
+        Activity::class,
+    ];
 
     /**
-     * @var boolean show contents of deactivated users in stream
+     * @var int number of contents from which "Show more" appears in the stream
+     */
+    public $streamSuppressLimit = 2;
+
+    /**
+     * @var bool show contents of deactivated users in stream
      */
     public $showDeactivatedUserContent = true;
 

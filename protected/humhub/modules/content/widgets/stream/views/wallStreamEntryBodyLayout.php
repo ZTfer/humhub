@@ -1,31 +1,33 @@
 <?php
 
+use humhub\components\View;
 use humhub\modules\content\components\ContentActiveRecord;
-use humhub\modules\content\widgets\WallEntryLabels;
 use humhub\modules\topic\models\Topic;
-use humhub\modules\topic\widgets\TopicLabel;
-use humhub\modules\ui\view\components\View;
+use humhub\modules\topic\widgets\TopicBadge;
 
 /* @var $this View */
 /* @var $model ContentActiveRecord */
 /* @var $header string */
 /* @var $content string */
 /* @var $footer string */
+/* @var $topics Topic[] */
 
 ?>
 
 <div class="panel panel-default wall_<?= $model->getUniqueId() ?>">
     <div class="panel-body">
-        <div class="media wall-entry-header">
+        <div class="d-flex wall-entry-header">
             <?= $header ?>
         </div>
 
         <div class="wall-entry-body">
-            <div class="wall-entry-topics">
-                <?php foreach (Topic::findByContent($model->content)->all() as $topic) : ?>
-                    <?= TopicLabel::forTopic($topic) ?>
-                <?php endforeach; ?>
-            </div>
+            <?php if ($topics !== []) : ?>
+                <div class="topic-label-list d-flex gap-1 flex-wrap">
+                    <?php foreach ($topics as $topic) : ?>
+                        <?= TopicBadge::forTopic($topic, $model->content) ?>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
 
             <div class="wall-entry-content content" id="wall_content_<?= $model->getUniqueId() ?>">
                 <?= $content ?>

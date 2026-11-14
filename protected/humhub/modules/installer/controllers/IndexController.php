@@ -8,10 +8,11 @@
 
 namespace humhub\modules\installer\controllers;
 
-
+use humhub\components\InstallationState;
+use Yii;
 use humhub\components\access\ControllerAccess;
 use humhub\components\Controller;
-
+use humhub\modules\installer\libs\DynamicConfig;
 
 /**
  * Index Controller shows a simple welcome page.
@@ -40,8 +41,8 @@ class IndexController extends Controller
      */
     public function actionGo()
     {
-        if ($this->module->checkDBConnection()) {
-            return $this->redirect(['setup/init']);
+        if (Yii::$app->installationState->hasState(InstallationState::STATE_DATABASE_CREATED)) {
+            return $this->redirect(['setup/finalize']);
         } else {
             return $this->redirect(['setup/prerequisites']);
         }

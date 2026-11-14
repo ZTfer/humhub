@@ -1,6 +1,10 @@
 <?php
-return array (
-  'Collapse' => 'Zarrar',
-  'Read more' => '',
-  'User Interface' => '',
-);
+
+return [
+    'Collapse' => 'Zarrar',
+    'Read more' => '',
+    'Reset filters' => '',
+    'Select' => '',
+    'Toggle filters' => '',
+    'User Interface' => '',
+];

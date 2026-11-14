@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -8,10 +9,10 @@
 
 namespace humhub\modules\content\widgets;
 
-use Yii;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\content\models\ContentTag;
 use humhub\modules\ui\form\widgets\JsInputWidget;
+use Yii;
 
 class ContentTagDropDown extends JsInputWidget
 {
@@ -70,7 +71,7 @@ class ContentTagDropDown extends JsInputWidget
     {
         $result = [
             'class' => 'form-control',
-            'options' => $this->itemOptions
+            'options' => $this->itemOptions,
         ];
 
         if ($this->prompt) {
@@ -88,22 +89,23 @@ class ContentTagDropDown extends JsInputWidget
 
         if (!$this->query) {
             if ($this->contentContainer) {
-                $this->query = call_user_func($this->tagClass .'::findByContainer', $this->contentContainer, $this->includeGlobal);
+                $this->query = call_user_func($this->tagClass . '::findByContainer', $this->contentContainer, $this->includeGlobal);
             } elseif (!empty($this->type)) {
                 $type = ($this->type === true) ? $this->tagClass : $this->type;
-                $this->query = call_user_func($this->tagClass .'::findByType', [$type]);
+                $this->query = call_user_func($this->tagClass . '::findByType', [$type]);
             } else {
-                $this->query = call_user_func($this->tagClass .'::find');
+                $this->query = call_user_func($this->tagClass . '::find');
             }
         }
 
+        /* @var ContentTag[] $tags */
         $tags = $this->items = $this->query->all();
 
         $result = [];
         foreach ($tags as $tag) {
             $result[$tag->id] = $tag->name;
             $this->itemOptions[$tag->id] = [
-                'data-type-color' => $tag->color
+                'data-color' => $tag->color,
             ];
         }
 

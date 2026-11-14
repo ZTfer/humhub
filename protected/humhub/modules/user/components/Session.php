@@ -8,18 +8,17 @@
 
 namespace humhub\modules\user\components;
 
+use Exception;
 use Yii;
+use yii\db\Expression;
 use yii\web\DbSession;
 use yii\web\ErrorHandler;
-use yii\db\Query;
-use yii\db\Expression;
 
 /**
  * @inheritdoc
  */
 class Session extends DbSession
 {
-
     /**
      * @inheritdoc
      */
@@ -27,7 +26,7 @@ class Session extends DbSession
 
     /**
      * Returns all current logged in users.
-     * 
+     *
      * @return ActiveQueryUser
      */
     public static function getOnlineUsers()
@@ -37,6 +36,27 @@ class Session extends DbSession
         $query->andWhere(['IS NOT', 'user_http_session.user_id', new Expression('NULL')]);
         $query->andWhere(['>', 'user_http_session.expire', time()]);
         return $query;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getTimeout()
+    {
+        return (int) Yii::$app->user->authTimeout;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCookieParams()
+    {
+        $params = parent::getCookieParams();
+        if (Yii::$app->request->autoEnsureSecureConnection
+            && Yii::$app->request->isSecureConnection) {
+            $params['secure'] = true;
+        }
+        return $params;
     }
 
     /**
@@ -52,31 +72,20 @@ class Session extends DbSession
                 $userId = Yii::$app->user->id;
             }
 
-            $expire = time() + $this->getTimeout();
-            $query = new Query;
-            $exists = $query->select(['id'])
-                    ->from($this->sessionTable)
-                    ->where(['id' => $id])
-                    ->createCommand($this->db)
-                    ->queryScalar();
-            if ($exists === false) {
-                $this->db->createCommand()
-                        ->insert($this->sessionTable, [
-                            'id' => $id,
-                            'data' => $data,
-                            'expire' => $expire,
-                            'user_id' => $userId,
-                        ])->execute();
-            } else {
-                $this->db->createCommand()
-                        ->update($this->sessionTable, ['data' => $data, 'expire' => $expire, 'user_id' => $userId], ['id' => $id])
-                        ->execute();
-            }
-        } catch (\Exception $e) {
-            $exception = ErrorHandler::convertExceptionToString($e);
-            // its too late to use Yii logging here
-            error_log($exception);
-            echo $exception;
+            // Atomic INSERT ... ON DUPLICATE KEY UPDATE: concurrent requests with the same (new or expired)
+            // session ID must not fail with a duplicate key error, as a SELECT followed by INSERT/UPDATE would.
+            $this->db->createCommand()
+                ->upsert($this->sessionTable, [
+                    'id' => $id,
+                    'data' => $data,
+                    'expire' => time() + $this->getTimeout(),
+                    'user_id' => $userId,
+                ])->execute();
+        } catch (Exception $e) {
+            // A session write handler must not produce output, as it may run mid-request (e.g. session_regenerate_id()).
+            // Also log to the PHP error log, as the Yii log targets may fail as well (e.g. DbTarget).
+            Yii::error($e, 'user');
+            error_log(ErrorHandler::convertExceptionToString($e));
 
             return false;
         }

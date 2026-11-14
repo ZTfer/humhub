@@ -1,34 +1,37 @@
 humhub.module('tour', function (module, requrie, $) {
 
     var client = requrie('client');
-    var tourOptions;
-    var completedUrl;
+    var tourId;
     var nextUrl;
 
     var start = function (options) {
-       new Tour({
-            storage: false,
-            template: module.config.template,
-            steps: options.steps,
-            framework: "bootstrap3",
-            name: options.name,
-            sanitizeWhitelist: {'a' : ['data-action-click']},
-            onEnd: tourCompleted
-        }).start();
-
-        tourOptions = options;
-        completedUrl = options.completedUrl;
+        tourId = options.tourId;
         nextUrl = options.nextUrl;
+
+        // Load driver.js
+        const driver = window.driver.js.driver;
+        const driverObj = driver({
+            ...module.config.driverJsOptions,
+            ...options.driverJs,
+            onDestroyStarted: () => {
+                // If the last step is displayed, go to the next tour
+                if (!driverObj.hasNextStep()) {
+                    const next = nextUrl !== "" && nextUrl != null;
+                    tourCompleted(next);
+                }
+                driverObj.destroy();
+            },
+        });
+        driverObj.drive();
     };
 
     /**
      * Set tour as seen
      */
     function tourCompleted(next) {
-        // load user spaces
-        client.post(module.config.completedUrl, {data: {section: tourOptions.name}}).then(function() {
+        client.post(module.config.completedUrl, {data: {tour_id: tourId}}).then(function () {
             // cross out welcome tour entry
-            $('#interface_entry').addClass('completed');
+            $('#tour-panel-' + module.config.dashboardTourId).addClass('completed');
 
             if (next === true && nextUrl) {
                 window.location.href = nextUrl;
@@ -42,8 +45,14 @@ humhub.module('tour', function (module, requrie, $) {
         tourCompleted(true);
     };
 
+    var hidePanel = function (event) {
+        $(".panel-tour").slideToggle("slow");
+        client.post(event)
+    }
+
     module.export({
         start: start,
-        next: next
+        next: next,
+        hidePanel: hidePanel,
     });
 });

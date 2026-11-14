@@ -1,26 +1,28 @@
 <?php
 
-use yii\helpers\Html;
+use humhub\helpers\Html;
+use humhub\widgets\PanelMenu;
 use yii\helpers\Url;
+
 ?>
 <?php if ($user->hasTags()) : ?>
     <div id="user-tags-panel" class="panel panel-default" style="position: relative;">
 
-        <?php echo \humhub\widgets\PanelMenu::widget(['id' => 'user-tags-panel']); ?>
+        <?= PanelMenu::widget() ?>
 
-        <div class="panel-heading"><?php echo Yii::t('UserModule.base', '<strong>User</strong> tags'); ?></div>
+        <div class="panel-heading"><?= Yii::t('UserModule.base', '<strong>User</strong> tags') ?></div>
         <div class="panel-body">
             <!-- start: tags for user skills -->
-            <div class="tags">
+            <ul class="tags list-unstyled d-flex flex-wrap gap-1">
                 <?php foreach ($user->getTags() as $tag): ?>
-                    <?php echo Html::a(Html::encode($tag), Url::to(['/directory/directory/members', 'keyword' => $tag]), ['class' => 'btn btn-default btn-xs tag']); ?>
+                    <li><?= Html::a(Html::encode($tag), Url::to(['/user/people', 'keyword' => $tag]), ['class' => 'btn btn-light btn-sm tag']) ?></li>
                 <?php endforeach; ?>
-            </div>
+            </ul>
             <!-- end: tags for user skills -->
 
         </div>
     </div>
-    <script <?= \humhub\libs\Html::nonce() ?>>
+    <script <?= Html::nonce() ?>>
         function toggleUp() {
             $('.pups').slideUp("fast", function () {
                 // Animation complete.

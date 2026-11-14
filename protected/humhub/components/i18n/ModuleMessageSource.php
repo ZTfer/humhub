@@ -13,7 +13,6 @@ use humhub\libs\I18NHelper;
 use Yii;
 use yii\base\InvalidConfigException;
 
-
 /**
  * ModuleMessageSource
  *
@@ -39,6 +38,8 @@ class ModuleMessageSource extends PhpMessageSource
      */
     public function init()
     {
+        parent::init();
+
         if ($this->module === null && !empty($this->moduleId)) {
             $this->module = Yii::$app->moduleManager->getModule($this->moduleId);
         }
@@ -62,7 +63,7 @@ class ModuleMessageSource extends PhpMessageSource
     /**
      * @inheritDoc
      */
-    protected function loadMessages($category, $language)
+    public function loadMessages($category, $language)
     {
         $messages = parent::loadMessages($category, $language);
 

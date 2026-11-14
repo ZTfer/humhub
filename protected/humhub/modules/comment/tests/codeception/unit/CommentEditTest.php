@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -14,14 +15,12 @@ use humhub\modules\post\models\Post;
 
 class CommentEditTest extends HumHubDbTestCase
 {
-
     public function testNewCommentIsNotEdited()
     {
         $this->becomeUser('User2');
         $comment = new Comment([
             'message' => 'User2 comment!',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]);
 
         $this->assertTrue($comment->save());
@@ -37,8 +36,7 @@ class CommentEditTest extends HumHubDbTestCase
         $this->becomeUser('User2');
         $comment = new Comment([
             'message' => 'User2 comment!',
-            'object_model' => Post::class,
-            'object_id' => 11
+            'content_id' => 11,
         ]);
 
         $this->assertTrue($comment->save());

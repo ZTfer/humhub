@@ -8,11 +8,10 @@
 
 namespace humhub\modules\ui\form\widgets;
 
-use Yii;
-use humhub\libs\Html;
-use yii\helpers\Json;
+use DateTime;
 use humhub\assets\JqueryTimeEntryAsset;
-use humhub\modules\ui\form\widgets\JsInputWidget;
+use humhub\helpers\Html;
+use yii\helpers\Json;
 
 /**
  * DurationPicker renders an UI form widget to select time durations.
@@ -22,7 +21,6 @@ use humhub\modules\ui\form\widgets\JsInputWidget;
  */
 class DurationPicker extends JsInputWidget
 {
-
     /**
      * @inheritdoc
      */
@@ -36,7 +34,7 @@ class DurationPicker extends JsInputWidget
             'unlimitedHours' => true,
             'defaultTime' => '01:00',
             'timeSteps' => [1, 15],
-            'spinnerImage' => ''
+            'spinnerImage' => '',
         ];
 
         JqueryTimeEntryAsset::register($view);
@@ -51,7 +49,7 @@ class DurationPicker extends JsInputWidget
         }
     }
 
-    public static function getDuration(\DateTime $start, \DateTime $end)
+    public static function getDuration(DateTime $start, DateTime $end)
     {
         $duration = $start->diff($end);
         return $duration->h . ':' . $duration->m;

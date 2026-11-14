@@ -1,50 +1,61 @@
 <?php
 
-use yii\helpers\Url;
-use yii\helpers\Html;
-use yii\bootstrap\ActiveForm;
+use humhub\helpers\Html;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+use humhub\widgets\LanguageChooser;
 use humhub\widgets\SiteLogo;
+use yii\helpers\Url;
 
 $this->pageTitle = Yii::t('UserModule.auth', 'Password reset');
 ?>
-<div class="container" style="text-align: center;">
-    <?= SiteLogo::widget(['place' => 'login']); ?>
+<div id="user-password-recovery-reset" class="container container-password">
+    <?= SiteLogo::widget(['place' => SiteLogo::PLACE_LOGIN]) ?>
     <br>
 
-    <div class="row">
-        <div id="password-recovery-form" class="panel panel-default animated bounceIn" style="max-width: 300px; margin: 0 auto 20px; text-align: left;">
-            <div class="panel-heading"><?= Yii::t('UserModule.auth', '<strong>Change</strong> your password'); ?></div>
-            <div class="panel-body">
+    <div id="password-recovery-form" class="panel panel-default animated bounceIn">
+        <div class="panel-heading">
+            <strong class="fw-bolder"><?= Yii::t('UserModule.auth', 'Change your password') ?></strong>
+        </div>
+        <div class="panel-body">
 
-                <?php $form = ActiveForm::begin(['enableClientValidation'=>false]); ?>
-                
-                    <?= $form->field($model, 'newPassword')->passwordInput(['class' => 'form-control', 'id' => 'new_password', 'maxlength' => 255, 'value' => ''])?>
+            <?php $form = ActiveForm::begin(['enableClientValidation' => false]); ?>
 
-                    <?= $form->field($model, 'newPasswordConfirm')->passwordInput(['class' => 'form-control', 'maxlength' => 255, 'value' => ''])?>
+            <?= $form->field($model, 'newPassword')->passwordInput(['class' => 'form-control', 'id' => 'new_password', 'maxlength' => 255, 'value' => '', 'autocomplete' => 'new-password']) ?>
 
-                    <?= Html::submitButton(Yii::t('UserModule.auth', 'Change password'), ['class' => 'btn btn-primary', 'data-ui-loader' => '']); ?> 
+            <?= $form->field($model, 'newPasswordConfirm')->passwordInput(['class' => 'form-control', 'maxlength' => 255, 'value' => '', 'autocomplete' => 'new-password']) ?>
 
-                    <a class="btn btn-primary" data-ui-loader href="<?= Url::home() ?>">
-                        <?= Yii::t('UserModule.auth', 'Back') ?>
-                    </a>
-
-                <?php ActiveForm::end(); ?>
+            <div class="row g-3">
+                <div class="col-6">
+                    <?= Button::light(Yii::t('UserModule.auth', 'Back'))
+                        ->link(Url::home())
+                        ->cssClass('w-100')
+                        ->pjax(false) ?>
+                </div>
+                <div class="col-6">
+                    <?= Button::save(Yii::t('UserModule.auth', 'Change password'))
+                        ->submit()
+                        ->cssClass('w-100') ?>
+                </div>
             </div>
+
+            <?php ActiveForm::end(); ?>
         </div>
     </div>
+
+    <?= LanguageChooser::widget(['vertical' => true]) ?>
 </div>
 
-<script <?= \humhub\libs\Html::nonce() ?>>
-
+<script <?= Html::nonce() ?>>
     $(function () {
         // set cursor to email field
         $('#new_password').focus();
     });
 
     // Shake panel after wrong validation
-<?php if ($model->hasErrors()) { ?>
-        $('#password-recovery-form').removeClass('bounceIn');
-        $('#password-recovery-form').addClass('shake');
-        $('#app-title').removeClass('fadeIn');
-<?php } ?>
+    <?php if ($model->hasErrors()) { ?>
+    $('#password-recovery-form').removeClass('bounceIn');
+    $('#password-recovery-form').addClass('shake');
+    $('#app-title').removeClass('fadeIn');
+    <?php } ?>
 </script>

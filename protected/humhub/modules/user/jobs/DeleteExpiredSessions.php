@@ -19,13 +19,12 @@ use humhub\modules\user\models\Session;
  */
 class DeleteExpiredSessions extends ActiveJob
 {
-
     /**
      * @inheritdoc
      */
     public function run()
     {
-        foreach (Session::find()->where(['<', 'expire', time()])->all() as $session) {
+        foreach (Session::find()->where(['<', 'expire', time()])->each() as $session) {
             $session->delete();
         }
     }

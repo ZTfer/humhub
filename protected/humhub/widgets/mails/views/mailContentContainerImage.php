@@ -5,7 +5,7 @@
  * @license https://www.humhub.com/licences
  */
 
-use yii\helpers\Html;
+use humhub\helpers\Html;
 
 /* @var $container \humhub\modules\content\components\ContentContainerActiveRecord */
 /* @var $url string */
@@ -14,7 +14,7 @@ use yii\helpers\Html;
 
 <a href="<?= $url ?>">
     <div>
-        <img src="<?= $container->getProfileImage()->getUrl("", true); ?>"
+        <img src="<?= $container->image->getUrl(null, true); ?>"
              width="50"
              height="50"
              alt=""

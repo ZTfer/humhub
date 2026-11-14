@@ -2,66 +2,121 @@
 
 namespace humhub\modules\activity\tests\codeception\unit;
 
-use humhub\modules\activity\models\Activity;
-use humhub\modules\activity\tests\codeception\activities\TestActivity;
-use Yii;
-use tests\codeception\_support\HumHubDbTestCase;
 use Codeception\Specify;
+use humhub\modules\activity\models\Activity;
+use humhub\modules\activity\services\ActivityManager;
+use humhub\modules\activity\services\RenderService;
+use humhub\modules\activity\tests\codeception\activities\TestActivity;
+use humhub\modules\comment\activities\NewCommentActivity;
+use humhub\modules\comment\models\Comment;
 use humhub\modules\post\models\Post;
+use tests\codeception\_support\HumHubDbTestCase;
+use Yii;
 
 class ActivityTest extends HumHubDbTestCase
 {
-
     use Specify;
 
     public function testCreateActivity()
     {
         $this->becomeUser('User2');
         $post = Post::findOne(['id' => 1]);
-        
-        $activity = TestActivity::instance()->from(Yii::$app->user->getIdentity())->about($post);
-        
-        // Test Originator
-        $this->assertEquals($activity->originator->id, Yii::$app->user->getIdentity()->id, 'Originator id before save');
-        $this->assertEquals($activity->record->content->created_by, Yii::$app->user->getIdentity()->id, 'Content originator before save');
-        $this->assertEquals($activity->record->content->contentcontainer_id, $post->content->container->id, 'ContentContainer before save');
-        
-        // Test Source
-        $this->assertEquals($activity->source->id, $post->id, 'Source id before save');
-        $this->assertEquals(get_class($activity->source), Post::class, 'Source class before save');
-        
-        // Test Activity Record
-        $this->assertNotNull($activity->record, 'BaseActivity Record not null');
-        
-        $activity->create();
-        
+
+        ActivityManager::dispatch(TestActivity::class, $post);
+
         $record = Activity::findOne(['class' => TestActivity::class]);
-        $this->assertEquals($record->module, 'test');
-        $source = $record->getPolymorphicRelation();
-       
         $this->assertNotNull($record, 'Activity record persisted');
-        
-        $testActivity = $record->getActivityBaseClass();
+
+        $testActivity = ActivityManager::load($record);
         $this->assertNotNull($testActivity, 'Get BaseActivity from Activity Record');
-        
-        $this->assertEquals(get_class($activity), get_class($testActivity));
-        $this->assertEquals(get_class($source), get_class($testActivity->source), 'Activity source after reload');
-        $this->assertEquals($source->id, $testActivity->source->id, 'Activity Source id after reload');
-        
-        $this->assertNotNull($testActivity->getContent(), 'Activity::getContent');
-        $this->assertEquals($testActivity->getContent()->id, $post->content->id, 'Compare activity content with source content.');
-        
-        $this->assertEquals($testActivity->getContentContainer()->id, $post->content->container->id, 'Activity::getContentContainer content');
+
+        $this->assertEquals(TestActivity::class, $testActivity::class);
+        $this->assertEquals($record->content->polymorphicRelation->id, $post->id);
+        $this->assertEquals($record->contentcontainer_id, $post->content->contentcontainer_id);
     }
 
-    public function testCreateActivityAboutOnly()
+    public function testCreateActivityOnGlobalContent()
     {
-        $post = Post::findOne(['id' => 1]);
-        $activity = TestActivity::instance()->about($post)->create();
-        $this->assertEquals($post->content->created_by, $activity->record->content->created_by);
+        $this->becomeUser('User2');
 
-        $activity = Activity::findOne(['id' => $activity->record->id]);
+        $post = new Post(['message' => 'Global content']);
+        $this->assertTrue($post->save());
+        $this->assertNull($post->content->contentcontainer_id);
 
-        $this->assertEquals($post->content->created_by, $activity->getActivityBaseClass()->originator->id);
+        // Commenting on global content dispatches NewCommentActivity without a container
+        $comment = new Comment([
+            'message' => 'Comment on global content',
+            'content_id' => $post->content->id,
+        ]);
+        $this->assertTrue($comment->save());
+
+        $record = Activity::findOne(['class' => NewCommentActivity::class]);
+        $this->assertNotNull($record, 'Activity record persisted');
+        $this->assertNull($record->contentcontainer_id);
+
+        $activity = ActivityManager::load($record);
+        $this->assertNull($activity->contentContainer);
+
+        $renderService = new RenderService($record);
+        $this->assertNotEmpty($renderService->getWeb());
+        $this->assertNotEmpty($renderService->getMailText());
+        $this->assertNotEmpty($renderService->getMailHtml());
+    }
+
+    public function testDeleteRecord()
+    {
+        $this->becomeUser('User2');
+        $post = Post::findOne(1);
+
+        ActivityManager::dispatch(TestActivity::class, $post);
+
+        // Record exists
+        $this->assertNotNull(Activity::findOne(['class' => TestActivity::class]));
+
+        // Soft Delete
+        $this->assertTrue($post->delete());
+
+        // Record still exists
+        $this->assertNotNull(Activity::findOne(['class' => TestActivity::class]));
+
+        // Default Scope filtering soft deleted activities
+        $this->assertNull(Activity::find()->defaultScopes(Yii::$app->user->identity)
+            ->andWhere(['class' => TestActivity::class])->one());
+
+        $this->assertTrue($post->hardDelete());
+
+        $this->assertNull(Activity::findOne(['class' => TestActivity::class]));
+
+        /*
+        $post2 = Post::findOne(2);
+        ActivityManager::dispatch(TestActivity::class, $post2);
+        $this->assertNotNull(Activity::findOne(['class' => TestActivity::class]));
+        $post2->content->delete();
+        $this->assertNotNull(Activity::findOne(['class' => TestActivity::class]));
+        $post2->content->hardDelete();
+        $this->assertNull(Activity::findOne(['class' => TestActivity::class]));
+        */
+    }
+
+    public function testDeleteOriginator()
+    {
+        $this->becomeUser('User2');
+
+        // Post (User 2 Space 2 Post Public)
+        $post = Post::findOne(10);
+
+        ActivityManager::dispatch(TestActivity::class, $post);
+        $activityRecord = Activity::findOne(['class' => TestActivity::class]);
+
+
+        $this->assertNotNull(Activity::findOne(['activity.id' => $activityRecord->id]));
+        Yii::$app->user->identity->softDelete();
+
+        // Activity still there
+        $this->assertNotNull(Activity::findOne(['activity.id' => $activityRecord->id]));
+
+        Yii::$app->user->identity->delete();
+
+        $this->assertNull(Activity::findOne(['activity.id' => $activityRecord->id]));
     }
 }

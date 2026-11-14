@@ -1,6 +1,10 @@
 <?php
-return array (
-  'Collapse' => 'جمع شدن',
-  'Read more' => '',
-  'User Interface' => 'رابط کاربری',
-);
+
+return [
+    'Collapse' => 'جمع شدن',
+    'User Interface' => 'رابط کاربری',
+    'Read more' => '',
+    'Reset filters' => '',
+    'Select' => '',
+    'Toggle filters' => '',
+];

@@ -1,4 +1,5 @@
 <?php
+
 namespace user\acceptance;
 
 use user\AcceptanceTester;
@@ -9,28 +10,42 @@ class PasswordRecoveryCest
     public function testPasswordRecovery(AcceptanceTester $I)
     {
         $I->wantTo('ensure that password recovery works');
-        
-        $I->amGoingTo('request a recovery  mail for an invalid user email and wrong captcha');
-        LoginPage::openBy($I);
+
+        $I->amGoingTo('request a recovery mail for an invalid user email and wrong captcha');
+        $loginPage = LoginPage::openBy($I);
+        $loginPage->openPasswordStep('admin');
         $I->wait(3);
-        $I->waitForText('Forgot your password?');
+        $I->waitForText('Forgot password?');
         $I->jsClick('#password-recovery-link');
         $I->waitForText('Password recovery');
         $I->fillField('#email_txt', 'wrong@mail.de');
-        $I->fillField('#accountrecoverpassword-verifycode', 'wrong');
+        $I->fillField('#accountrecoverpassword-captcha', 'wrong');
         $I->click('Reset password');
         $I->wait(3);
         $I->expectTo('see error messages');
-        $I->see('E-Mail "wrong@mail.de" was not found!');
         $I->see('The verification code is incorrect.');
-        
-        $I->amGoingTo('request a recovery  mail with valid data');
+
+        $I->amGoingTo('request a recovery mail for an invalid user email');
+        $I->fillField('#accountrecoverpassword-captcha', 'testme');
+        $I->click('Reset password');
+        $I->wait(3);
+        $I->expectTo('see confirm messages even with wrong email for safe reason');
+        $I->see('Password recovery');
+        $I->see('If a user account associated with this email address exists, further instructions will be sent to you by email shortly.');
+
+        $I->amGoingTo('request a recovery mail with valid data');
+        $loginPage = LoginPage::openBy($I);
+        $loginPage->openPasswordStep('admin');
+        $I->wait(3);
+        $I->waitForText('Forgot password?');
+        $I->jsClick('#password-recovery-link');
+        $I->waitForText('Password recovery');
         $I->fillField('#email_txt', 'user1@example.com');
-        $I->fillField('#accountrecoverpassword-verifycode', 'testme');
+        $I->fillField('#accountrecoverpassword-captcha', 'testme');
         $I->click('Reset password');
         $I->wait(3);
         $I->expectTo('see confirm messages');
-        $I->see('Password recovery!');
-        $I->see('We’ve sent you an email containing a link that will allow you to reset your password.');
+        $I->see('Password recovery');
+        $I->see('If a user account associated with this email address exists, further instructions will be sent to you by email shortly.');
     }
 }

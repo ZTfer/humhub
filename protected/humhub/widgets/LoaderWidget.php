@@ -29,7 +29,6 @@ namespace humhub\widgets;
  */
 class LoaderWidget extends \yii\base\Widget
 {
-
     /**
      * id for DOM element
      *
@@ -43,11 +42,17 @@ class LoaderWidget extends \yii\base\Widget
      * @var string
      */
     public $cssClass = "";
-    
+
     /**
      * defines if the loader is initially shown
      */
     public $show = true;
+
+    /**
+     * Custom loading text
+     * @since 1.18
+     */
+    public ?string $text = null;
 
     /**
      * Displays / Run the Widgets
@@ -57,10 +62,9 @@ class LoaderWidget extends \yii\base\Widget
         return $this->render('loader', [
             'id' => $this->id,
             'cssClass' => $this->cssClass,
-            'show' => $this->show
+            'show' => $this->show,
+            'text' => $this->text,
         ]);
     }
 
 }
-
-?>

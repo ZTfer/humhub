@@ -1,16 +1,13 @@
 <?php
 
-
 namespace humhub\modules\admin\grid;
 
-
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\user\models\ProfileField;
 use yii\grid\DataColumn;
 
 class CheckboxColumn extends DataColumn
 {
-
     public $attribute;
 
     public $disabled = true;

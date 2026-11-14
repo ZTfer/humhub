@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'Verwijder panel',
+  '&larr; Previous' => '&larr; Vorige',
   '<strong>Account</strong> Menu' => '<strong>Account</strong> Menu',
   '<strong>Getting</strong> Started' => '<strong>Beginnen</strong>',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Gids:</strong> Beheer (Modules)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '<strong>Start</strong> de ruimtegids',
   'Cancel' => 'Annuleren',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => 'Om het spoor van alle zaken niet verliezen! <br /><br /> Dit icoon houdt u op de hoogte van de activiteiten en berichten die u betreffen.',
+  'Done' => 'Klaar',
   'Drag a photo here or click to browse your files' => 'Sleep hier een foto heen of klik hierop om een bestand te kiezen',
-  'End guide' => 'Beëindig tour',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Leer de weg kennen op deze webpagina\'s door de belangrijkste kenmerken met de volgende gidsen te leren kennen:',
   'Hide my year of birth' => 'Verberg mijn geboortejaar',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => 'Hoi <strong>%firstname% </strong>, bedankt voor het gebruik van %community%.',
-  'Next »' => 'Volgende »',
+  'Next &rarr;' => 'Volgende &rarr;',
   'Ok' => 'Oké',
   'Save and close' => 'Bewaar en sluit',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'Het account menu geeft u toegang tot uw persoonlijke instellingen en laat u uw openbare profiel beheren.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Uw achternaam',
   'Your mobile phone number' => 'Uw mobiele telefoon nummer',
   'Your phone number at work' => 'Uw telefoonnummer op het werk',
-  'Your skills, knowledge and experience (comma seperated)' => 'Uw vaardigheden, ervaring, etc. (gescheiden met komma\'s)',
+  'Your skills, knowledge and experience' => 'Uw vaardigheden, kennis en ervaring',
   'Your title or position' => 'Uw titel of positie',
-  '« Prev' => '« Vorige',
-);
+  '{{current}} of {{total}}' => '{{current}} of {{total}}',
+];

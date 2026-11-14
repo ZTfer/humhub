@@ -8,6 +8,10 @@
 
 namespace humhub\modules\file;
 
+use humhub\modules\file\handler\UploadAudioFileHandler;
+use humhub\modules\file\handler\UploadImageFileHandler;
+use humhub\modules\file\handler\UploadVideoFileHandler;
+
 /**
  * File Module
  *
@@ -15,7 +19,6 @@ namespace humhub\modules\file;
  */
 class Module extends \humhub\components\Module
 {
-
     /**
      * @inheritdoc
      */
@@ -40,7 +43,16 @@ class Module extends \humhub\components\Module
         'application/x-pdf',
         'image/gif',
         'image/png',
-        'image/jpeg'
+        'image/jpeg',
+    ];
+
+    /**
+     * @var array Additional MIME types which are not detected correctly by function finfo_file()
+     */
+    public $additionalMimeTypes = [
+        'dotx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xltx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'potx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     ];
 
     /**
@@ -88,4 +100,16 @@ class Module extends \humhub\components\Module
      * @var int The maximum width of generated preview image files in px.
      */
     public $imagePreviewMaxWidth = 400;
+
+    /**
+     * @since 1.10
+     * @var int The maximum megapixels(width*height) of processing image files.
+     */
+    public $imageMaxProcessingMP = 64;
+
+    /**
+     * @since 1.15
+     * @var string[] List of file types added to the upload dropdown button (must be classes extending the BaseFileHandler class)
+     */
+    public $defaultFileHandlers = [UploadAudioFileHandler::class, UploadImageFileHandler::class, UploadVideoFileHandler::class];
 }

@@ -22,7 +22,7 @@ class BaseImage extends Widget
     public $htmlOptions = [];
 
     /**
-     * @var boolean create link to the space or user profile
+     * @var bool create link to the space or user profile
      */
     public $link = false;
 
@@ -32,7 +32,7 @@ class BaseImage extends Widget
     public $linkOptions = [];
 
     /**
-     * @var string show tooltip with further information about the space or the user (Only available when link is true)
+     * @var bool show tooltip with further information about the space or the user (Only available when link is true)
      * @since 1.3
      */
     public $showTooltip = false;

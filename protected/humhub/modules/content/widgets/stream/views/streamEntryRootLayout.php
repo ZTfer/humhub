@@ -1,7 +1,7 @@
 <?php
 
-use humhub\libs\Html;
-use humhub\modules\ui\view\components\View;
+use humhub\components\View;
+use humhub\helpers\Html;
 
 /* @var $this View */
 /* @var $rootElement string */
@@ -9,9 +9,8 @@ use humhub\modules\ui\view\components\View;
 /* @var $bodyLayout $string */
 ?>
 
-<?= Html::beginTag($rootElement,  $options)?>
+<?= Html::beginTag($rootElement, $options) ?>
 
-    <?= $bodyLayout ?>
+<?= $bodyLayout ?>
 
 <?= Html::endTag($rootElement) ?>
-

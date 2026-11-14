@@ -1,69 +1,36 @@
 <?php
 
+use humhub\components\View;
 use humhub\modules\space\assets\SpaceAsset;
-use humhub\libs\Helpers;
-use yii\helpers\Url;
+use humhub\modules\space\models\Space;
+use humhub\widgets\modal\Modal;
+use humhub\widgets\modal\ModalButton;
 
-/* @var $availableModules array available modules for space*/
+/* @var $availableModules array available modules for space */
+/* @var $space Space */
+/* @var $this View */
 
 SpaceAsset::register($this);
-
 ?>
-<div class="modal-dialog modal-dialog-medium animated fadeIn">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h4 class="modal-title" id="myModalLabel">
-                <?= Yii::t('SpaceModule.manage', 'Add <strong>Modules</strong>') ?>
-            </h4>
-        </div>
-        <div class="modal-body">
-            <br><br>
 
-            <div class="row">
+<?php Modal::beginDialog([
+    'closeButton' => false,
+    'title' => Yii::t('SpaceModule.manage', 'Add <strong>Modules</strong>'),
+    'size' => Modal::SIZE_LARGE,
+    'footer' => ModalButton::accent(Yii::t('SpaceModule.manage', 'Next'))->post(['/space/create/invite', 'spaceId' => $space->id]),
+]) ?>
+    <div class="text-body-secondary">
+        <?= Yii::t('SpaceModule.manage', 'Choose the modules you want to use for this Space. If you are undecided, you can also activate them later on via the Space settings.') ?>
+    </div>
 
-                <?php foreach ($availableModules as $moduleId => $module) :?>
-                    <div class="col-md-6">
-                        <div class="media well well-small ">
-                            <img class="media-object img-rounded pull-left" data-src="holder.js/64x64" alt="64x64"
-                                 style="width: 64px; height: 64px;"
-                                 src="<?= $module->getContentContainerImage($space); ?>">
-
-                            <div class="media-body">
-                                <h4 class="media-heading"><?= $module->getContentContainerName($space); ?></h4>
-
-                                <p style="height: 35px;"><?= Helpers::truncateText($module->getContentContainerDescription($space), 75); ?></p>
-
-                                <a href="#" class="btn btn-sm btn-primary enable"
-                                   data-action-click="content.container.enableModule"
-                                   data-ui-loader
-                                   <?php if ($space->isModuleEnabled($moduleId)): ?>style="display:none"<?php endif; ?>
-                                   data-action-url="<?= $space->createUrl('/space/manage/module/enable', ['moduleId' => $moduleId]); ?>">
-                                    <?= Yii::t('SpaceModule.manage', 'Enable'); ?>
-                                </a>
-
-                                <a href="#" class="btn btn-sm btn-primary disable"
-                                   <?php if (!$space->isModuleEnabled($moduleId)): ?>style="display:none"<?php endif; ?>
-                                   data-action-click="content.container.disableModule"
-                                   data-ui-loader
-                                   data-action-url="<?= $space->createUrl('/space/manage/module/disable', ['moduleId' => $moduleId]); ?>">
-                                    <?= Yii::t('SpaceModule.manage', 'Disable'); ?>
-                                </a>
-
-                            </div>
-                        </div>
-                        <br>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-
-        <div class="modal-footer">
-            <a href="#" class="btn btn-primary"
-               data-action-click="ui.modal.post"
-               data-ui-loader
-               data-action-url="<?= Url::to(['/space/create/invite', 'spaceId' => $space->id]); ?>">
-                <?= Yii::t('SpaceModule.manage', 'Next'); ?>
-            </a>
+    <div class="container container-cards container-modules container-create-space-modules">
+        <div class="modules-group">
+            <?php foreach ($availableModules as $module) : ?>
+                <?= $this->render('module-entry', [
+                    'space' => $space,
+                    'module' => $module,
+                ]) ?>
+            <?php endforeach; ?>
         </div>
     </div>
-</div>
+<?php Modal::endDialog() ?>

@@ -1,20 +1,29 @@
 <?php
 
-use yii\helpers\Url;
+use humhub\modules\user\components\MaintenanceModeGate;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\SiteLogo;
 
-$this->pageTitle = Yii::t('UserModule.auth', 'Password reset');
+$this->pageTitle = Yii::t('UserModule.auth', 'Password changed!');
+
+// During maintenance only the admin login form leads back into the platform
+$loginRoute = MaintenanceModeGate::isActive() ? ['/user/auth/login', 'maintenanceAdmin' => 1] : ['/user/auth/login'];
 ?>
-<div class="container" style="text-align: center;">
-    <?php echo humhub\widgets\SiteLogo::widget(['place' => 'login']); ?>
-
+<div id="user-password-recovery-reset-success" class="container container-password">
+    <?= SiteLogo::widget(['place' => SiteLogo::PLACE_LOGIN]) ?>
     <br>
-    <div class="row">
-        <div class="panel panel-default animated fadeIn" style="max-width: 300px; margin: 0 auto 20px; text-align: left;">
-            <div class="panel-heading"><?php echo Yii::t('UserModule.auth', '<strong>Password</strong> changed!'); ?></div>
-            <div class="panel-body">
-                <p><?= Yii::t('UserModule.auth', "Your password has been successfully changed!"); ?></p><br/>
-                <a href="<?= Url::home() ?>" data-ui-loader data-pjax-prevent class="btn btn-primary"><?= Yii::t('UserModule.auth', 'Login') ?></a>
-            </div>
+
+    <div class="panel panel-default animated fadeIn">
+        <div class="panel-heading">
+            <strong class="fw-bolder"><?= Yii::t('UserModule.auth', 'Password changed!') ?></strong>
+        </div>
+        <div class="panel-body">
+            <p><?= Yii::t('UserModule.auth', 'Your password has been successfully changed!') ?></p>
+            <br>
+            <?= Button::primary(Yii::t('UserModule.auth', 'Sign In'))
+                ->link($loginRoute)
+                ->cssClass('w-100')
+                ->pjax(false) ?>
         </div>
     </div>
 </div>

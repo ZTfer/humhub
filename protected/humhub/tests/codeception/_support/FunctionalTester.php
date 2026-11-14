@@ -24,7 +24,6 @@ use yii\helpers\Url;
  */
 class FunctionalTester extends BaseTester
 {
-
     use _generated\FunctionalTesterActions;
 
     public function amAdmin($logout = false)
@@ -33,14 +32,14 @@ class FunctionalTester extends BaseTester
             $this->logout();
         }
 
-        LoginPage::openBy($this)->login('admin', 'test');
+        LoginPage::openBy($this)->login('admin', 'admin&humhub@PASS%worD!');
         $this->see('Dashboard');
         $this->see('Administration');
     }
 
     public function setGroupPermission($groupId, $permission, $state = 1)
     {
-        if(is_string($permission)) {
+        if (is_string($permission)) {
             $permission = Yii::createObject(['class' => $permission]);
         }
 
@@ -48,8 +47,8 @@ class FunctionalTester extends BaseTester
             'permission_id' => $permission->id,
             'group_id' => $groupId,
             'module_id' => $permission->moduleId,
-            'class' => get_class($permission),
-            'state' => $state
+            'class' => $permission::class,
+            'state' => $state,
         ]))->save();
 
         \Yii::$app->user->getPermissionManager()->clear();
@@ -80,7 +79,7 @@ class FunctionalTester extends BaseTester
     {
         $space = $this->loginBySpaceUserGroup($userGroup, $path, $params, $post);
 
-        if($userGroup === Space::USERGROUP_GUEST) {
+        if ($userGroup === Space::USERGROUP_GUEST) {
             $this->seeInCurrentUrl('auth');
             $this->seeInCurrentUrl('login');
         } else {
@@ -102,7 +101,7 @@ class FunctionalTester extends BaseTester
     {
         $spaceId = null;
         $user = null;
-        switch($userGroup) {
+        switch ($userGroup) {
             case 'root':
                 $spaceId = 2;
                 $user = 'Admin';
@@ -129,15 +128,15 @@ class FunctionalTester extends BaseTester
                 break;
             case Space::USERGROUP_GUEST:
                 $this->logout();
-                $spaceId = 1;
+                $spaceId = 2;
                 break;
         }
 
-        if($spaceId) {
+        if ($spaceId) {
             $space = Space::findOne(['id' => $spaceId]);
         }
 
-        if($user) {
+        if ($user) {
             $this->logout();
             $this->amUser($user);
         }
@@ -147,7 +146,7 @@ class FunctionalTester extends BaseTester
     }
 
 
-    public function amUser($user = null, $password = '123qwe', $logout = false)
+    public function amUser($user = null, $password = 'user^humhub@PASS%worD!', $logout = false)
     {
         if ($logout) {
             $this->logout();
@@ -156,8 +155,8 @@ class FunctionalTester extends BaseTester
         if ($user == null) {
             $this->amUser1();
         } else {
-            if(strtolower($user) == 'admin') {
-                $password = 'test';
+            if (strtolower((string) $user) == 'admin') {
+                $password = 'admin&humhub@PASS%worD!';
             }
             LoginPage::openBy($this)->login($user, $password);
             tests\codeception\_pages\DashboardPage::openBy($this);
@@ -167,17 +166,17 @@ class FunctionalTester extends BaseTester
 
     public function amUser1($logout = false)
     {
-        $this->amUser('User1', '123qwe', $logout);
+        $this->amUser('User1', 'user^humhub@PASS%worD!', $logout);
     }
 
     public function amUser2($logout = false)
     {
-        $this->amUser('User2', '123qwe', $logout);
+        $this->amUser('User2', 'user^humhub@PASS%worD!', $logout);
     }
 
     public function amUser3($logout = false)
     {
-        $this->amUser('User3', '123qwe', $logout);
+        $this->amUser('User3', 'user^humhub@PASS%worD!', $logout);
     }
 
     public function logout()
@@ -246,11 +245,11 @@ class FunctionalTester extends BaseTester
             $path = '/space/space';
         }
 
-        if(is_int($spaceOrIndexOrGuid)) {
+        if (is_int($spaceOrIndexOrGuid)) {
             $guid = $this->getFixtureSpaceGuid(--$spaceOrIndexOrGuid);
-        } else if(is_string($spaceOrIndexOrGuid)) {
+        } elseif (is_string($spaceOrIndexOrGuid)) {
             $guid = $spaceOrIndexOrGuid;
-        } else if($spaceOrIndexOrGuid instanceof Space) {
+        } elseif ($spaceOrIndexOrGuid instanceof Space) {
             $guid = $spaceOrIndexOrGuid->guid;
         } else {
             $guid = '';

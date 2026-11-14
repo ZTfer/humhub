@@ -2,7 +2,29 @@
 
 namespace humhub\modules\web\security\helpers;
 
+use Exception;
 use Psr\Http\Message\MessageInterface;
+use TypeError;
+use Yii;
+
+use function array_keys;
+use function file_exists;
+use function file_get_contents;
+use function file_put_contents;
+use function filter_var;
+use function hash;
+use function header;
+use function headers_sent;
+use function implode;
+use function in_array;
+use function is_array;
+use function is_string;
+use function json_decode;
+use function preg_replace;
+use function random_bytes;
+use function rtrim;
+use function str_replace;
+use function strpos;
 
 /**
  * Class CSPBuilder from https://github.com/paragonie/csp-builder/blob/master/src/CSPBuilder.php made compatible with
@@ -18,13 +40,8 @@ use Psr\Http\Message\MessageInterface;
  */
 class CSPBuilder
 {
-    const FORMAT_APACHE = 'apache';
-    const FORMAT_NGINX = 'nginx';
-
-    /**
-     * @var array
-     */
-    private $policies = [];
+    public const FORMAT_APACHE = 'apache';
+    public const FORMAT_NGINX = 'nginx';
 
     /**
      * @var array<int, string>
@@ -75,27 +92,26 @@ class CSPBuilder
         'manifest-src',
         'script-src',
         'style-src',
-        'worker-src'
+        'worker-src',
     ];
 
     /**
-     * @param array $policy
+     * @param array $policies
      */
-    public function __construct(array $policy = [])
+    public function __construct(private array $policies = [])
     {
-        $this->policies = $policy;
     }
 
     /**
      * Compile the current policies into a CSP header
      *
      * @return string
-     * @throws \TypeError
+     * @throws TypeError
      */
     public function compile()
     {
-        $ruleKeys = \array_keys($this->policies);
-        if (\in_array('report-only', $ruleKeys)) {
+        $ruleKeys = array_keys($this->policies);
+        if (in_array('report-only', $ruleKeys)) {
             $this->reportOnly = !!$this->policies['report-only'];
         } else {
             $this->reportOnly = false;
@@ -104,32 +120,32 @@ class CSPBuilder
         $compiled = [];
 
         foreach (self::$directives as $dir) {
-            if (\in_array($dir, $ruleKeys)) {
+            if (in_array($dir, $ruleKeys)) {
                 if (empty($ruleKeys)) {
                     if ($dir === 'base-uri') {
                         continue;
                     }
                 }
-                $compiled []= $this->compileSubgroup(
+                $compiled [] = $this->compileSubgroup(
                     $dir,
-                    $this->policies[$dir]
+                    $this->policies[$dir],
                 );
             }
         }
 
         if (!empty($this->policies['report-uri'])) {
-            if (!\is_string($this->policies['report-uri'])) {
-                throw new \TypeError('report-uri policy somehow not a string');
+            if (!is_string($this->policies['report-uri'])) {
+                throw new TypeError('report-uri policy somehow not a string');
             }
             if ($this->supportOldBrowsers) {
                 $compiled [] = 'report-uri ' . $this->policies['report-uri'] . '; ';
             }
         }
         if (!empty($this->policies['upgrade-insecure-requests'])) {
-            $compiled []= 'upgrade-insecure-requests';
+            $compiled [] = 'upgrade-insecure-requests';
         }
 
-        $this->compiled = \implode('', $compiled);
+        $this->compiled = implode('', $compiled);
         $this->needsCompile = false;
         return rtrim($this->compiled, ';');
     }
@@ -142,7 +158,7 @@ class CSPBuilder
      *
      * @return self
      */
-    public function addSource( $directive,  $path)
+    public function addSource($directive, $path)
     {
         switch ($directive) {
             case 'child':
@@ -212,7 +228,7 @@ class CSPBuilder
      *
      * @return self
      */
-    public function addDirective( $key, $value = null)
+    public function addDirective($key, $value = null)
     {
         if ($value === null) {
             if (!isset($this->policies[$key])) {
@@ -232,7 +248,7 @@ class CSPBuilder
      */
     public function allowPluginType($mime = 'text/plain')
     {
-        $this->policies['plugin-types']['types'] []= $mime;
+        $this->policies['plugin-types']['types'] [] = $mime;
 
         $this->needsCompile = true;
         return $this;
@@ -281,14 +297,14 @@ class CSPBuilder
      *
      * @param string $data
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public static function fromData($data = '')
     {
-        $array = \json_decode($data, true);
+        $array = json_decode($data, true);
 
-        if (!\is_array($array)) {
-            throw new \Exception('Is not array valid');
+        if (!is_array($array)) {
+            throw new Exception('Is not array valid');
         }
 
         return new CSPBuilder($array);
@@ -299,16 +315,16 @@ class CSPBuilder
      *
      * @param string $filename
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public static function fromFile($filename = '')
     {
-        if (!\file_exists($filename)) {
-            throw new \Exception($filename.' does not exist');
+        if (!file_exists($filename)) {
+            throw new Exception($filename . ' does not exist');
         }
-        $contents = \file_get_contents($filename);
-        if (!\is_string($contents)) {
-            throw new \Exception('Could not read file contents');
+        $contents = file_get_contents($filename);
+        if (!is_string($contents)) {
+            throw new Exception('Could not read file contents');
         }
         return self::fromData($contents);
     }
@@ -339,7 +355,7 @@ class CSPBuilder
         }
         $return = [];
         foreach ($this->getHeaderKeys($legacy) as $key) {
-            $return[(string) $key] = $this->compiled;
+            $return[(string)$key] = $this->compiled;
         }
         return $return;
     }
@@ -353,7 +369,7 @@ class CSPBuilder
         foreach ($this->requireSRIFor as $directive) {
             $headers[] = [
                 'Content-Security-Policy',
-                'require-sri-for ' . $directive
+                'require-sri-for ' . $directive,
             ];
         }
         return $headers;
@@ -370,14 +386,14 @@ class CSPBuilder
     public function hash(
         $directive = 'script-src',
         $script = '',
-        $algorithm = 'sha384'
+        $algorithm = 'sha384',
     ) {
-        $ruleKeys = \array_keys($this->policies);
-        if (\in_array($directive, $ruleKeys)) {
-            $this->policies[$directive]['hashes'] []= [
+        $ruleKeys = array_keys($this->policies);
+        if (in_array($directive, $ruleKeys)) {
+            $this->policies[$directive]['hashes'] [] = [
                 $algorithm => base64_encode(
-                    \hash($algorithm, $script, true)
-                )
+                    hash($algorithm, $script, true),
+                ),
             ];
         }
         return $this;
@@ -390,9 +406,9 @@ class CSPBuilder
      * etc.) This method returns an instance of whatever you passed, so long
      * as it implements MessageInterface.
      *
-     * @param \Psr\Http\Message\MessageInterface $message
+     * @param MessageInterface $message
      * @param bool $legacy
-     * @return \Psr\Http\Message\MessageInterface
+     * @return MessageInterface
      */
     public function injectCSPHeader(MessageInterface $message, $legacy = false)
     {
@@ -400,7 +416,7 @@ class CSPBuilder
             $this->compile();
         }
         foreach ($this->getRequireHeaders() as $header) {
-            list ($key, $value) = $header;
+            [$key, $value] = $header;
             $message = $message->withAddedHeader($key, $value);
         }
         foreach ($this->getHeaderKeys($legacy) as $key) {
@@ -415,19 +431,19 @@ class CSPBuilder
      * @param string $directive
      * @param string $nonce (if empty, it will be generated)
      * @return string
-     * @throws \Exception
+     * @throws Exception
      */
     public function nonce($directive = 'script-src', $nonce = '')
     {
-        $ruleKeys = \array_keys($this->policies);
-        if (!\in_array($directive, $ruleKeys)) {
+        $ruleKeys = array_keys($this->policies);
+        if (!in_array($directive, $ruleKeys)) {
             return '';
         }
 
         if (empty($nonce)) {
-            $nonce = base64_encode(\random_bytes(18));
+            $nonce = base64_encode(random_bytes(18));
         }
-        $this->policies[$directive]['nonces'] []= $nonce;
+        $this->policies[$directive]['nonces'] [] = $nonce;
         return $nonce;
     }
 
@@ -442,12 +458,12 @@ class CSPBuilder
     public function preHash(
         $directive = 'script-src',
         $hash = '',
-        $algorithm = 'sha384'
+        $algorithm = 'sha384',
     ) {
-        $ruleKeys = \array_keys($this->policies);
-        if (\in_array($directive, $ruleKeys)) {
-            $this->policies[$directive]['hashes'] []= [
-                $algorithm => $hash
+        $ruleKeys = array_keys($this->policies);
+        if (in_array($directive, $ruleKeys)) {
+            $this->policies[$directive]['hashes'] [] = [
+                $algorithm => $hash,
             ];
         }
         return $this;
@@ -459,7 +475,7 @@ class CSPBuilder
      */
     public function requireSRIFor($directive)
     {
-        if (!\in_array($directive, $this->requireSRIFor, true)) {
+        if (!in_array($directive, $this->requireSRIFor, true)) {
             $this->requireSRIFor[] = $directive;
         }
         return $this;
@@ -471,11 +487,11 @@ class CSPBuilder
      * @param string $outputFile Output file name
      * @param string $format Which format are we saving in?
      * @return bool
-     * @throws \Exception
+     * @throws Exception
      */
     public function saveSnippet(
         $outputFile,
-        $format = self::FORMAT_NGINX
+        $format = self::FORMAT_NGINX,
     ) {
         if ($this->needsCompile) {
             $this->compile();
@@ -486,32 +502,27 @@ class CSPBuilder
             ? 'Content-Security-Policy-Report-Only'
             : 'Content-Security-Policy';
 
-        switch ($format) {
-            case self::FORMAT_NGINX:
-                // In PHP < 7, implode() is faster than concatenation
-                $output = \implode('', [
-                    'add_header ',
-                    $which,
-                    ' "',
-                    \rtrim($this->compiled, ' '),
-                    '" always;',
-                    "\n"
-                ]);
-                break;
-            case self::FORMAT_APACHE:
-                $output = \implode('', [
-                    'Header add ',
-                    $which,
-                    ' "',
-                    \rtrim($this->compiled, ' '),
-                    '"',
-                    "\n"
-                ]);
-                break;
-            default:
-                throw new \Exception('Unknown format: '.$format);
-        }
-        return \file_put_contents($outputFile, $output) !== false;
+        $output = match ($format) {
+            // In PHP < 7, implode() is faster than concatenation
+            self::FORMAT_NGINX => implode('', [
+                'add_header ',
+                $which,
+                ' "',
+                rtrim($this->compiled, ' '),
+                '" always;',
+                "\n",
+            ]),
+            self::FORMAT_APACHE => implode('', [
+                'Header add ',
+                $which,
+                ' "',
+                rtrim($this->compiled, ' '),
+                '"',
+                "\n",
+            ]),
+            default => throw new Exception('Unknown format: ' . $format),
+        };
+        return file_put_contents($outputFile, $output) !== false;
     }
 
     /**
@@ -520,22 +531,22 @@ class CSPBuilder
      * @param bool $legacy Send legacy headers?
      *
      * @return bool
-     * @throws \Exception
+     * @throws Exception
      */
     public function sendCSPHeader($legacy = true)
     {
-        if (\headers_sent()) {
-            throw new \Exception('Headers already sent!');
+        if (headers_sent()) {
+            throw new Exception('Headers already sent!');
         }
         if ($this->needsCompile) {
             $this->compile();
         }
         foreach ($this->getRequireHeaders() as $header) {
-            list ($key, $value) = $header;
-            \header($key.': '.$value);
+            [$key, $value] = $header;
+            header($key . ': ' . $value);
         }
         foreach ($this->getHeaderKeys($legacy) as $key) {
-            \header($key.': '.$this->compiled);
+            header($key . ': ' . $this->compiled);
         }
         return true;
     }
@@ -546,12 +557,12 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setAllowUnsafeEval($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['unsafe-eval'] = $allow;
         return $this;
@@ -563,12 +574,12 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setAllowUnsafeInline($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['unsafe-inline'] = $allow;
         return $this;
@@ -580,12 +591,12 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setBlobAllowed($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['blob'] = $allow;
         return $this;
@@ -597,12 +608,12 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setDataAllowed($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['data'] = $allow;
         return $this;
@@ -631,12 +642,12 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setFileSystemAllowed($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['filesystem'] = $allow;
         return $this;
@@ -648,12 +659,12 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setMediaStreamAllowed($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['mediastream'] = $allow;
         return $this;
@@ -665,24 +676,24 @@ class CSPBuilder
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setSelfAllowed($directive = '', $allow = false)
     {
-        if (!\in_array($directive, self::$directives)) {
-            throw new \Exception('Directive ' . $directive . ' does not exist');
+        if (!in_array($directive, self::$directives)) {
+            throw new Exception('Directive ' . $directive . ' does not exist');
         }
         $this->policies[$directive]['self'] = $allow;
         return $this;
     }
 
     /**
-     * @see CSPBuilder::setAllowUnsafeEval()
-     *
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
+     * @see CSPBuilder::setAllowUnsafeEval()
+     *
      */
     public function setUnsafeEvalAllowed($directive = '', $allow = false)
     {
@@ -690,12 +701,12 @@ class CSPBuilder
     }
 
     /**
-     * @see CSPBuilder::setAllowUnsafeInline()
-     *
      * @param string $directive
      * @param bool $allow
      * @return self
-     * @throws \Exception
+     * @throws Exception
+     * @see CSPBuilder::setAllowUnsafeInline()
+     *
      */
     public function setUnsafeInlineAllowed($directive = '', $allow = false)
     {
@@ -709,7 +720,7 @@ class CSPBuilder
      * @param bool $allow
      *
      * @return self
-     * @throws \Exception
+     * @throws Exception
      */
     public function setStrictDynamic($directive = '', $allow = false)
     {
@@ -747,12 +758,12 @@ class CSPBuilder
             if ($directive === 'plugin-types') {
                 return '';
             }
-            return $directive." 'none'; ";
+            return $directive . " 'none'; ";
         }
-        $ret = $directive.' ';
+        $ret = $directive . ' ';
         if ($directive === 'plugin-types') {
             // Expects MIME types, not URLs
-            return $ret . \implode(' ', $policies['allow']).'; ';
+            return $ret . implode(' ', $policies['allow']) . '; ';
         }
         if (!empty($policies['self'])) {
             $ret .= "'self' ";
@@ -760,24 +771,24 @@ class CSPBuilder
 
         if (!empty($policies['allow'])) {
             foreach ($policies['allow'] as $url) {
-                $url = \filter_var($url, FILTER_SANITIZE_URL);
+                $url = filter_var($url, FILTER_SANITIZE_URL);
                 if ($url !== false) {
                     if ($this->supportOldBrowsers) {
-                        if (\strpos($url, '://') === false) {
-                            if (($this->isHTTPSConnection() && $this->httpsTransformOnHttpsConnections)
+                        if (!str_contains($url, '://')) {
+                            if ((Yii::$app->request->isSecureConnection && $this->httpsTransformOnHttpsConnections)
                                 || !empty($this->policies['upgrade-insecure-requests'])) {
                                 // We only want HTTPS connections here.
-                                $ret .= 'https://'.$url.' ';
+                                $ret .= 'https://' . $url . ' ';
                             } else {
-                                $ret .= 'https://'.$url.' http://'.$url.' ';
+                                $ret .= 'https://' . $url . ' http://' . $url . ' ';
                             }
                         }
                     }
-                    if (($this->isHTTPSConnection() && $this->httpsTransformOnHttpsConnections)
+                    if ((Yii::$app->request->isSecureConnection && $this->httpsTransformOnHttpsConnections)
                         || !empty($this->policies['upgrade-insecure-requests'])) {
-                        $ret .= \str_replace('http://', 'https://', $url).' ';
+                        $ret .= str_replace('http://', 'https://', $url) . ' ';
                     } else {
-                        $ret .= $url.' ';
+                        $ret .= $url . ' ';
                     }
                 }
             }
@@ -786,12 +797,12 @@ class CSPBuilder
         if (!empty($policies['hashes'])) {
             foreach ($policies['hashes'] as $hash) {
                 foreach ($hash as $algo => $hashval) {
-                    $ret .= \implode('', [
+                    $ret .= implode('', [
                         "'",
-                        \preg_replace('/[^A-Za-z0-9]/', '', $algo),
+                        preg_replace('/[^A-Za-z0-9]/', '', (string) $algo),
                         '-',
-                        \preg_replace('/[^A-Za-z0-9\+\/=]/', '', $hashval),
-                        "' "
+                        preg_replace('/[^A-Za-z0-9\+\/=]/', '', (string) $hashval),
+                        "' ",
                     ]);
                 }
             }
@@ -799,17 +810,17 @@ class CSPBuilder
 
         if (!empty($policies['nonces'])) {
             foreach ($policies['nonces'] as $nonce) {
-                $ret .= \implode('', [
+                $ret .= implode('', [
                     "'nonce-",
-                    \preg_replace('/[^A-Za-z0-9\+\/=]/', '', $nonce),
-                    "' "
+                    preg_replace('/[^A-Za-z0-9\+\/=]/', '', (string) $nonce),
+                    "' ",
                 ]);
             }
         }
 
         if (!empty($policies['types'])) {
             foreach ($policies['types'] as $type) {
-                $ret .= $type.' ';
+                $ret .= $type . ' ';
             }
         }
 
@@ -840,7 +851,7 @@ class CSPBuilder
         if (!empty($policies['unsafe-hashed-attributes'])) {
             $ret .= "'unsafe-hashed-attributes' ";
         }
-        return \rtrim($ret, ' ').'; ';
+        return rtrim($ret, ' ') . '; ';
     }
 
     /**
@@ -855,32 +866,16 @@ class CSPBuilder
         $return = [
             $this->reportOnly
                 ? 'Content-Security-Policy-Report-Only'
-                : 'Content-Security-Policy'
+                : 'Content-Security-Policy',
         ];
 
         // If we're supporting legacy devices, include these too:
         if ($legacy) {
-            $return []= $this->reportOnly
-                ? 'X-Content-Security-Policy-Report-Only'
-                : 'X-Content-Security-Policy';
-            $return []= $this->reportOnly
+            $return [] = $this->reportOnly
                 ? 'X-Webkit-CSP-Report-Only'
                 : 'X-Webkit-CSP';
         }
         return $return;
-    }
-
-    /**
-     * Is this user currently connected over HTTPS?
-     *
-     * @return bool
-     */
-    protected function isHTTPSConnection()
-    {
-        if (!empty($_SERVER['HTTPS'])) {
-            return $_SERVER['HTTPS'] !== 'off';
-        }
-        return false;
     }
 
     /**

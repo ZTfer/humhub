@@ -8,9 +8,11 @@
 
 namespace humhub\modules\user\widgets;
 
+use humhub\helpers\Html;
+use humhub\modules\ui\icon\widgets\Icon;
+use humhub\modules\user\models\User;
 use Yii;
-use yii\bootstrap\Html;
-use humhub\modules\friendship\models\Friendship;
+use yii\base\Widget;
 
 /**
  * UserFollowButton
@@ -18,11 +20,10 @@ use humhub\modules\friendship\models\Friendship;
  * @author luke
  * @since 0.11
  */
-class UserFollowButton extends \yii\base\Widget
+class UserFollowButton extends Widget
 {
-
     /**
-     * @var \humhub\modules\user\models\User
+     * @var User
      */
     public $user;
 
@@ -37,14 +38,14 @@ class UserFollowButton extends \yii\base\Widget
     public $unfollowLabel = null;
 
     /**
-     * @var string options for follow button 
+     * @var array options for follow button
      */
     public $followOptions = ['class' => 'btn btn-primary'];
 
     /**
-     * @var array options for unfollow button 
+     * @var array options for unfollow button
      */
-    public $unfollowOptions = ['class' => 'btn btn-info'];
+    public $unfollowOptions = ['class' => 'btn btn-outline-primary'];
 
     /**
      * @inheritdoc
@@ -52,10 +53,10 @@ class UserFollowButton extends \yii\base\Widget
     public function init()
     {
         if ($this->followLabel === null) {
-            $this->followLabel = Yii::t("UserModule.base", "Follow");
+            $this->followLabel = Yii::t('UserModule.base', 'Follow');
         }
         if ($this->unfollowLabel === null) {
-            $this->unfollowLabel = Yii::t("UserModule.base", "Unfollow");
+            $this->unfollowLabel = Icon::get('check') . Yii::t('UserModule.base', 'Following');
         }
 
         if (!isset($this->followOptions['class'])) {
@@ -80,15 +81,8 @@ class UserFollowButton extends \yii\base\Widget
      */
     public function run()
     {
-        if ($this->user->isCurrentUser() || \Yii::$app->user->isGuest) {
+        if ($this->user->isCurrentUser() || Yii::$app->user->isGuest) {
             return;
-        }
-
-        if (Yii::$app->getModule('friendship')->getIsEnabled()) {
-            // Don't show follow button, when friends
-            if (Friendship::getStateForUser(Yii::$app->user->getIdentity(), $this->user)) {
-                return;
-            }
         }
 
         // Add class for javascript handling
@@ -97,9 +91,9 @@ class UserFollowButton extends \yii\base\Widget
 
         // Hide inactive button
         if ($this->user->isFollowedByUser()) {
-            $this->followOptions['style'] .= ' display:none;';
+            $this->followOptions['class'] .= ' d-none';
         } else {
-            $this->unfollowOptions['style'] .= ' display:none;';
+            $this->unfollowOptions['class'] .= ' d-none';
         }
 
         // Add UserId Buttons
@@ -118,6 +112,16 @@ class UserFollowButton extends \yii\base\Widget
         $this->followOptions['data-ui-loader'] = '';
         $this->unfollowOptions['data-ui-loader'] = '';
 
+        // Confirm action "Unfollow"
+        $this->unfollowOptions['data-action-confirm'] = Yii::t('SpaceModule.base', 'Would you like to unfollow {userName}?', [
+            '{userName}' => '<strong>' . Html::encode($this->user->getDisplayName()) . '</strong>',
+        ]);
+
+        if ($this->user->isFollowedByUser()) {
+            $this->unfollowOptions['aria-pressed'] = 'true';
+            $this->followOptions['aria-pressed'] = 'false';
+        }
+
         $module = Yii::$app->getModule('user');
 
         // still enable unfollow if following was disabled afterwards.
@@ -125,8 +129,8 @@ class UserFollowButton extends \yii\base\Widget
             return Html::a($this->unfollowLabel, '#', $this->unfollowOptions);
         }
 
-        return Html::a($this->unfollowLabel, '#', $this->unfollowOptions) .
-                Html::a($this->followLabel, '#', $this->followOptions);
+        return Html::a($this->unfollowLabel, '#', $this->unfollowOptions)
+            . Html::a($this->followLabel, '#', $this->followOptions);
     }
 
 }

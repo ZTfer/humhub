@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => '',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => '',
   '<strong>Getting</strong> Started' => '',
   '<strong>Guide:</strong> Administration (Modules)' => '',
@@ -11,14 +12,14 @@ return array (
   '<strong>Remove</strong> tour panel' => '',
   '<strong>Space</strong> Menu' => '',
   '<strong>Start</strong> space guide' => '',
-  'Cancel' => '',
+  'Cancel' => '取消',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => '',
+  'Done' => '已完成',
   'Drag a photo here or click to browse your files' => '',
-  'End guide' => '',
   'Get to know your way around the site\'s most important features with the following guides:' => '',
   'Hide my year of birth' => '',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => '',
-  'Next »' => '',
+  'Next &rarr;' => '',
   'Ok' => '',
   'Save and close' => '',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => '',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => '',
   'Your mobile phone number' => '',
   'Your phone number at work' => '',
-  'Your skills, knowledge and experience (comma seperated)' => '',
+  'Your skills, knowledge and experience' => '',
   'Your title or position' => '',
-  '« Prev' => '',
-);
+  '{{current}} of {{total}}' => '',
+];

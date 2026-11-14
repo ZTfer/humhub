@@ -1,10 +1,11 @@
 <?php
 
+use humhub\helpers\Html;
+use humhub\modules\admin\grid\CheckboxColumn;
 use humhub\modules\user\models\ProfileField;
 use humhub\modules\user\models\ProfileFieldCategory;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
 use humhub\widgets\GridView;
-use humhub\modules\admin\grid\CheckboxColumn;
 use yii\data\ArrayDataProvider;
 use yii\grid\ActionColumn;
 use yii\helpers\Url;
@@ -23,14 +24,12 @@ use yii\helpers\Url;
     <br/>
 
 <?= GridView::widget([
-    'dataProvider' => new ArrayDataProvider(['allModels' => $category->fields]),
+    'dataProvider' => new ArrayDataProvider(['allModels' => $category->fields, 'pagination' => ['pageSize' => 0]]),
     'layout' => '{items}',
     'columns' => [
         [
             'attribute' => 'title',
-            'content' => function (ProfileField $model, $key, $index, $that) {
-                return Yii::t($model->getTranslationCategory(), $that->getDataCellValue($model, $key, $index));
-            }
+            'content' => fn(ProfileField $model, $key, $index, $that) => Html::encode(Yii::t($model->getTranslationCategory(), $that->getDataCellValue($model, $key, $index)))
         ],
         [
             'class' => CheckboxColumn::class,
@@ -79,23 +78,21 @@ use yii\helpers\Url;
             }
         ],
         [
+            'attribute' => 'sort_order',
+        ],
+        [
             'header' => '&nbsp;',
             'class' => ActionColumn::class,
             'options' => ['style' => 'width:56px;'],
-            'contentOptions' => ['style' => 'text-align:center'],
-            'headerOptions' => ['style' => 'text-align:center'],
+            'contentOptions' => ['class' => 'text-center'],
+            'template' => '{update}',
             'buttons' => [
-                'view' => function () {
-                    return;
-                },
-                'delete' => function ($url, $model) {
-                    return;
-                },
-                'update' => function ($url, $category) {
-                    /* @var $model ProfileField */
-                    return Button::primary()->icon('edit')->link(Url::to(['edit-field', 'id' => $category->id]))->sm();
-                },
+                'update' => fn($url, $category) => Button::primary()
+                    ->icon('edit')
+                    ->link(['edit-field', 'id' => $category->id])
+                    ->options(['aria-label' => Yii::t('AdminModule.user', 'Edit field')])
+                    ->sm(),
             ],
         ],
-    ]
+    ],
 ]);

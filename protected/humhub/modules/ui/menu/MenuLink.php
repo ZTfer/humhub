@@ -8,9 +8,10 @@
 
 namespace humhub\modules\ui\menu;
 
+use Exception;
 use humhub\modules\ui\icon\widgets\Icon;
 use humhub\modules\ui\menu\widgets\Menu;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
 
 /**
  * Class MenuLink
@@ -27,13 +28,16 @@ class MenuLink extends MenuEntry
      * @var string|array the url or route
      */
     protected $url;
-
-
     /**
      * @var Button
      */
     protected $link;
 
+    public function setEncodeLabel(bool $encodeLabel)
+    {
+        $this->getLink()->encodeLabel($encodeLabel);
+        return $this;
+    }
 
     /**
      * @return Button
@@ -55,7 +59,7 @@ class MenuLink extends MenuEntry
      */
     public function renderEntry($extraHtmlOptions = [])
     {
-        // Set default html options and merge with extraoptions
+        // Set default HTML options and merge with extra options
         $this->getHtmlOptions($extraHtmlOptions);
         return $this->getLink()->asString();
     }
@@ -76,7 +80,7 @@ class MenuLink extends MenuEntry
         $this->getLink()->options(['data-sort-order' => $this->getSortOrder()]);
 
 
-        return $this->getLink()->htmlOptions;
+        return $this->getLink()->options;
     }
 
     public function compare(MenuEntry $entry)
@@ -90,7 +94,7 @@ class MenuLink extends MenuEntry
      */
     public function setLabel($label)
     {
-        $this->getLink()->setText($label);
+        $this->getLink()->setLabel($label);
         return $this;
     }
 
@@ -109,7 +113,7 @@ class MenuLink extends MenuEntry
      */
     public function getLabel()
     {
-        return $this->getLink()->text;
+        return $this->getLink()->label;
     }
 
     /**
@@ -117,17 +121,17 @@ class MenuLink extends MenuEntry
      */
     public function getIcon()
     {
-        return $this->getLink()->_icon;
+        return $this->getLink()->icon;
     }
 
     /**
      * @param $icon Icon|string the icon instance or icon name
-     * * @return static
-     * @throws \Exception
+     * @return static
+     * @throws Exception
      */
-    public function setIcon($icon, $right = false, $raw = false)
+    public function setIcon($icon)
     {
-        $this->getLink()->icon($icon, $right, $raw);
+        $this->getLink()->icon($icon);
         return $this;
     }
 
@@ -180,54 +184,6 @@ class MenuLink extends MenuEntry
     }
 
     /**
-     * Creates MenuEntry by old and deprecated array structure
-     *
-     * > Note: In the array icons must be provided in legacy html format.
-     *
-     * @param $item
-     * @return MenuLink
-     * @deprecated since 1.4
-     */
-    public static function createByArray($item)
-    {
-        $entry = new static;
-
-        if (isset($item['id'])) {
-            $entry->id = $item['id'];
-        }
-
-        if (isset($item['label'])) {
-            $entry->setLabel($item['label']);
-        }
-
-        if (isset($item['icon'])) {
-            $entry->setIcon($item['icon'], false, true);
-        }
-
-        if (isset($item['url'])) {
-            $entry->setUrl($item['url']);
-        }
-
-        if (isset($item['sortOrder'])) {
-            $entry->sortOrder = $item['sortOrder'];
-        }
-
-        if (isset($item['isActive'])) {
-            $entry->isActive = $item['isActive'];
-        }
-
-        if (isset($item['isVisible'])) {
-            $entry->isVisible = $item['isVisible'];
-        }
-
-        if (isset($item['htmlOptions'])) {
-            $entry->setHtmlOptions($item['htmlOptions']);
-        }
-
-        return $entry;
-    }
-
-    /**
      * @param array $htmlOptions
      * @return static
      */
@@ -236,28 +192,4 @@ class MenuLink extends MenuEntry
         $this->getLink()->options($htmlOptions);
         return $this;
     }
-
-    /**
-     * Returns the MenuEntry as array structure
-     *
-     * @return array the menu entry array representation
-     * @deprecated since 1.4
-     */
-    public function toArray()
-    {
-        if (!isset($this->htmlOptions['class'])) {
-            $this->htmlOptions['class'] = '';
-        }
-
-        return [
-            'label' => $this->getLabel(),
-            'id' => $this->getId(),
-            'icon' => $this->getIcon(),
-            'url' => $this->getUrl(),
-            'sortOrder' => $this->sortOrder,
-            'isActive' => $this->isActive,
-            'htmlOptions' => $this->getHtmlOptions()
-        ];
-    }
-
 }

@@ -1,9 +1,10 @@
 <?php
 
 use yii\helpers\Url;
+
 ?>
 
-<script <?= \humhub\libs\Html::nonce() ?>>
+<script <?= \humhub\helpers\Html::nonce() ?>>
     $(document).ready(function() {
         //The original form input element will be hidden
         var $formInput = $('#<?php echo $id; ?>').hide();
@@ -86,8 +87,8 @@ use yii\helpers\Url;
             }
         }).atwho({
             at: ":",
-            insert_tpl: "<img data-emoji-name=';${name};' class='atwho-emoji' with='18' height='18' src='<?php echo Yii::getAlias('@web-static/img/emoji/${name}.svg'); ?>' />",
-            tpl: "<li class='atwho-emoji-entry' data-value=';${name};'><img with='18' height='18' src='<?php echo Yii::getAlias('@web-static/img/emoji/${name}.svg'); ?>'/></li>",
+            insert_tpl: "<img data-emoji-name=';${name};' class='atwho-emoji' with='18' height='18' src='<?= Yii::getAlias(Yii::$app->assetManager->getPublishedUrl('@humhub/resources') . '/img/emoji/${name}.svg') ?>' />",
+            tpl: "<li class='atwho-emoji-entry' data-value=';${name};'><img with='18' height='18' src='<?= Yii::getAlias(Yii::$app->assetManager->getPublishedUrl('@humhub/resources') . '/img/emoji/${name}.svg') ?>'/></li>",
             data: emojis_list,
             highlight_first: true,
             limit: 100
@@ -98,7 +99,7 @@ use yii\helpers\Url;
         $editableContent = $('#<?php echo $id; ?>_contenteditable');
 
         //This is a workaround for mobile browsers especially for Android Chrome which is not able to remove contenteditable="false" nodes.
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|BB|PlayBook|IEMobile|Windows Phone|Kindle|Silk|Opera Mini/i.test(navigator.userAgent)) {
+        if ($('body').is('.device-mobile, .device-tablet')) {
             $editableContent.on('contextmenu', 'a, img', function() {
                 if($(this).parent().is('span')) {
                     $(this).parent().remove();

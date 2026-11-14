@@ -1,16 +1,10 @@
 <?php
-/**
- * @link https://www.humhub.org/
- * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
- * @license https://www.humhub.com/licences
- *
- */
 
 namespace humhub\modules\content\widgets\richtext;
 
+use humhub\helpers\Html;
 use humhub\modules\ui\form\widgets\JsInputWidget;
 use yii\helpers\ArrayHelper;
-use yii\helpers\Html;
 use yii\helpers\Url;
 
 /**
@@ -46,9 +40,11 @@ use yii\helpers\Url;
  */
 class AbstractRichTextEditor extends JsInputWidget
 {
-    const LAYOUT_BLOCK = 'block';
+    public const LAYOUT_BLOCK = 'block';
 
-    const LAYOUT_INLINE = 'inline';
+    public const LAYOUT_INLINE = 'inline';
+
+    public const BACKUP_COOKIE_KEY = 'RichTextEditor.backup';
 
     /**
      * @var string richtext feature preset e.g: 'markdown', 'normal', 'full'
@@ -81,7 +77,18 @@ class AbstractRichTextEditor extends JsInputWidget
      *
      * @var string
      */
-    protected $mentioningRoute = "/search/mentioning";
+    protected $mentioningRoute = '/user/mentioning';
+
+    /**
+     * Back up content each X seconds, 0 - to don't back up
+     * NOTE: If id is not specified for this editor
+     *       then interval will be forced to 0,
+     *       so back up will be disabled,
+     *       because impossible to back up with random id
+     *
+     * @var int
+     */
+    public $backupInterval = 3;
 
     /**
      * RichText plugin supported for this instance.
@@ -106,15 +113,21 @@ class AbstractRichTextEditor extends JsInputWidget
     public $pluginOptions = [];
 
     /**
+     * Options for field of active form
+     * @var array
+     */
+    public $fieldOptions = [];
+
+    /**
      * If set to true the picker will be focused automatically.
      *
-     * @var boolean
+     * @var bool
      */
     public $focus = false;
 
     /**
      * Disables the input field.
-     * @var boolean
+     * @var bool
      */
     public $disabled = false;
 
@@ -136,32 +149,52 @@ class AbstractRichTextEditor extends JsInputWidget
     public $visible = true;
 
     /**
-     * @var boolean defines if the default label should be rendered.
+     * @var bool defines if the default label should be rendered.
      */
     public $label = false;
+    /**
+     * @since 1.18
+     */
+    private ?string $fieldTemplate = "{label}\n{input}";
 
-        /**
-         * @inhertidoc
-         */
+    /**
+     * @inhertidoc
+     */
+    public function beforeRun()
+    {
+        if (empty($this->id)) {
+            // No reason to back up a content with random input ID,
+            // because on next page reloading we cannot know previous input ID
+            $this->backupInterval = 0;
+        }
+
+        return parent::beforeRun();
+    }
+
+    /**
+     * @inhertidoc
+     */
     public function run()
     {
         $inputOptions = $this->getInputAttributes();
 
-        if ($this->form != null) {
-            $input = $this->form->field($this->model, $this->attribute)->textarea($inputOptions)->label(false);
-            $richText = Html::tag('div', $this->editOutput($this->getValue()), $this->getOptions());
-            $richText = $this->getLabel() . $richText;
-        } elseif ($this->model != null) {
+        if ($this->form !== null) {
+            $fieldOptions = [];
+            if (!empty($this->options)) {
+                $fieldOptions['options'] = $this->options;
+            }
+            if ($this->fieldTemplate) {
+                $fieldOptions['template'] = $this->fieldTemplate;
+            }
+            $input = $this->form->field($this->model, $this->attribute, $fieldOptions)->textarea($inputOptions)->label(false);
+        } elseif ($this->model !== null) {
             $input = Html::activeTextarea($this->model, $this->attribute, $inputOptions);
-            $richText = Html::tag('div', $this->editOutput($this->getValue()), $this->getOptions());
-            $richText = $this->getLabel() . $richText;
         } else {
             $input = Html::textarea(((!$this->name) ? 'richtext' : $this->name), $this->value, $inputOptions);
-            $richText = Html::tag('div', $this->editOutput($this->getValue()), $this->getOptions());
-            $richText = $this->getLabel() . $richText;
         }
 
-        return $input . $richText . $this->prepend();
+        $richText = Html::tag('div', $this->editOutput($this->getValue()), $this->getOptions());
+        return $this->getLabel() . $richText . $input . $this->prepend();
     }
 
     /**
@@ -173,7 +206,8 @@ class AbstractRichTextEditor extends JsInputWidget
      * This method can be overwritten in order to prepend content after the actual rich text content.
      * @return string
      */
-    public function prepend() {
+    public function prepend()
+    {
         return '';
     }
 
@@ -185,7 +219,7 @@ class AbstractRichTextEditor extends JsInputWidget
         return [
             'id' => $this->getId(true) . '_input',
             'style' => 'display:none;',
-            'title' => $this->placeholder
+            'title' => $this->placeholder,
         ];
     }
 
@@ -194,7 +228,7 @@ class AbstractRichTextEditor extends JsInputWidget
      */
     public function getLabel()
     {
-        if(!$this->label) {
+        if (!$this->label) {
             return "";
         }
 
@@ -226,7 +260,7 @@ class AbstractRichTextEditor extends JsInputWidget
 
         $config = ArrayHelper::merge(static::$renderer, $params);
         unset($config['class']);
-        return call_user_func(static::$renderer['class'].'::output', $content, $config);
+        return call_user_func(static::$renderer['class'] . '::output', $content, $config);
     }
 
     /**
@@ -238,15 +272,17 @@ class AbstractRichTextEditor extends JsInputWidget
             'exclude' => $this->exclude,
             'include' => $this->include,
             'mentioning-url' => $this->getMentioningUrl(),
+            'backup-interval' => $this->backupInterval,
+            'backup-cookie-key' => self::BACKUP_COOKIE_KEY,
             'plugin-options' => $this->pluginOptions,
-            'focus' => $this->focus
+            'focus' => $this->focus,
         ];
 
-        if(!empty($this->preset)) {
+        if (!empty($this->preset)) {
             $result['preset'] = $this->preset;
         }
 
-        if(!empty($this->placeholder)) {
+        if (!empty($this->placeholder)) {
             $result['placeholder'] = $this->placeholder;
         }
 
@@ -263,6 +299,6 @@ class AbstractRichTextEditor extends JsInputWidget
      */
     public function getMentioningUrl()
     {
-        return ($this->mentioningUrl) ? $this->mentioningUrl : Url::to([$this->mentioningRoute]);
+        return $this->mentioningUrl ?: Url::to([$this->mentioningRoute]);
     }
 }

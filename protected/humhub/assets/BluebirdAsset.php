@@ -9,7 +9,7 @@
 namespace humhub\assets;
 
 use humhub\components\assets\AssetBundle;
-use humhub\modules\ui\view\components\View;
+use humhub\components\View;
 
 /**
  * bluebird promis library
@@ -18,11 +18,6 @@ use humhub\modules\ui\view\components\View;
  */
 class BluebirdAsset extends AssetBundle
 {
-    /**
-     * @inheritdoc
-     */
-    public $defaultDepends = false;
-
     /**
      * @inheritdoc
      */
@@ -37,6 +32,15 @@ class BluebirdAsset extends AssetBundle
      * @inheritdoc
      */
     public $sourcePath = '@npm/bluebird';
+
+    /**
+     * @inheritdoc
+     */
+    public $publishOptions = [
+        'only' => [
+            'js/browser/bluebird.min.js',
+        ],
+    ];
 
     /**
      * @inheritdoc

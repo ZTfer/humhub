@@ -9,15 +9,26 @@
 namespace humhub\modules\marketplace\components;
 
 use humhub\components\ModuleEvent;
-use humhub\libs\HttpClient;
+use humhub\models\ModuleEnabled;
 use humhub\modules\admin\libs\HumHubAPI;
+use humhub\services\ModuleDependencyService;
+use humhub\services\ModuleDiscoveryService;
+use humhub\services\ModuleService;
+use humhub\modules\marketplace\models\Module as ModelModule;
 use humhub\modules\marketplace\Module;
+use humhub\modules\marketplace\services\MarketplaceService;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Yii;
+use yii\base\Application;
 use yii\base\Component;
-use yii\web\HttpException;
+use yii\base\ErrorException;
 use yii\base\Exception;
+use yii\base\InvalidConfigException;
 use yii\helpers\FileHelper;
-use humhub\libs\CURLHelper;
+use yii\helpers\Json;
+use yii\web\HttpException;
+use yii\web\ServerErrorHttpException;
 use ZipArchive;
 
 /**
@@ -27,8 +38,8 @@ use ZipArchive;
  */
 class OnlineModuleManager extends Component
 {
-    const EVENT_BEFORE_UPDATE = 'beforeUpdate';
-    const EVENT_AFTER_UPDATE = 'afterUpdate';
+    public const EVENT_BEFORE_UPDATE = 'beforeUpdate';
+    public const EVENT_AFTER_UPDATE = 'afterUpdate';
 
     private $_modules = null;
 
@@ -36,66 +47,66 @@ class OnlineModuleManager extends Component
      * Installs latest compatible module version
      *
      * @param string $moduleId
+     * @return void
      * @throws Exception
      * @throws HttpException
-     * @throws \yii\base\ErrorException
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
+     * @throws ServerErrorHttpException
      */
     public function install($moduleId)
     {
         /** @var Module $marketplaceModule */
         $marketplaceModule = Yii::$app->getModule('marketplace');
-        $modulesPath = Yii::getAlias($marketplaceModule->modulesPath);
+        $modulesPath = realpath(Yii::getAlias($marketplaceModule->modulesPath));
 
         if (!is_writable($modulesPath)) {
-            throw new Exception(Yii::t('MarketplaceModule.base', 'Module directory %modulePath% is not writeable!', ['%modulePath%' => $modulesPath]));
+            $this->throwError($moduleId, Yii::t('MarketplaceModule.base', 'Module directory %modulePath% is not writeable!', ['%modulePath%' => $modulesPath]));
         }
 
         $moduleInfo = $this->getModuleInfo($moduleId);
 
         if (!isset($moduleInfo['latestCompatibleVersion'])) {
-            throw new Exception(Yii::t('MarketplaceModule.base', 'No compatible module version found!'));
+            $this->throwError($moduleId, Yii::t('MarketplaceModule.base', 'No compatible module version found!'));
         }
 
-        // Check Module Folder exists
-        $moduleDownloadFolder = Yii::getAlias($marketplaceModule->modulesDownloadPath);
-        FileHelper::createDirectory($moduleDownloadFolder);
-
-        // Download
-        $downloadUrl = $moduleInfo['latestCompatibleVersion']['downloadUrl'];
-        $downloadTargetFileName = $moduleDownloadFolder . DIRECTORY_SEPARATOR . basename($downloadUrl);
-        try {
-            $hashSha256 = $moduleInfo['latestCompatibleVersion']['downloadFileSha256'];
-            $this->downloadFile($downloadTargetFileName, $downloadUrl, $hashSha256);
-        } catch (\Exception $ex) {
-            throw new HttpException('500', Yii::t('MarketplaceModule.base', 'Module download failed! (%error%)', ['%error%' => $ex->getMessage()]));
-        }
+        $downloadTargetFileName = $this->downloadModule($moduleId);
+        $this->checkRequirements($moduleId, $downloadTargetFileName);
 
         // Remove old module path
         if (!$this->removeModuleDir($modulesPath . DIRECTORY_SEPARATOR . $moduleId)) {
-            throw new HttpException('500', Yii::t('MarketplaceModule.base', 'Could not remove old module path!'));
-        }
-
-        // Extract Package
-        if (!file_exists($downloadTargetFileName)) {
-            throw new HttpException('500', Yii::t('MarketplaceModule.base', 'Download of module failed!'));
+            $this->throwError($moduleId, Yii::t('MarketplaceModule.base', 'Could not remove old module path!'));
         }
 
         if (!$this->unzip($downloadTargetFileName, $modulesPath)) {
-            Yii::error('Could not unzip ' . $downloadTargetFileName . ' to ' . $modulesPath, 'marketplace');
-            throw new HttpException('500', Yii::t('MarketplaceModule.base', 'Could not extract module!'));
+            $this->throwError(
+                $moduleId,
+                'Could not unzip ' . $downloadTargetFileName . ' to ' . $modulesPath,
+                Yii::t('MarketplaceModule.base', 'Could not extract module!'),
+            );
+        }
+
+        // Reset the OPcache so the updated module files are recompiled on the following requests.
+        // This is deferred to the end of the request: in worker runtimes (e.g. FrankenPHP) opcache_reset()
+        // restarts the worker, which would otherwise interrupt the still running update (cache flush,
+        // registration and database migrations) and leave the module in a half-updated state.
+        if (function_exists('opcache_reset')) {
+            Yii::$app->on(Application::EVENT_AFTER_REQUEST, static function (): void {
+                @opcache_reset();
+            });
         }
 
         Yii::$app->moduleManager->flushCache();
         Yii::$app->moduleManager->register($modulesPath . DIRECTORY_SEPARATOR . $moduleId);
+        $this->refreshMarketplaceLastChange();
     }
 
 
     private function removeModuleDir($path)
     {
         if (is_dir($path)) {
-            $files = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST,
             );
 
             foreach ($files as $fileinfo) {
@@ -111,7 +122,7 @@ class OnlineModuleManager extends Component
 
     private function unzip($file, $folder)
     {
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
         $res = $zip->open($file);
         if ($res !== true) {
             return false;
@@ -122,7 +133,94 @@ class OnlineModuleManager extends Component
         return true;
     }
 
-    private function downloadFile($fileName, $url, $sha256 = null)
+    private function checkRequirements($moduleId, $moduleZipFile)
+    {
+        $dependencyService = new ModuleDependencyService($this->readPackageModuleInfo($moduleId, $moduleZipFile));
+        $unmetDependencies = $dependencyService->getUnmetDependencies();
+        if ($unmetDependencies !== []) {
+            $this->throwError($moduleId, implode(' ', $unmetDependencies));
+        }
+
+        // Lets a requirements.php that checks its dependencies via Yii::$app->getModule() also work
+        // in console commands, which do not load third-party modules
+        $dependencyService->registerDependencies();
+
+        $zip = new ZipArchive();
+        $zip->open($moduleZipFile);
+        if ($zip->locateName($moduleId . '/requirements.php')) {
+            $requirementCheckResult = include('zip://' . $moduleZipFile . '#' . $moduleId . '/requirements.php');
+            if (is_string($requirementCheckResult)) {
+                $this->throwError($moduleId, $requirementCheckResult);
+            }
+        }
+    }
+
+    /**
+     * Downloads the latest compatible version of a module and returns the `module.json` of the package.
+     *
+     * The download is kept, so a following {@see install()} or {@see update()} of the same version
+     * does not download it again.
+     *
+     * @return array the `module.json` contents, an empty array if the package has none
+     * @throws ServerErrorHttpException
+     * @since 1.19.1
+     */
+    public function getPackageModuleInfo(string $moduleId): array
+    {
+        return $this->readPackageModuleInfo($moduleId, $this->downloadModule($moduleId));
+    }
+
+    private function readPackageModuleInfo(string $moduleId, string $moduleZipFile): array
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($moduleZipFile) !== true) {
+            return [];
+        }
+
+        $moduleJson = $zip->getFromName($moduleId . '/module.json');
+        $zip->close();
+
+        try {
+            $moduleInfo = $moduleJson !== false ? Json::decode($moduleJson) : [];
+        } catch (\Throwable) {
+            $moduleInfo = [];
+        }
+
+        return is_array($moduleInfo) ? $moduleInfo : [];
+    }
+
+    private function downloadModule($moduleId): string
+    {
+        $moduleInfo = $this->getModuleInfo($moduleId);
+
+        /** @var Module $marketplaceModule */
+        $marketplaceModule = Yii::$app->getModule('marketplace');
+
+        // Check Module Folder exists
+        $moduleDownloadFolder = Yii::getAlias($marketplaceModule->modulesDownloadPath);
+        FileHelper::createDirectory($moduleDownloadFolder);
+
+
+        // Download
+        $downloadUrl = $moduleInfo['latestCompatibleVersion']['downloadUrl'];
+        $downloadTargetFileName = $moduleDownloadFolder . DIRECTORY_SEPARATOR . basename((string) $downloadUrl);
+        try {
+            $hashSha256 = $moduleInfo['latestCompatibleVersion']['downloadFileSha256'];
+            $this->downloadFile($moduleId, $downloadTargetFileName, $downloadUrl, $hashSha256);
+        } catch (\Exception $ex) {
+            $this->throwError($moduleId, Yii::t('MarketplaceModule.base', 'Module download failed! (%error%)', ['%error%' => $ex->getMessage()]));
+        }
+
+        // Extract Package
+        if (!file_exists($downloadTargetFileName)) {
+            $this->throwError($moduleId, Yii::t('MarketplaceModule.base', 'Download of module failed!'));
+        }
+
+        return $downloadTargetFileName;
+    }
+
+
+    private function downloadFile(string $moduleId, $fileName, $url, $sha256 = null)
     {
         if (is_file($fileName) && !empty($sha256) && hash_file('sha256', $fileName) === $sha256) {
             // File already downloaded
@@ -135,15 +233,15 @@ class OnlineModuleManager extends Component
             $httpClient->get($url)->addOptions(['timeout' => 300])->setOutputFile($fp)->send();
             fclose($fp);
         } catch (\yii\httpclient\Exception $e) {
-            throw new \Exception('Download failed.' . $e->getMessage());
+            $this->throwError($moduleId, 'Download failed.' . $e->getMessage());
         }
 
         if (!is_file($fileName)) {
-            throw new \Exception('Download failed. Could not write file! ' . $fileName);
+            $this->throwError($moduleId, 'Download failed. Could not write file! ' . $fileName);
         }
 
         if (!empty($sha256) && hash_file('sha256', $fileName) !== $sha256) {
-            throw new \Exception('File verification failed. Could not download file! ' . $fileName);
+            $this->throwError($moduleId, 'File verification failed. Could not download file! ' . $fileName);
         }
 
         return true;
@@ -153,27 +251,46 @@ class OnlineModuleManager extends Component
     /**
      * Updates a given module
      *
-     * @param string $moduleId
+     * @param $moduleId
+     * @return void
      * @throws Exception
+     * @throws InvalidConfigException
+     * @throws ServerErrorHttpException
+     * @throws ErrorException
      * @throws HttpException
-     * @throws \yii\base\ErrorException
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function update($moduleId)
     {
-        $this->trigger(static::EVENT_BEFORE_UPDATE, new ModuleEvent(['module' => Yii::$app->moduleManager->getModule($moduleId)]));
+        $this->trigger(static::EVENT_BEFORE_UPDATE, new ModuleEvent(['module' => Yii::$app->moduleManager->getModule($moduleId, false)]));
+
+        $moduleZipFile = $this->downloadModule($moduleId);
+        $this->checkRequirements($moduleId, $moduleZipFile);
 
         // Temporary disable module if enabled
         if (Yii::$app->hasModule($moduleId)) {
             Yii::$app->setModule($moduleId, null);
         }
 
-        Yii::$app->moduleManager->removeModule($moduleId, false);
+        $moduleToRemove = Yii::$app->moduleManager->getModule($moduleId, false);
+        if ($moduleToRemove !== null) {
+            (new ModuleService($moduleToRemove))->remove(false);
+        }
 
         $this->install($moduleId);
 
         $updatedModule = Yii::$app->moduleManager->getModule($moduleId);
-        $updatedModule->migrate();
+        $updatedModule->update();
+
+        (new MarketplaceService())->refreshPendingModuleUpdateCount();
+
+        $moduleEnabled = ModuleEnabled::findOne(['module_id' => $updatedModule->id]);
+        if ($moduleEnabled) {
+            $moduleEnabled->version = $updatedModule->version;
+            $moduleEnabled->save();
+        }
+
+        $this->refreshMarketplaceLastChange();
 
         $this->trigger(static::EVENT_AFTER_UPDATE, new ModuleEvent(['module' => $updatedModule]));
     }
@@ -187,9 +304,10 @@ class OnlineModuleManager extends Component
      *  - latestVersion
      *  - latestCompatibleVersion
      *
+     * @param bool $cached
      * @return array of modules
      */
-    public function getModules($cached = true)
+    public function getModules(bool $cached = true)
     {
         if (!$cached) {
             $this->_modules = null;
@@ -206,37 +324,70 @@ class OnlineModuleManager extends Component
         $this->_modules = Yii::$app->cache->get('onlineModuleManager_modules');
         if ($this->_modules === null || !is_array($this->_modules)) {
             $this->_modules = HumHubAPI::request('v1/modules/list', [
-                'includeBetaVersions' => (boolean)$module->settings->get('includeBetaUpdates')
+                'includeBetaVersions' => (bool)$module->settings->get('includeBetaUpdates'),
             ]);
 
             foreach ($module->moduleBlacklist as $blacklistedModuleId) {
                 unset($this->_modules[$blacklistedModuleId]);
             }
 
-            Yii::$app->cache->set('onlineModuleManager_modules', $this->_modules, Yii::$app->settings->get('cache.expireTime'));
+            Yii::$app->cache->set('onlineModuleManager_modules', $this->_modules, Yii::$app->settings->get('cacheExpireTime'));
+        }
+
+        if (!(bool)$module->settings->get('includeCommunityModules', false)) {
+            $installed = ModuleDiscoveryService::findInstalledModules();
+            foreach ($this->_modules as $id => $info) {
+                if (!empty($info['isCommunity'])
+                    && !Yii::$app->moduleManager->hasModule($id)
+                    && !array_key_exists($id, $installed)) {
+                    unset($this->_modules[$id]);
+                }
+            }
         }
 
         return $this->_modules;
     }
 
-
-    public function getCategories()
+    public function getCategories(): array
     {
         return Yii::$app->cache->getOrSet('marketplace-categories', function () {
-
+            $modules = $this->getModules();
             $categories = HumHubAPI::request('v1/modules/list-categories');
 
-            $names = [];
-            $names[0] = 'All categories (' . count($this->_modules) . ')';
+            $totalCount = 0;
+            $withoutCategoryCount = 0;
+            foreach ($modules as $module) {
+                $onlineModule = new ModelModule($module);
+                if (!$onlineModule->isMarketplaced()) {
+                    continue;
+                }
 
-            foreach ($categories as $i => $n) {
-                $c = 0;
-                foreach ($this->_modules as $m) {
-                    if (in_array($i, $m['categories'])) {
-                        $c++;
+                $totalCount++;
+
+                if (empty($module['categories'])) {
+                    $withoutCategoryCount++;
+                    continue;
+                }
+
+                foreach ($module['categories'] as $catIndex) {
+                    if (isset($categories[$catIndex])) {
+                        if (!isset($categories[$catIndex]['count'])) {
+                            $categories[$catIndex]['count'] = 0;
+                        }
+                        $categories[$catIndex]['count']++;
                     }
                 }
-                $names[$i] = $n['name'] . ' (' . $c . ')';
+            }
+
+            $names = [];
+            $names[0] = Yii::t('MarketplaceModule.base', 'All modules') . ' (' . $totalCount . ')';
+
+            foreach ($categories as $c => $category) {
+                $names[$c] = $category['name'] . ' (' . ($category['count'] ?? '0') . ')';
+            }
+
+            if ($withoutCategoryCount > 0) {
+                $names[-1] = Yii::t('MarketplaceModule.base', 'Without category') . ' (' . $withoutCategoryCount . ')';
             }
 
             return $names;
@@ -249,22 +400,40 @@ class OnlineModuleManager extends Component
         $updates = [];
 
         foreach ($this->getModules($cached) as $moduleId => $moduleInfo) {
+            if (!isset($moduleInfo['latestCompatibleVersion'])) {
+                continue;
+            }
 
-            if (isset($moduleInfo['latestCompatibleVersion']) && Yii::$app->moduleManager->hasModule($moduleId)) {
+            $installedVersion = $this->getInstalledVersion($moduleId);
+            if ($installedVersion === null) {
+                continue;
+            }
 
-                $module = Yii::$app->moduleManager->getModule($moduleId);
-
-                if ($module !== null) {
-                    if (version_compare($moduleInfo['latestCompatibleVersion'], $module->getVersion(), 'gt')) {
-                        $updates[$moduleId] = $moduleInfo;
-                    }
-                } else {
-                    Yii::error('Could not load module: ' . $moduleId . ' to get updates');
-                }
+            if (version_compare($moduleInfo['latestCompatibleVersion'], $installedVersion, 'gt')) {
+                $updates[$moduleId] = $moduleInfo;
             }
         }
 
         return $updates;
+    }
+
+    /**
+     * Returns the installed version of a module.
+     *
+     * Prefers the loaded module instance for accuracy; falls back to reading module.json
+     * from the filesystem when the module could not be loaded (e.g. during upgrades when
+     * the module config references a removed core class).
+     */
+    private function getInstalledVersion(string $moduleId): ?string
+    {
+        if (Yii::$app->moduleManager->hasModule($moduleId)) {
+            $module = Yii::$app->moduleManager->getModule($moduleId, false);
+            if ($module !== null) {
+                return $module->getVersion();
+            }
+        }
+
+        return ModuleDiscoveryService::findInstalledVersion($moduleId);
     }
 
     /**
@@ -282,8 +451,107 @@ class OnlineModuleManager extends Component
         }
 
         return HumHubAPI::request('v1/modules/info', [
-            'id' => $moduleId, 'includeBetaVersions' => (boolean)$module->settings->get('includeBetaUpdates')
+            'id' => $moduleId, 'includeBetaVersions' => (bool)$module->settings->get('includeBetaUpdates'),
         ]);
+    }
+
+    /**
+     * Get only not installed modules
+     *
+     * @return ModelModule[]
+     */
+    public function getNotInstalledModules(): array
+    {
+        $modules = [];
+
+        foreach ($this->getModules() as $moduleId => $module) {
+            $onlineModule = new ModelModule($module);
+            if (!$onlineModule->isInstalled() && $onlineModule->isMarketplaced()) {
+                $modules[$moduleId] = $onlineModule;
+            }
+        }
+
+        return $modules;
+    }
+
+    /**
+     * Get only installed modules
+     *
+     * @return ModelModule[]
+     */
+    public function getInstalledModules(): array
+    {
+        $modules = [];
+
+        foreach ($this->getModules() as $moduleId => $module) {
+            $onlineModule = new ModelModule($module);
+            if ($onlineModule->isInstalled()) {
+                $modules[$moduleId] = $onlineModule;
+            }
+        }
+
+        return $modules;
+    }
+
+    /**
+     * Get only purchased modules
+     *
+     * @param bool $cached
+     * @return ModelModule[]
+     */
+    public function getPurchasedModules(bool $cached = true): array
+    {
+        $modules = $this->getModules($cached);
+
+        foreach ($modules as $i => $module) {
+            if (!isset($module['purchased']) || !$module['purchased']) {
+                unset($modules[$i]);
+            }
+        }
+
+        return $modules;
+    }
+
+    /**
+     * Get modules with available update
+     *
+     * @return ModelModule[]
+     */
+    public function getAvailableUpdateModules(): array
+    {
+        $modules = $this->getModuleUpdates(false);
+
+        foreach ($modules as $o => $module) {
+            $modules[$o] = new ModelModule($module);
+        }
+
+        return $modules;
+    }
+
+    /**
+     * Get online module by ID
+     *
+     * @param string $id
+     * @return ModelModule|null
+     */
+    public function getModule(string $id): ?ModelModule
+    {
+        $modules = $this->getModules();
+        return isset($modules[$id]) ? new ModelModule($modules[$id]) : null;
+    }
+
+    /**
+     * @throws ServerErrorHttpException
+     */
+    private function throwError(string $moduleId, string $errorMsg, ?string $displayedErrorMsg = null): void
+    {
+        Yii::error('Error installing or updating the "' . $moduleId . '" module: ' . $errorMsg, 'marketplace');
+        throw new ServerErrorHttpException($displayedErrorMsg ?? $errorMsg);
+    }
+
+    public function refreshMarketplaceLastChange(): void
+    {
+        Yii::$app->settings->set('marketplaceLastChange', time());
     }
 
 }

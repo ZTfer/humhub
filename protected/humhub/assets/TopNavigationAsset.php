@@ -1,17 +1,17 @@
 <?php
 
-
 namespace humhub\assets;
 
-
-use yii\web\AssetBundle;
+use humhub\components\assets\AssetBundle;
 
 class TopNavigationAsset extends AssetBundle
 {
-    public $jsOptions = ['position' => \yii\web\View::POS_END];
+    /**
+     * @inheritdoc
+     */
+    public $sourcePath = '@humhub/resources';
 
-    public $basePath = '@webroot-static';
-    public $baseUrl = '@web-static';
+    public $jsOptions = ['position' => \yii\web\View::POS_END];
 
     /**
      * @inheritdoc

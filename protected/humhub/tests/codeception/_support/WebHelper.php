@@ -3,6 +3,7 @@
 namespace tests\codeception\_support;
 
 use Codeception\Module;
+use Codeception\TestInterface;
 use Yii;
 
 /**
@@ -13,7 +14,6 @@ use Yii;
  */
 class WebHelper extends Module
 {
-
     /**
      * Method called before any suite tests run. Loads User fixture login user
      * to use in acceptance and functional tests.
@@ -21,23 +21,57 @@ class WebHelper extends Module
      */
     public function _beforeSuite($settings = [])
     {
-        include __DIR__.'/../acceptance/_bootstrap.php';
+        include __DIR__ . '/../acceptance/_bootstrap.php';
         $this->initModules();
     }
 
     public function _before(\Codeception\TestInterface $test)
     {
-        Yii::$app->getUrlManager()->setScriptUrl('/index-test.php');
+        ;
     }
 
     /**
      * Initializes modules defined in @tests/codeception/config/test.config.php
      * Note the config key in test.config.php is modules and not humhubModules!
      */
-    protected function initModules() {
+    protected function initModules()
+    {
         $cfg = \Codeception\Configuration::config();
-        if(!empty($cfg['humhub_modules'])) {
-            Yii::$app->moduleManager->enableModules($cfg['humhub_modules']);
+        if (!empty($cfg['humhub_modules'])) {
+            foreach ($cfg['humhub_modules'] as $moduleId) {
+                Yii::$app->moduleManager->getModule($moduleId)->enable();
+            }
         }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function _failed(TestInterface $test, $fail)
+    {
+        parent::_failed($test, $fail);
+
+        $filePath = codecept_output_dir() . str_replace(['\\', '/', ':', ' '], '.', $test->getSignature());
+
+        $logFilePath = Yii::getAlias('@runtime/logs') . DIRECTORY_SEPARATOR . 'app.log';
+        if (file_exists($logFilePath)) {
+            copy($logFilePath, $filePath . '.app.log');
+        }
+
+        if (!Yii::$app->db->isActive) {
+            return;
+        }
+
+        preg_match('/host=([^;]+)/', Yii::$app->db->dsn, $hostMatch);
+        preg_match('/dbname=([^;]+)/', Yii::$app->db->dsn, $dbMatch);
+
+        exec(sprintf(
+            'mysqldump --skip-column-statistics -u%s -p%s -h%s %s > %s',
+            escapeshellarg(Yii::$app->db->username ?? 'root'),
+            escapeshellarg(Yii::$app->db->password ?? 'root'),
+            escapeshellarg($hostMatch[1] ?? '127.0.0.1'),
+            escapeshellarg($dbMatch[1] ?? 'humhub_test'),
+            escapeshellarg($filePath . '.dump.sql'),
+        ));
     }
 }

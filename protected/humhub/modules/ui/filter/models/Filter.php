@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -8,15 +9,14 @@
 
 namespace humhub\modules\ui\filter\models;
 
-
 use Yii;
 use yii\base\Model;
 
 abstract class Filter extends Model
 {
-    const AUTO_LOAD_GET = 0;
-    const AUTO_LOAD_POST = 1;
-    const AUTO_LOAD_ALL = 2;
+    public const AUTO_LOAD_GET = 0;
+    public const AUTO_LOAD_POST = 1;
+    public const AUTO_LOAD_ALL = 2;
 
     /**
      * @var string can be used to overwrite the default formName used by [[load()]]
@@ -28,25 +28,45 @@ abstract class Filter extends Model
      */
     public $autoLoad = self::AUTO_LOAD_ALL;
 
-    public abstract function apply();
+    /**
+     * @var bool True - if data was loaded at least one time
+     */
+    protected $isLoaded = false;
 
-    public function init() {
+    abstract public function apply();
+
+    public function init()
+    {
         if (Yii::$app->request->isConsoleRequest) {
             return;
         }
 
-        if($this->autoLoad === static::AUTO_LOAD_ALL) {
+        if ($this->autoLoad === static::AUTO_LOAD_ALL) {
             $this->load(Yii::$app->request->get());
             $this->load(Yii::$app->request->post());
-        } elseif($this->autoLoad === static::AUTO_LOAD_GET) {
+        } elseif ($this->autoLoad === static::AUTO_LOAD_GET) {
             $this->load(Yii::$app->request->get());
-        } elseif($this->autoLoad === static::AUTO_LOAD_POST) {
+        } elseif ($this->autoLoad === static::AUTO_LOAD_POST) {
             $this->load(Yii::$app->request->post());
         }
     }
 
-    public function formName() {
-        return $this->formName ? $this->formName : parent::formName();
+    public function formName()
+    {
+        return $this->formName ?: parent::formName();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function load($data, $formName = null)
+    {
+        if (parent::load($data, $formName)) {
+            $this->isLoaded = true;
+            return true;
+        }
+
+        return false;
     }
 
 }

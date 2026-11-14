@@ -8,7 +8,7 @@
 
 namespace humhub\assets;
 
-use humhub\components\assets\WebStaticAssetBundle;
+use humhub\components\assets\AssetBundle;
 use yii\web\View;
 
 /**
@@ -16,12 +16,12 @@ use yii\web\View;
  *
  * @author buddha
  */
-class PjaxAsset extends WebStaticAssetBundle
+class PjaxAsset extends AssetBundle
 {
     /**
      * @inheritdoc
      */
-    public $defaultDepends = false;
+    public $sourcePath = '@humhub/resources';
 
     /**
      * @inheritdoc

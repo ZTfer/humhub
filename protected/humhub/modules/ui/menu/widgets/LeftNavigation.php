@@ -32,9 +32,17 @@ abstract class LeftNavigation extends Menu
     public function getAttributes()
     {
         return [
-            'class' => 'panel panel-default left-navigation'
+            'class' => 'panel panel-default left-navigation',
         ];
     }
 
-
+    /**
+     * @inheritdoc
+     */
+    protected function getOptions()
+    {
+        return array_merge(parent::getOptions(), [
+            'aria-label' => strip_tags($this->panelTitle),
+        ]);
+    }
 }

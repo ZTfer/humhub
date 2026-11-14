@@ -20,7 +20,9 @@
 
 namespace humhub\widgets;
 
+use humhub\models\forms\ChooseLanguage;
 use Yii;
+use yii\base\Widget;
 
 /**
  * LanguageChooser
@@ -28,17 +30,30 @@ use Yii;
  * @author luke
  * @since 0.11
  */
-class LanguageChooser extends \yii\base\Widget
+class LanguageChooser extends Widget
 {
+    public bool $vertical = false;
+
+    /**
+     * @inheritdoc
+     */
+    public function beforeRun()
+    {
+        return parent::beforeRun() && Yii::$app->user->isGuest;
+    }
 
     /**
      * Displays / Run the Widget
      */
     public function run()
     {
-        $model = new \humhub\models\forms\ChooseLanguage();
+        $model = new ChooseLanguage();
         $model->language = Yii::$app->language;
-        return $this->render('languageChooser', ['model' => $model, 'languages' => Yii::$app->i18n->getAllowedLanguages()]);
-    }
 
+        return $this->render('languageChooser', [
+            'model' => $model,
+            'languages' => Yii::$app->i18n->getAllowedLanguages(),
+            'vertical' => $this->vertical,
+        ]);
+    }
 }

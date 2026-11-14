@@ -8,6 +8,16 @@
 
 namespace humhub\modules\marketplace;
 
+use humhub\helpers\Html;
+use humhub\modules\admin\events\ModulesEvent;
+use humhub\modules\admin\permissions\ManageModules;
+use humhub\modules\marketplace\models\Module as ModelModule;
+use humhub\modules\marketplace\search\MarketplaceSearchProvider;
+use humhub\modules\marketplace\services\MarketplaceService;
+use humhub\modules\ui\menu\MenuLink;
+use humhub\modules\user\widgets\AccountTopMenu;
+use humhub\widgets\bootstrap\Badge;
+use humhub\widgets\MetaSearchWidget;
 use Yii;
 use yii\base\BaseObject;
 use yii\base\Event;
@@ -15,7 +25,6 @@ use yii\helpers\Url;
 
 class Events extends BaseObject
 {
-
     /**
      * On console application initialization
      *
@@ -23,10 +32,7 @@ class Events extends BaseObject
      */
     public static function onConsoleApplicationInit($event)
     {
-        /** @var Module $module */
-        $module = Yii::$app->getModule('marketplace');
-
-        if (!$module->enabled) {
+        if (!Module::isMarketplaceEnabled()) {
             return;
         }
 
@@ -34,50 +40,64 @@ class Events extends BaseObject
         $application->controllerMap['module'] = commands\MarketplaceController::class;
     }
 
-    public static function onAdminModuleMenuInit($events)
-    {
-        /** @var Module $module */
-        $module = Yii::$app->getModule('marketplace');
-
-        if (!$module->enabled) {
-            return;
-        }
-
-        $updatesBadge = '';
-        $updatesCount = count($module->onlineModuleManager->getModuleUpdates());
-        if ($updatesCount > 0) {
-            $updatesBadge = '&nbsp;&nbsp;<span class="label label-danger">' . $updatesCount . '</span>';
-        } else {
-            $updatesBadge = '&nbsp;&nbsp;<span class="label label-default">0</span>';
-        }
-
-        $events->sender->addItem([
-            'label' => Yii::t('MarketplaceModule.base', 'Browse online'),
-            'url' => Url::to(['/marketplace/browse']),
-            'sortOrder' => 200,
-            'isActive' => (Yii::$app->controller->id == 'browse'),
-        ]);
-
-        $events->sender->addItem([
-            'label' => Yii::t('MarketplaceModule.base', 'Purchases'),
-            'url' => Url::to(['/marketplace/purchase']),
-            'sortOrder' => 300,
-            'isActive' => (Yii::$app->controller->id == 'purchase'),
-        ]);
-
-        $events->sender->addItem([
-            'label' => Yii::t('MarketplaceModule.base', 'Available updates') . $updatesBadge,
-            'url' => Url::to(['/marketplace/update']),
-            'sortOrder' => 400,
-            'isActive' => (Yii::$app->controller->id == 'update'),
-        ]);
-
-    }
-
-    public static function onHourlyCron($event)
+    public static function onHourlyCron()
     {
         Yii::$app->queue->push(new jobs\PeActiveCheckJob());
         Yii::$app->queue->push(new jobs\ModuleCleanupsJob());
+        Yii::$app->queue->push(new jobs\RefreshPendingModuleUpdateCountJob());
     }
 
+    public static function onMarketplaceAfterFilterModules(ModulesEvent $event)
+    {
+        if (!Module::isMarketplaceEnabled()) {
+            return;
+        }
+
+        if (!is_array($event->modules)) {
+            return;
+        }
+
+        foreach ($event->modules as $m => $module) {
+            if ($module instanceof ModelModule && !$module->getFilterService()->isFiltered()) {
+                unset($event->modules[$m]);
+            }
+        }
+    }
+
+    public static function onAccountTopMenuInit($event)
+    {
+        if (!Module::isMarketplaceEnabled()
+            || !Yii::$app->user->isAdmin()
+            || !Yii::$app->user->can(ManageModules::class)) {
+            return;
+        }
+
+        /* @var AccountTopMenu $menu */
+        $menu = $event->sender;
+
+        $updatesCount = (new MarketplaceService())->getPendingModuleUpdateCount();
+        $updatesCountInfo = $updatesCount > 0 ? ' ' . Badge::light($updatesCount) : '';
+
+        $menu->addEntry(new MenuLink([
+            'label' => Html::encode(Yii::t('MarketplaceModule.base', 'Marketplace')) . $updatesCountInfo,
+            'encodeLabel' => false, // $updatesCountInfo shouldn't be encoded
+            'icon' => 'cubes',
+            'url' => Url::toRoute('/marketplace/browse'),
+            'sortOrder' => 450,
+        ]));
+    }
+
+    public static function onMetaSearchInit($event)
+    {
+        if (!Module::isMarketplaceEnabled()
+            || !Yii::$app->user->isAdmin()
+            || !Yii::$app->user->can(ManageModules::class)) {
+            return;
+        }
+
+        /* @var MetaSearchWidget $widget */
+        $widget = $event->sender;
+
+        $widget->addProvider(MarketplaceSearchProvider::class);
+    }
 }

@@ -23,14 +23,13 @@ use Yii;
  */
 class BaseStack extends Widget
 {
-
-    const EVENT_INIT = 'init';
-    const EVENT_RUN = 'run';
+    public const EVENT_INIT = 'init';
+    public const EVENT_RUN = 'run';
 
     /**
      * Default value for the sort order if no sort order value is specified in the widget.
      */
-    const DEFAULT_SORT_ORDER = 9000;
+    public const DEFAULT_SORT_ORDER = 9000;
 
     /**
      * Holds all added widgets
@@ -92,7 +91,7 @@ class BaseStack extends Widget
                     $content .= $this->seperator;
                 }
                 $hasContent = true;
-                $content .= $out;
+                $content .= trim((string) $out);
             }
         }
 
@@ -122,8 +121,8 @@ class BaseStack extends Widget
     {
 
         usort($this->widgets, function ($a, $b) {
-            $sortA = (isset($a[2]['sortOrder'])) ? $a[2]['sortOrder'] : static::DEFAULT_SORT_ORDER;
-            $sortB = (isset($b[2]['sortOrder'])) ? $b[2]['sortOrder'] : static::DEFAULT_SORT_ORDER;
+            $sortA = $a[2]['sortOrder'] ?? static::DEFAULT_SORT_ORDER;
+            $sortB = $b[2]['sortOrder'] ?? static::DEFAULT_SORT_ORDER;
 
             if ($sortA == $sortB) {
                 return 0;
@@ -153,7 +152,7 @@ class BaseStack extends Widget
         $this->widgets[] = [
             $className,
             $params,
-            $options
+            $options,
         ];
     }
 

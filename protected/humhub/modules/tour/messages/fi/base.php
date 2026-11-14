@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => ' Poista paneeli',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => '',
   '<strong>Getting</strong> Started' => '<strong>Kuinka</strong> tätä nyt käytetään?',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Ohje:</strong> Ylläpitäjä (Laajennukset)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '',
   'Cancel' => 'Peruuta',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => '',
+  'Done' => 'Tehty',
   'Drag a photo here or click to browse your files' => 'Pudota kuva tai valitse se sinun tiedostoista',
-  'End guide' => 'Poistu',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Tutustu intran tärkeimpiin ominaisuuksiin seuraavilla oppailla:',
   'Hide my year of birth' => 'Piilota minun syntymäaika',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => '',
-  'Next »' => 'Seuraava »',
+  'Next &rarr;' => '',
   'Ok' => 'Ok',
   'Save and close' => 'Tallanna ja sulje',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => '',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Sukunimesi',
   'Your mobile phone number' => 'Puhelinnumerosi',
   'Your phone number at work' => 'Työpuhelin numerosi',
-  'Your skills, knowledge and experience (comma seperated)' => 'Taitosi, tietosi ja kokemuksesi (pilkulla erotettu)',
+  'Your skills, knowledge and experience' => '',
   'Your title or position' => 'Nimesi tai tehtäväsi',
-  '« Prev' => '« Edellinen',
-);
+  '{{current}} of {{total}}' => '',
+];

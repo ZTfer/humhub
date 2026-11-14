@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'Supprimer le panneau',
+  '&larr; Previous' => '&larr; Précédent',
   '<strong>Account</strong> Menu' => 'Menu <strong>Compte</strong>',
   '<strong>Getting</strong> Started' => '<strong>Commencer</strong>',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Guide :</strong> Administration (Modules)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '<strong>Démarrer</strong> la visite guidée d\'un espace',
   'Cancel' => 'Annuler',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => 'Ne perdez pas la trace des choses !<br /><br />Cette icône vous tiendra au courant des activités et des messages qui vous concernent directement.',
+  'Done' => 'Terminé',
   'Drag a photo here or click to browse your files' => 'Faites glisser une photo ici ou cliquez pour parcourir vos fichiers',
-  'End guide' => 'Fin',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Apprenez à utiliser les fonctionnalités les plus importantes du site à travers les guides suivants :',
   'Hide my year of birth' => 'Cacher l\'année de naissance',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => 'Bonjour <strong>%firstname%</strong>, merci d\'utiliser %community%.',
-  'Next »' => 'Suivant',
+  'Next &rarr;' => 'Suivant &rarr;',
   'Ok' => 'Ok',
   'Save and close' => 'Enregistrer et fermer',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'Le menu compte vous donne accès à vos paramètres privés et vous permet de gérer votre profil public.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Votre nom de famille',
   'Your mobile phone number' => 'Votre téléphone portable',
   'Your phone number at work' => 'Votre téléphone de bureau',
-  'Your skills, knowledge and experience (comma seperated)' => 'Vos compétences, savoir-faire et expériences (séparés par des virgules)',
+  'Your skills, knowledge and experience' => 'Vos compétences, connaissances et expériences',
   'Your title or position' => 'Votre titre ou poste',
-  '« Prev' => 'Préc.',
-);
+  '{{current}} of {{total}}' => '{{current}} sur {{total}}',
+];

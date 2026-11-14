@@ -1,5 +1,5 @@
 <?php
-return array (
+return [
   '<strong>E-Mail</strong> Summaries' => '<strong>E-Mail</strong>-Zusammenfassungen',
   '<strong>Latest</strong> activities' => '<strong>Letzte</strong> Aktivitäten',
   'Activities' => 'Aktivitäten',
@@ -11,6 +11,7 @@ return array (
   'Hourly' => 'Stündlich',
   'Interval' => 'Intervall',
   'Latest news' => 'Letzte Neuigkeiten',
+  'Monthly' => 'monatlich',
   'Never' => 'Niemals',
   'On this page you can configure the contents and the interval of these e-mail updates.' => 'Auf dieser Seite kannst du die Inhalte und das Intervall der E-Mail-Zusammenfassungen einstellen.',
   'On this page you can define the default behavior for your users. These settings can be overwritten by users in their account settings page.' => 'Auf dieser Seite kannst du die Standardeinstellungen für die Benutzer definieren. Die Einstellungen können vom Benutzer in den Einstellungen seines Kontos angepasst werden.',
@@ -22,16 +23,12 @@ return array (
   'Weekly' => 'Wöchentlich',
   'You will only receive an e-mail if there is something new.' => 'Du erhältst nur E-Mails, wenn Neuigkeiten vorliegen.',
   'Your daily summary' => 'Deine tägliche Übersicht',
+  'Your monthly summary' => 'Deine monatliche Zusammenfassung',
   'Your weekly summary' => 'Deine wöchentliche Übersicht',
   'see online' => 'online ansehen',
   'via' => 'via',
-  '{displayName} created the new space {spaceName}' => '{displayName} hat einen neuen Space »{spaceName}« erstellt.',
-  '{displayName} created this space.' => '{displayName} hat diesen Space erstellt.',
-  '{displayName} joined the space {spaceName}' => '{displayName} ist dem Space »{spaceName}« beigetreten',
-  '{displayName} joined this space.' => '{displayName} ist diesem Space beigetreten.',
-  '{displayName} left the space {spaceName}' => '{displayName} hat den Space »{spaceName}« verlassen',
-  '{displayName} left this space.' => '{displayName} hat diesen Space verlassen.',
-  '{spaceName} has been archived' => '{spaceName} wurde archiviert',
-  '{spaceName} has been unarchived' => 'Die Archivierung im Space {spaceName} wurde zurückgenommen',
-  '{user1} now follows {user2}.' => '{user1} folgt nun {user2}.',
-);
+  '{displayName1} and {displayName2}' => '{displayName1} und {displayName2}',
+  '{displayName1}, {displayName2} and {count} more' => '{displayName1}, {displayName2} und {count} weitere',
+  '{displayNames} now follow {followedDisplayName}.' => '{displayNames} folgen jetzt {followedDisplayName}.',
+  '{displayName} now follows {followedDisplayName}.' => '{displayName} folgt jetzt {followedDisplayName}.',
+];

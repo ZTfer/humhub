@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Zend Framework (http://framework.zend.com/)
  *
@@ -9,12 +10,10 @@
 
 namespace Zend\Stdlib;
 
-
 use ArrayAccess;
 use Countable;
 use IteratorAggregate;
-use Serializable;
-use Zend\Stdlib\Exception\InvalidArgumentException;
+use yii\base\InvalidArgumentException;
 
 /**
  * ***** PHP 7.3 modified variant of ZF2 Array Object *****
@@ -23,23 +22,18 @@ use Zend\Stdlib\Exception\InvalidArgumentException;
  *
  * Extends version-specific "abstract" implementation.
  */
-class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Countable
+class ArrayObject implements IteratorAggregate, ArrayAccess, Countable
 {
     /**
      * Properties of the object have their normal functionality
      * when accessed as list (var_dump, foreach, etc.).
      */
-    const STD_PROP_LIST = 1;
+    public const STD_PROP_LIST = 1;
 
     /**
      * Entries can be accessed as properties (read and write).
      */
-    const ARRAY_AS_PROPS = 2;
-
-    /**
-     * @var array
-     */
-    protected $storage;
+    public const ARRAY_AS_PROPS = 2;
 
     /**
      * @var int
@@ -59,14 +53,13 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     /**
      * Constructor
      *
-     * @param array $input
+     * @param array $storage
      * @param int $flags
      * @param string $iteratorClass
      */
-    public function __construct($input = [], $flags = self::STD_PROP_LIST, $iteratorClass = 'ArrayIterator')
+    public function __construct(protected $storage = [], $flags = self::STD_PROP_LIST, $iteratorClass = 'ArrayIterator')
     {
         $this->setFlags($flags);
-        $this->storage = $input;
         $this->setIteratorClass($iteratorClass);
         $this->protectedProperties = array_keys(get_object_vars($this));
     }
@@ -83,7 +76,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
             return $this->offsetExists($key);
         }
         if (in_array($key, $this->protectedProperties)) {
-            throw new Exception\InvalidArgumentException('$key is a protected property, use a different key');
+            throw new InvalidArgumentException('$key is a protected property, use a different key');
         }
 
         return isset($this->$key);
@@ -102,7 +95,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
             return $this->offsetSet($key, $value);
         }
         if (in_array($key, $this->protectedProperties)) {
-            throw new Exception\InvalidArgumentException('$key is a protected property, use a different key');
+            throw new InvalidArgumentException('$key is a protected property, use a different key');
         }
         $this->$key = $value;
     }
@@ -119,7 +112,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
             return $this->offsetUnset($key);
         }
         if (in_array($key, $this->protectedProperties)) {
-            throw new Exception\InvalidArgumentException('$key is a protected property, use a different key');
+            throw new InvalidArgumentException('$key is a protected property, use a different key');
         }
         unset($this->$key);
     }
@@ -134,12 +127,12 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     {
         $ret = null;
         if ($this->flag == self::ARRAY_AS_PROPS) {
-            $ret =& $this->offsetGet($key);
+            $ret = & $this->offsetGet($key);
 
             return $ret;
         }
         if (in_array($key, $this->protectedProperties)) {
-            throw new Exception\InvalidArgumentException('$key is a protected property, use a different key');
+            throw new InvalidArgumentException('$key is a protected property, use a different key');
         }
 
         return $this->$key;
@@ -185,7 +178,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     public function exchangeArray($data)
     {
         if (!is_array($data) && !is_object($data)) {
-            throw new Exception\InvalidArgumentException('Passed variable is not an array or object, using empty array instead');
+            throw new InvalidArgumentException('Passed variable is not an array or object, using empty array instead');
         }
 
         if (is_object($data) && ($data instanceof self || $data instanceof \ArrayObject)) {
@@ -297,7 +290,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
         if (!$this->offsetExists($key)) {
             return $ret;
         }
-        $ret =& $this->storage[$key];
+        $ret = & $this->storage[$key];
 
         return $ret;
     }
@@ -330,11 +323,11 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     /**
      * Serialize an ArrayObject
      *
-     * @return string
+     * @return array
      */
-    public function serialize()
+    public function __serialize(): array
     {
-        return serialize(get_object_vars($this));
+        return get_object_vars($this);
     }
 
     /**
@@ -362,7 +355,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
             return;
         }
 
-        if (strpos($class, '\\') === 0) {
+        if (str_starts_with($class, '\\')) {
             $class = '\\' . $class;
             if (class_exists($class)) {
                 $this->iteratorClass = $class;
@@ -371,7 +364,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
             }
         }
 
-        throw new Exception\InvalidArgumentException('The iterator class does not exist');
+        throw new InvalidArgumentException('The iterator class does not exist');
     }
 
     /**
@@ -403,12 +396,11 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     /**
      * Unserialize an ArrayObject
      *
-     * @param string $data
+     * @param array $ar
      * @return void
      */
-    public function unserialize($data)
+    public function __unserialize($ar)
     {
-        $ar = unserialize($data);
         $this->protectedProperties = array_keys(get_object_vars($this));
 
         $this->setFlags($ar['flag']);
@@ -427,7 +419,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
                     $this->setIteratorClass($v);
                     break;
                 case 'protectedProperties':
-//                    continue;
+                    //                    continue;
 
                     // HUMHUB MODIFICATION
                     continue 2;

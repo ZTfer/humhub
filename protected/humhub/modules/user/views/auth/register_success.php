@@ -1,20 +1,34 @@
 <?php
-$this->pageTitle = Yii::t('UserModule.auth', 'Registration successful');
+
+use humhub\components\View;
+use humhub\modules\user\models\Invite;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\SiteLogo;
+use yii\helpers\Url;
+
+/* @var $this View */
+/* @var $model Invite */
+
+$this->pageTitle = Yii::t('UserModule.auth', 'Almost there!');
 ?>
-<div class="container" style="text-align: center;">
-    <?= humhub\widgets\SiteLogo::widget(['place' => 'login']); ?>
+
+<div id="user-auth-register-success" class="container container-registration">
+    <?= SiteLogo::widget(['place' => SiteLogo::PLACE_LOGIN]) ?>
     <br>
-    <div class="row">
-        <div class="panel panel-default" style="max-width: 300px; margin: 0 auto 20px; text-align: left;">
-            <div class="panel-heading"><?php echo Yii::t('UserModule.auth', '<strong>Registration</strong> successful!'); ?></div>
-            <div class="panel-body">
-                <p><?php echo Yii::t('UserModule.auth', 'Please check your email and follow the instructions!'); ?></p>
-                <br/>
-                <a href="<?php echo \yii\helpers\Url::to(["/"]) ?>" data-pjax-prevent data-ui-loader class="btn btn-primary"><?php echo Yii::t('UserModule.auth', 'back to home') ?></a>
-            </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong class="fw-bolder"><?= Yii::t('UserModule.auth', 'Almost there!') ?></strong>
+        </div>
+        <div class="panel-body">
+            <p><?= Yii::t('UserModule.auth', 'An email has been sent to {emailAddress}. Please check your inbox to complete the registration.', [
+                'emailAddress' => $model->email,
+            ]) ?></p>
+            <p><?= Yii::t('UserModule.auth', 'If you don\'t see the email, please check your spam folder.') ?></p>
+            <?= Button::light(Yii::t('UserModule.auth', 'Back'))
+                ->link(Url::home())
+                ->cssClass('w-100')
+                ->pjax(false) ?>
         </div>
     </div>
 </div>
-
-
-

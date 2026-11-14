@@ -8,6 +8,7 @@
 
 namespace humhub\components\i18n;
 
+use humhub\components\InstallationState;
 use IntlDateFormatter;
 use Yii;
 use yii\base\InvalidArgumentException;
@@ -17,7 +18,6 @@ use yii\base\InvalidArgumentException;
  */
 class Formatter extends \yii\i18n\Formatter
 {
-
     /**
      * @inheritdoc
      */
@@ -37,7 +37,7 @@ class Formatter extends \yii\i18n\Formatter
     {
         parent::init();
 
-        if (Yii::$app->params['installed'] && Yii::$app->getModule('admin') !== null && !empty(Yii::$app->getModule('admin')->settings->get('defaultDateInputFormat'))) {
+        if (Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED) && Yii::$app->getModule('admin') !== null && !empty(Yii::$app->getModule('admin')->settings->get('defaultDateInputFormat'))) {
             $this->dateInputFormat = Yii::$app->getModule('admin')->settings->get('defaultDateInputFormat');
         }
     }
@@ -74,7 +74,7 @@ class Formatter extends \yii\i18n\Formatter
     {
         if (extension_loaded('intl')) {
             $pattern = $this->getDateTimePattern(IntlDateFormatter::NONE, IntlDateFormatter::SHORT);
-            return strpos($pattern, 'a') !== false;
+            return str_contains((string) $pattern, 'a');
         }
         return false;
     }
@@ -90,18 +90,55 @@ class Formatter extends \yii\i18n\Formatter
      */
     public function asShortInteger($value, $options = [], $textOptions = [])
     {
-        list($params, $position) = $this->formatNumber($value, null, 2, 1000, $options, $textOptions);
-        $params['nFormatted'] = floor($params['nFormatted']);
+        [$params, $position] = $this->formatNumber($value, 0, 2, 1000, $options, $textOptions);
 
-        switch ($position) {
-            case 0:
-                return $params['nFormatted'];
-            case 1:
-                return Yii::t('base', '{nFormatted}K', $params, $this->language); // Thousand
-            case 2:
-                return Yii::t('base', '{nFormatted}M', $params, $this->language); // Million
-            default:
-                return Yii::t('base', '{nFormatted}B', $params, $this->language); // Billion
+        if ($position < 3 && mb_strlen((string) $params['nFormatted']) === 4) {
+            // Convert 1000K to 1M or 1000M to 1B
+            $params['nFormatted'] = mb_substr((string) $params['nFormatted'], 0, 1);
+            $position++;
         }
+
+        return match ($position) {
+            0 => $params['nFormatted'],
+            1 => Yii::t('base', '{nFormatted}K', $params, $this->language),
+            2 => Yii::t('base', '{nFormatted}M', $params, $this->language),
+            default => Yii::t('base', '{nFormatted}B', $params, $this->language),
+        };
+    }
+
+    /**
+     * Fix unicode chars
+     *
+     * @param string $value
+     * @return string
+     */
+    private function fixUnicodeChars($value): string
+    {
+        // Replace newly introduced Unicode separator whitespace, which a standard one, to sway backward compatible.
+        return str_replace(' ', ' ', $value);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function asDate($value, $format = null)
+    {
+        return $this->fixUnicodeChars(parent::asDate($value, $format));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function asTime($value, $format = null)
+    {
+        return $this->fixUnicodeChars(parent::asTime($value, $format));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function asDatetime($value, $format = null)
+    {
+        return $this->fixUnicodeChars(parent::asDatetime($value, $format));
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -26,18 +27,16 @@ class FilterPanel extends Widget
 
     public $view = 'filterPanel';
 
-    public $span = 3;
-
     /**
      * @inheritdoc
      */
     public function run()
     {
 
-        if(empty($this->blocks)) {
+        if (empty($this->blocks)) {
             return '';
         }
 
-        return $this->render($this->view, ['blocks' => Sort::sort($this->blocks), 'span' => $this->span]);
+        return $this->render($this->view, ['blocks' => Sort::sort($this->blocks)]);
     }
 }

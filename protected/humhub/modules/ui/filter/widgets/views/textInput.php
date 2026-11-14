@@ -6,10 +6,11 @@
  *
  */
 
-use yii\bootstrap\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
 
-/* @var $this \humhub\modules\ui\view\components\View */
+/* @var $this View */
 ?>
-<div class="form-group">
-    <?= Html::textInput(null,null, $options) ?>
+<div class="mb-3">
+    <?= Html::textInput(null, null, $options) ?>
 </div>

@@ -9,7 +9,7 @@
 namespace humhub\modules\installer;
 
 use Exception;
-use humhub\libs\DynamicConfig;
+use humhub\components\InstallationState;
 use Yii;
 use yii\console\Application;
 use yii\helpers\Url;
@@ -22,16 +22,20 @@ use yii\web\HttpException;
  */
 class Module extends \humhub\components\Module
 {
-
     /**
      * @event on configuration steps init
      */
-    const EVENT_INIT_CONFIG_STEPS = 'steps';
+    public const EVENT_INIT_CONFIG_STEPS = 'steps';
 
     /**
      * @inheritdoc
      */
     public $controllerNamespace = 'humhub\modules\installer\controllers';
+
+    /**
+     * @var bool enable auto setup
+     */
+    public bool $enableAutoSetup = false;
 
     /**
      * Array of config steps
@@ -61,10 +65,13 @@ class Module extends \humhub\components\Module
      */
     public function beforeAction($action)
     {
+        // The installer must never be indexed by search engines
+        Yii::$app->response->headers->set('X-Robots-Tag', 'noindex, nofollow');
 
         // Block installer, when it's marked as installed
-        if (Yii::$app->params['installed']) {
-            throw new HttpException(500, 'HumHub is already installed!');
+        // 404 instead of 500: crawlers hitting the URL must not fill the error log
+        if (Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED)) {
+            throw new HttpException(404, 'HumHub is already installed!');
         }
 
         Yii::$app->controller->enableCsrfValidation = false;
@@ -75,7 +82,7 @@ class Module extends \humhub\components\Module
     /**
      * Checks if database connections works
      *
-     * @return boolean state of database connection
+     * @return bool state of database connection
      */
     public function checkDBConnection()
     {
@@ -85,8 +92,7 @@ class Module extends \humhub\components\Module
             Yii::$app->db->open();
             // return the current connection state.
             return Yii::$app->db->getIsActive();
-        } catch (Exception $e) {
-            
+        } catch (Exception) {
         }
 
         return false;
@@ -104,40 +110,34 @@ class Module extends \humhub\components\Module
         return true;
     }
 
-    /**
-     * Sets application in installed state (disables installer)
-     */
-    public function setInstalled()
-    {
-        $config = DynamicConfig::load();
-        $config['params']['installed'] = true;
-        DynamicConfig::save($config);
-    }
-
-    /**
-     * Sets application database in installed state
-     */
-    public function setDatabaseInstalled()
-    {
-        $config = DynamicConfig::load();
-        $config['params']['databaseInstalled'] = true;
-        DynamicConfig::save($config);
-    }
-
     protected function initConfigSteps()
     {
-
         /**
          * Step:  Basic Configuration
          */
         $this->configSteps['basic'] = [
             'sort' => 100,
             'url' => Url::to(['/installer/config/basic']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'basic');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'basic',
         ];
 
+        /**
+         * Step: Mail (SMTP) transport configuration
+         */
+        $this->configSteps['mail'] = [
+            'sort' => 120,
+            'url' => Url::to(['/installer/config/mail']),
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'mail',
+        ];
+
+        /**
+         * Step: Localisation
+         */
+        $this->configSteps['localisation'] = [
+            'sort' => 130,
+            'url' => Url::to(['/installer/config/localisation']),
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'localisation',
+        ];
 
         /**
          * Step: Use Case
@@ -145,9 +145,7 @@ class Module extends \humhub\components\Module
         $this->configSteps['usecase'] = [
             'sort' => 150,
             'url' => Url::to(['/installer/config/use-case']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'use-case');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'use-case',
         ];
 
         /**
@@ -156,9 +154,7 @@ class Module extends \humhub\components\Module
         $this->configSteps['security'] = [
             'sort' => 200,
             'url' => Url::to(['/installer/config/security']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'security');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'security',
         ];
 
         /**
@@ -167,22 +163,17 @@ class Module extends \humhub\components\Module
         $this->configSteps['modules'] = [
             'sort' => 300,
             'url' => Url::to(['/installer/config/modules']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'modules');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'modules',
         ];
 
         /**
-         * Step:  Setup Admin User
+         * Step: Setup Admin User
          */
         $this->configSteps['admin'] = [
             'sort' => 400,
             'url' => Url::to(['/installer/config/admin']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'admin');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'admin',
         ];
-
 
         /**
          * Step: Sample Data
@@ -190,9 +181,7 @@ class Module extends \humhub\components\Module
         $this->configSteps['sample-data'] = [
             'sort' => 450,
             'url' => Url::to(['/installer/config/sample-data']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'sample-data');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'sample-data',
         ];
 
         /**
@@ -201,9 +190,7 @@ class Module extends \humhub\components\Module
         $this->configSteps['finish'] = [
             'sort' => 1000,
             'url' => Url::to(['/installer/config/finish']),
-            'isCurrent' => function() {
-                return (Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'finish');
-            },
+            'isCurrent' => fn() => Yii::$app->controller->id == 'config' && Yii::$app->controller->action->id == 'finish',
         ];
 
         $this->trigger(self::EVENT_INIT_CONFIG_STEPS);
@@ -233,9 +220,6 @@ class Module extends \humhub\components\Module
      */
     protected function sortConfigSteps()
     {
-        usort($this->configSteps, function($a, $b) {
-            return ($a['sort'] > $b['sort']) ? 1 : -1;
-        });
+        usort($this->configSteps, fn($a, $b) => ($a['sort'] > $b['sort']) ? 1 : -1);
     }
-
 }

@@ -1,16 +1,25 @@
 <?php
+/**
+ * @link https://www.humhub.org/
+ * @copyright Copyright (c) HumHub GmbH & Co. KG
+ * @license https://www.humhub.com/licences
+ */
 
-use humhub\modules\ui\mail\DefaultMailStyle;
-use yii\helpers\Url;
-use yii\helpers\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\helpers\MailStyleHelper;
+use humhub\widgets\mails\MailButton;
+use humhub\widgets\mails\MailButtonList;
 
+/* @var View $this */
+/* @var $registrationUrl string */
 ?>
 <tr>
     <td align="center" valign="top" class="fix-box">
 
         <!-- start  container width 600px -->
         <table width="600" align="center" border="0" cellspacing="0" cellpadding="0" class="container"
-               style="background-color: <?= Yii::$app->view->theme->variable('background-color-main', '#fff') ?>; ">
+               style="background-color: <?= MailStyleHelper::getBackgroundColorMain() ?>; ">
 
 
             <tr>
@@ -18,7 +27,7 @@ use yii\helpers\Html;
 
                     <!-- start container width 560px -->
                     <table width="540" align="center" border="0" cellspacing="0" cellpadding="0" class="full-width"
-                           style="background-color:<?= Yii::$app->view->theme->variable('background-color-main', '#fff') ?>;">
+                           style="background-color:<?= MailStyleHelper::getBackgroundColorMain() ?>">
 
 
                         <!-- start text content -->
@@ -27,19 +36,18 @@ use yii\helpers\Html;
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
                                     <tr>
                                         <td valign="top" width="auto" align="center">
-                                            <!-- start button -->
                                             <table border="0" align="center" cellpadding="0" cellspacing="0">
                                                 <tr>
                                                     <td width="auto" align="center" valign="middle" height="28"
-                                                        style=" background-color:<?= Yii::$app->view->theme->variable('background-color-main', '#fff') ?>; background-clip: padding-box; font-size:26px; font-family: <?= Yii::$app->view->theme->variable('mail-font-family', DefaultMailStyle::DEFAULT_FONT_FAMILY) ?>; text-align:center; font-weight: 300; padding-left:18px; padding-right:18px; ">
+                                                        style=" background-color:<?= MailStyleHelper::getBackgroundColorMain() ?>; background-clip: padding-box; font-size:26px; font-family: <?= MailStyleHelper::getFontFamily() ?>; text-align:center; font-weight: 300; padding: 0 18px">
 
-                                                        <span style="color:  <?= Yii::$app->view->theme->variable('text-color-highlight', '#555') ?>; font-weight: 300;">
-                                                            <?= Yii::t('UserModule.base', 'Welcome to %appName%', ['%appName%' => '<strong>' . Html::encode(Yii::$app->name) . '</strong>']); ?>
+                                                        <span
+                                                            style="color:  <?= MailStyleHelper::getTextColorHighlight() ?>; font-weight: 300">
+                                                            <?= Yii::t('UserModule.base', 'Welcome to %appName%', ['%appName%' => '<strong>' . Html::encode(Yii::$app->name) . '</strong>']) ?>
                                                         </span>
                                                     </td>
                                                 </tr>
                                             </table>
-                                            <!-- end button -->
                                         </td>
                                     </tr>
 
@@ -65,7 +73,7 @@ use yii\helpers\Html;
 
         <!-- start  container width 600px -->
         <table width="600" align="center" border="0" cellspacing="0" cellpadding="0" class="container"
-               style="background-color: <?= Yii::$app->view->theme->variable('background-color-main', '#fff') ?>; ">
+               style="background-color: <?= MailStyleHelper::getBackgroundColorMain() ?>">
 
 
             <tr>
@@ -73,7 +81,7 @@ use yii\helpers\Html;
 
                     <!-- start container width 560px -->
                     <table width="540" align="center" border="0" cellspacing="0" cellpadding="0" class="full-width"
-                           bgcolor="#ffffff" style="background-color:<?= Yii::$app->view->theme->variable('background-color-main', '#fff') ?>;">
+                           style="background-color:<?= MailStyleHelper::getBackgroundColorMain() ?>">
 
 
                         <!-- start text content -->
@@ -95,9 +103,9 @@ use yii\helpers\Html;
                                                 <!--end space height -->
 
                                                 <tr>
-                                                    <td style="font-size: 14px; line-height: 22px; font-family: <?= Yii::$app->view->theme->variable('mail-font-family', DefaultMailStyle::DEFAULT_FONT_FAMILY) ?>; color:<?= Yii::$app->view->theme->variable('text-color-main', '#777') ?>; font-weight:300; text-align:center; ">
+                                                    <td style="font-size: 14px; line-height: 22px; font-family: <?= MailStyleHelper::getFontFamily() ?>; color:<?= MailStyleHelper::getTextColorMain() ?>; font-weight:300; text-align:center">
 
-                                                        <?php echo Yii::t('UserModule.base', 'Welcome to %appName%. Please click on the button below to proceed with your registration.', ['%appName%' => Html::encode(Yii::$app->name)]); ?>
+                                                        <?= Yii::t('UserModule.base', 'Welcome to %appName%. Please click on the button below to proceed with your registration.', ['%appName%' => Html::encode(Yii::$app->name)]) ?>
 
                                                     </td>
                                                 </tr>
@@ -116,25 +124,13 @@ use yii\helpers\Html;
 
                                     <tr>
                                         <td valign="top" width="auto" align="center">
-                                            <!-- start button -->
-                                            <table border="0" align="center" cellpadding="0" cellspacing="0">
-                                                <tr>
-                                                    <td width="auto" align="center" valign="middle" height="32"
-                                                        style=" background-color:<?= $this->theme->variable('primary'); ?>;  border-radius:5px; background-clip: padding-box;font-size:14px; font-family: <?= Yii::$app->view->theme->variable('mail-font-family', DefaultMailStyle::DEFAULT_FONT_FAMILY) ?>; text-align:center;  color:#ffffff; font-weight: 600; padding-left:30px; padding-right:30px; padding-top: 5px; padding-bottom: 5px;">
-
-                                                        <span style="color: <?= Yii::$app->view->theme->variable('text-color-contrast', '#fff') ?>; font-weight: 300;">
-                                                            <a href="<?php echo Url::toRoute(['/user/registration', 'token' => $token], true); ?>"
-                                                               style="text-decoration: none; color: <?= Yii::$app->view->theme->variable('text-color-contrast', '#fff') ?>; font-weight: 300;">
-                                                                <strong><?php echo Yii::t('UserModule.base', 'Sign up'); ?></strong>
-                                                            </a>
-                                                        </span>
-                                                    </td>
-
-                                                </tr>
-                                            </table>
-                                            <!-- end button -->
+                                            <?= MailButtonList::widget(['buttons' => [
+                                                MailButton::widget([
+                                                    'url' => $registrationUrl,
+                                                    'text' => Yii::t('UserModule.base', 'Sign up'),
+                                                ]),
+                                            ]]) ?>
                                         </td>
-
                                     </tr>
 
                                 </table>

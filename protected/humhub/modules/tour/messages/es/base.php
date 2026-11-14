@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'Eliminar panel',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => 'Menú de la <strong>cuenta</strong>',
   '<strong>Getting</strong> Started' => '<strong>Empezando</strong>',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Guía:</strong> Administración (Módulos)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '<strong>Empezar</strong> la guía de los espacios',
   'Cancel' => 'Cancelar',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => '¡No te pierdas nada!<br /><br />Este icono te mantendrá informado de actividades y mensajes que te afectan directamente.',
+  'Done' => 'Hecho',
   'Drag a photo here or click to browse your files' => 'Arrastre una foto aquí o haga clic para explorar sus archivos',
-  'End guide' => 'Terminar',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Entérate de todo lo que puedes hacer en esta red social con las siguientes guías:',
   'Hide my year of birth' => 'Ocultar mi año de nacimiento',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => 'Hola <strong>%firstname%</strong>, gracias por usar %community%.',
-  'Next »' => 'Siguiente >>',
+  'Next &rarr;' => '',
   'Ok' => 'Ok',
   'Save and close' => 'Guardar y cerrar',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'El menú de la cuenta te proporciona acceso a tus ajustes privados y te permite gestionar tu perfil público.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Tu apellido',
   'Your mobile phone number' => 'Tu número de teléfono',
   'Your phone number at work' => 'Tu número de teléfono en el trabajo',
-  'Your skills, knowledge and experience (comma seperated)' => 'Sus habilidades, conocimientos y experiencia (separados por comas)',
+  'Your skills, knowledge and experience' => 'Tus habilidades, conocimiento y experiencia',
   'Your title or position' => 'Tu título o posición',
-  '« Prev' => '<< Anterior',
-);
+  '{{current}} of {{total}}' => '',
+];

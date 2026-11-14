@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: kingb
@@ -7,7 +8,6 @@
  */
 
 namespace humhub\modules\content\models;
-
 
 use humhub\modules\content\components\ContentContainerActiveRecord;
 
@@ -31,7 +31,7 @@ interface Movable
      * can't be moved
      *
      */
-    public function canMove(ContentContainerActiveRecord $container = null);
+    public function canMove(?ContentContainerActiveRecord $container = null);
 
     /**
      * Implements the actual logic for moving the instance to the given [[ContentContainerActiveRecord]].
@@ -51,11 +51,11 @@ interface Movable
      * @param bool $force
      * @return bool
      */
-    public function move(ContentContainerActiveRecord $container = null, $force = false);
+    public function move(?ContentContainerActiveRecord $container = null, $force = false);
 
     /**
      * This function is called once the actual move logic has been performed.
      */
-    public function afterMove(ContentContainerActiveRecord $container = null);
+    public function afterMove(?ContentContainerActiveRecord $container = null);
 
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -31,14 +32,14 @@ class ContentContainerHelper
      */
     public static function getCurrent($type = null)
     {
-        if(!static::$container) {
+        if (!static::$container) {
             $controller = Yii::$app->controller;
-            if($controller instanceof ContentContainerController) {
-                static::$container =  $controller->contentContainer;
+            if ($controller instanceof ContentContainerController) {
+                static::$container = $controller->contentContainer;
             }
         }
 
-        if(static::$container && $type && !is_a(static::$container,  $type)) {
+        if (static::$container && $type && !is_a(static::$container, $type)) {
             return null;
         }
 
@@ -50,7 +51,7 @@ class ContentContainerHelper
      * @param ContentContainerActiveRecord|null $container
      * @since 1.7
      */
-    public static function setCurrent(ContentContainerActiveRecord $container = null)
+    public static function setCurrent(?ContentContainerActiveRecord $container = null)
     {
         static::$container = $container;
     }

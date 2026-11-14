@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => '',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => '',
   '<strong>Getting</strong> Started' => '',
   '<strong>Guide:</strong> Administration (Modules)' => '',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '',
   'Cancel' => 'Cancel·la',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => '',
+  'Done' => 'Fet',
   'Drag a photo here or click to browse your files' => 'Arrossegar una foto aquí o feu clic per navegar pels arxius',
-  'End guide' => 'Finalitza la guia',
   'Get to know your way around the site\'s most important features with the following guides:' => '',
   'Hide my year of birth' => 'Ocultar el meu any de naixement',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => '',
-  'Next »' => 'Següent »',
+  'Next &rarr;' => '',
   'Ok' => 'D\'acord',
   'Save and close' => 'Desar i eliminar',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => '',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Els teus cognoms',
   'Your mobile phone number' => 'El seu número de telèfon',
   'Your phone number at work' => 'El seu número de telèfon al treball',
-  'Your skills, knowledge and experience (comma seperated)' => 'Les seues habilitats, coneixements i experiència (separades per comes)',
+  'Your skills, knowledge and experience' => '',
   'Your title or position' => 'El teu títol o posició',
-  '« Prev' => '« Anterior',
-);
+  '{{current}} of {{total}}' => '',
+];

@@ -8,18 +8,29 @@
 
 namespace humhub\modules\user\models\fieldtype;
 
+use Collator;
+use humhub\helpers\Html;
+use humhub\libs\Iso3166Codes;
 use humhub\modules\user\models\User;
 use Yii;
-use humhub\libs\Iso3166Codes;
 
 /**
  * ProfileFieldTypeSelect handles numeric profile fields.
  *
- * @package humhub.modules_core.user.models
+ * @package humhub\modules\user\models\fieldtype
  * @since 0.5
  */
 class CountrySelect extends Select
 {
+    /**
+     * @inheritdoc
+     */
+    public function rules()
+    {
+        return [
+            [['options'], 'safe'],
+        ];
+    }
 
     /**
      * Returns Form Definition for edit/create this field.
@@ -29,82 +40,79 @@ class CountrySelect extends Select
     public function getFormDefinition($definition = [])
     {
         return parent::getFormDefinition([
-                    get_class($this) => [
-                        'type' => 'form',
-                        'title' => Yii::t('UserModule.profile', 'Supported ISO3166 country codes'),
-                        'elements' => [
-                            'options' => [
-                                'type' => 'textarea',
-                                'label' => Yii::t('UserModule.profile', 'Possible values'),
-                                'class' => 'form-control',
-                                'hint' => Yii::t('UserModule.profile', 'Comma separated country codes, e.g. DE,EN,AU')
-                            ]
-                        ]
-                    ]
+            static::class => [
+                'type' => 'form',
+                'title' => Yii::t('UserModule.profile', 'Supported ISO3166 country codes'),
+                'elements' => [
+                    'options' => [
+                        'type' => 'textarea',
+                        'label' => Yii::t('UserModule.profile', 'Possible values'),
+                        'class' => 'form-control',
+                        'hint' => Yii::t('UserModule.profile', 'Comma separated country codes, e.g. DE,EN,AU'),
+                    ],
+                ],
+            ],
         ]);
     }
 
     /**
-     * Returns a list of possible options
-     *
-     * @return array
+     * @inheritdoc
      */
-    public function getSelectItems()
+    public function getSelectItems(): array
     {
         $items = [];
 
         // if no options set basically return a translated map of all defined countries
         if (empty($this->options) || trim($this->options) == false) {
-            $items = iso3166Codes::$countries;
-            foreach ($items as $code => $value) {
-                $items[$code] = iso3166Codes::country($code);
+            $isoCodes = Iso3166Codes::$countries;
+
+            foreach ($isoCodes as $code => $value) {
+                $items[$code] = Iso3166Codes::country($code);
             }
         } else {
             foreach (explode(",", $this->options) as $code) {
-
                 $key = trim($code);
-                $value = iso3166Codes::country($key, true);
+                $value = Iso3166Codes::country($key, true);
                 if (!empty($key) && $key !== $value) {
-                    $items[trim($key)] = trim($value);
+                    $items[$key] = trim((string) $value);
                 }
             }
         }
 
-        // Sort countries list based on user language   
-        $col = new \Collator(Yii::$app->language);
+        // Sort countries list based on user language
+        $col = new Collator(Yii::$app->language);
         $col->asort($items);
 
         return $items;
     }
 
     /**
-     * Returns value of option
-     *
-     * @param User $user            
-     * @param Boolean $raw
-     *            Output Key
-     * @return String
+     * @inheritdoc
      */
-    public function getUserValue($user, $raw = true)
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
         $internalName = $this->profileField->internal_name;
-        $value = $user->profile->$internalName;
+        $value = $user->profile->$internalName ?? '';
 
-        if (!$raw) {
-            return \yii\helpers\Html::encode(iso3166Codes::country($value));
+        if (empty($value)) {
+            return '';
         }
 
-        return $value;
+        if (!$raw) {
+            $value = Iso3166Codes::country($value);
+        }
+
+        return $encode ? Html::encode($value) : $value;
     }
 
     /**
      * @inheritdoc
      */
-    public function getFieldFormDefinition()
+    public function getFieldFormDefinition(?User $user = null, array $options = []): array
     {
-        $definition = parent::getFieldFormDefinition();
-        $definition[$this->profileField->internal_name]['htmlOptions'] = ['data-ui-select2' => true, 'style' => 'width:100%'];
-        return $definition;
+        return parent::getFieldFormDefinition($user, array_merge([
+            'htmlOptions' => ['data-ui-select2' => true, 'style' => 'width:100%'],
+        ], $options));
     }
 
 }

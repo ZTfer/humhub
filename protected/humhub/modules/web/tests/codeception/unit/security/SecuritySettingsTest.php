@@ -2,13 +2,10 @@
 
 namespace tests\codeception\unit\modules\web\security;
 
-use web\WebSecurityTest;
-use Yii;
-use humhub\libs\Html;
-use humhub\modules\web\Module;
+use humhub\helpers\Html;
 use humhub\modules\web\security\helpers\Security;
 use humhub\modules\web\security\models\SecuritySettings;
-use yii\helpers\Json;
+use web\WebSecurityTest;
 
 class SecuritySettingsTest extends WebSecurityTest
 {
@@ -17,7 +14,6 @@ class SecuritySettingsTest extends WebSecurityTest
         $this->setConfigFile('security.default.json');
         $settings = new SecuritySettings();
         $this->assertEquals('max-age=31536000', $settings->getHeader('Strict-Transport-Security'));
-        $this->assertEquals('1', $settings->getHeader('X-XSS-Protection'));
         $this->assertEquals('nosniff', $settings->getHeader('X-Content-Type-Options'));
         $this->assertNull($settings->getHeader('X-Frame-Options'));
         $this->assertFalse($settings->isNonceSupportActive());
@@ -28,7 +24,6 @@ class SecuritySettingsTest extends WebSecurityTest
         $this->setConfigFile('security.strict.json');
         $settings = new SecuritySettings();
         $this->assertEquals('max-age=31536000', $settings->getHeader('Strict-Transport-Security'));
-        $this->assertEquals('1; mode=block', $settings->getHeader('X-XSS-Protection'));
         $this->assertEquals('nosniff', $settings->getHeader('X-Content-Type-Options'));
         $this->assertEquals('deny', $settings->getHeader('X-Frame-Options'));
     }
@@ -46,7 +41,7 @@ class SecuritySettingsTest extends WebSecurityTest
 
         $this->assertNotNull(Security::getNonce());
 
-        $this->assertContains(Security::getNonce(), $csp);
+        $this->assertStringContainsString(Security::getNonce(), $csp);
 
         // Make sure the csp/nonce does not change
         $this->assertEquals($csp, $settings->getCSPHeader());
@@ -73,7 +68,7 @@ class SecuritySettingsTest extends WebSecurityTest
         $this->assertNull($settings->getHeader('Content-Security-Policy'));
         $this->assertFalse($settings->isNonceSupportActive());
 
-        $this->assertNull($settings->getCSPHeader(true));
+        $this->assertNull($settings->getCSPHeader());
 
         $this->assertEmpty(Html::nonce());
         $this->assertEmpty(Security::getNonce());

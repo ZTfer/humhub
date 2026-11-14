@@ -8,9 +8,10 @@
 
 namespace humhub\modules\space\notifications;
 
+use humhub\helpers\Html;
 use humhub\modules\notification\components\BaseNotification;
+use humhub\modules\space\models\Membership;
 use Yii;
-use yii\bootstrap\Html;
 use yii\helpers\ArrayHelper;
 
 /**
@@ -20,7 +21,6 @@ use yii\helpers\ArrayHelper;
  */
 class ApprovalRequest extends BaseNotification
 {
-
     /**
      * @inheritdoc
      */
@@ -65,17 +65,29 @@ class ApprovalRequest extends BaseNotification
     public function getMailSubject()
     {
         return Yii::t('SpaceModule.notification', '{displayName} requests membership for the space {spaceName}', [
-                    '{displayName}' => $this->originator->displayName,
-                    '{spaceName}' => $this->source->name
+            '{displayName}' => $this->originator->displayName,
+            '{spaceName}' => $this->source->name,
         ]);
     }
 
     /**
-     *  @inheritdoc
+     * @inheritdoc
      */
     public function category()
     {
-        return new SpaceMemberNotificationCategory;
+        return new SpaceMemberNotificationCategory();
+    }
+
+    /**
+     * @inerhitdoc
+     */
+    public function isValid()
+    {
+        return Membership::find()->where([
+            'user_id' => $this->originator->id,
+            'space_id' => $this->source->id,
+            'status' => Membership::STATUS_APPLICANT,
+        ])->exists();
     }
 
     /**
@@ -84,29 +96,31 @@ class ApprovalRequest extends BaseNotification
     public function html()
     {
         return Yii::t('SpaceModule.notification', '{displayName} requests membership for the space {spaceName}', [
-                    '{displayName}' => Html::tag('strong', Html::encode($this->originator->displayName)),
-                    '{spaceName}' => Html::tag('strong', Html::encode($this->source->name))
+            '{displayName}' => Html::tag('strong', Html::encode($this->originator->displayName)),
+            '{spaceName}' => Html::tag('strong', Html::encode($this->source->name)),
         ]);
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function serialize()
+    public function getUrl()
     {
-        return serialize(['source' => $this->source, 'originator' => $this->originator, 'message' => $this->message]);
+        return $this->source->createUrl('/space/manage/member/pending-approvals');
     }
 
     /**
      * @inheritdoc
      */
-    public function unserialize($serialized)
+    public function __serialize(): array
     {
-        $this->init();
-        $unserializedArr = unserialize($serialized);
-        $this->from($unserializedArr['originator']);
-        $this->about($unserializedArr['source']);
-        $this->withMessage($unserializedArr['message']);
+        return array_merge(parent::__serialize(), ['message' => $this->message]);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function __unserialize($unserializedArr)
+    {
+        parent::__unserialize($unserializedArr);
+        $this->withMessage($unserializedArr['message'] ?? null);
     }
 
 }

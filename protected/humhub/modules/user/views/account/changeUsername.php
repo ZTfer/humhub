@@ -1,27 +1,30 @@
 <?php
 
-use yii\widgets\ActiveForm;
-use \humhub\compat\CHtml;
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\user\models\forms\AccountChangeUsername;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+
+/* @var AccountChangeUsername $model */
+/* @var View $this */
 ?>
 
 <?php $this->beginContent('@user/views/account/_userProfileLayout.php') ?>
-    <div class="help-block">
-         <?php echo Yii::t('UserModule.account', 'Your current username is <b>{username}</b>. You can change your current username here.', ['username' => CHtml::encode(Yii::$app->user->getIdentity()->username)]); ?>
-    </div>
-    <?php $form = ActiveForm::begin(); ?>
+<div class="text-body-secondary">
+    <?= Yii::t('UserModule.account', 'Your current username is <b>{username}</b>. You can change your current username here.', [
+        'username' => Html::encode(Yii::$app->user->getIdentity()->username),
+    ]) ?>
+</div>
+<?php $form = ActiveForm::begin(['acknowledge' => true]) ?>
 
-    <?php if ($model->isAttributeRequired('currentPassword')): ?>
-        <?php echo $form->field($model, 'currentPassword')->passwordInput(['maxlength' => 45]); ?>
-    <?php endif; ?>
+<?php if ($model->isAttributeRequired('currentPassword')): ?>
+    <?= $form->field($model, 'currentPassword')->passwordInput(['maxlength' => 45, 'autocomplete' => 'new-password']) ?>
+<?php endif ?>
 
-    <?php echo $form->field($model, 'newUsername')->textInput(['maxlength' => 45]); ?>
+<?= $form->field($model, 'newUsername')->textInput(['maxlength' => 45, 'autocomplete' => 'off']) ?>
 
-    <hr>
-    <?php echo CHtml::submitButton(Yii::t('UserModule.account', 'Save'), ['class' => 'btn btn-primary', 'data-ui-loader' => '']); ?>
+<?= Button::save()->submit() ?>
 
-    <?php ActiveForm::end(); ?>
-<?php $this->endContent(); ?>
-
-
-
-
+<?php ActiveForm::end() ?>
+<?php $this->endContent() ?>

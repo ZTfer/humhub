@@ -17,15 +17,28 @@ use humhub\components\assets\AssetBundle;
  */
 class JqueryWidgetAsset extends AssetBundle
 {
+    /**
+     * @inheritdoc
+     */
+    public $sourcePath = '@npm/jquery-ui';
+
+    /**
+     * @inheritdoc
+     *
+     * `ui/i18n/*` is included because `yii\jui\DatePickerLanguageAsset` publishes
+     * the same source path; bundles sharing a source path must publish with
+     * identical options as the published copy is keyed by source path only.
+     */
+    public $publishOptions = [
+        'only' => [
+            'ui/widget.js',
+            'ui/i18n/*',
+        ],
+    ];
 
     /**
      * @inheritdoc
      */
-    public $sourcePath = '@bower/jquery-ui';
-
-    /**
-     * @inheritdoc
-     */
-    public $js = ['ui/minified/widget.js'];
+    public $js = ['ui/widget.js'];
 
 }

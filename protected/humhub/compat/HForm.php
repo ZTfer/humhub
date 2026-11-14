@@ -8,16 +8,16 @@
 
 namespace humhub\compat;
 
+use humhub\helpers\Html;
 use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\content\widgets\richtext\RichTextField;
 use humhub\modules\file\components\FileManager;
 use humhub\modules\ui\form\widgets\DatePicker;
 use humhub\modules\ui\form\widgets\MultiSelect;
-use humhub\modules\ui\form\widgets\SortOrderField;
+use humhub\widgets\form\ActiveField;
+use humhub\widgets\form\ActiveForm;
+use humhub\widgets\form\SortOrderField;
 use Yii;
-use yii\helpers\Html;
-use yii\widgets\ActiveField;
-use yii\widgets\ActiveForm;
 
 /**
  * HForm - Yii1 compatible form generator
@@ -26,18 +26,18 @@ use yii\widgets\ActiveForm;
  */
 class HForm extends \yii\base\Component
 {
-    const EVENT_BEFORE_VALIDATE = 'beforeValidate';
-    const EVENT_AFTER_VALIDATE = 'afterValidate';
+    public const EVENT_BEFORE_VALIDATE = 'beforeValidate';
+    public const EVENT_AFTER_VALIDATE = 'afterValidate';
 
     /**
      * @since 1.2.6
      */
-    const EVENT_AFTER_INIT = 'afterInit';
+    public const EVENT_AFTER_INIT = 'afterInit';
 
     /**
      * @since 1.2.6
      */
-    const EVENT_BEFORE_RENDER = 'beforeRender';
+    public const EVENT_BEFORE_RENDER = 'beforeRender';
 
     public $showErrorSummary;
 
@@ -46,20 +46,18 @@ class HForm extends \yii\base\Component
      * @var ActiveForm
      */
     protected $form;
-
-    public $primaryModel = null;
     public $models = [];
-    public $definition = [];
 
     /**
-     * @var boolean manually mark form as submitted
+     * @var bool manually mark form as submitted
      */
     public $markedAsSubmitted = false;
 
-    public function __construct($definition = [], $primaryModel = null)
+    public function __construct(public $definition = [], public $primaryModel = null, array $config = [])
     {
-        $this->definition = $definition;
-        $this->primaryModel = $primaryModel;
+        if (!empty($config)) {
+            Yii::configure($this, $config);
+        }
 
         $this->init();
         $this->trigger(static::EVENT_AFTER_INIT);
@@ -69,11 +67,12 @@ class HForm extends \yii\base\Component
     {
         if (Yii::$app->request->method == 'POST') {
             if ($buttonName == "" || isset($_POST[$buttonName])) {
+                $allowedPostData = $this->getAllowedPostData();
                 foreach ($this->models as $model) {
-                    $model->load(Yii::$app->request->post());
+                    $model->load($allowedPostData);
                 }
                 if ($this->primaryModel !== null) {
-                    $this->primaryModel->load(Yii::$app->request->post());
+                    $this->primaryModel->load($allowedPostData);
                 }
                 return true;
             }
@@ -82,6 +81,32 @@ class HForm extends \yii\base\Component
         }
 
         return false;
+    }
+
+    protected function getAllowedPostData(): array
+    {
+        $post = Yii::$app->request->post();
+
+        foreach ($this->models as $modelName => $model) {
+            $className = substr(strrchr($model::class, '\\'), 1);
+            if (!isset($post[$className])) {
+                continue;
+            }
+            if (!isset($this->definition['elements'][$modelName])) {
+                // Remove post data of the object if no definition
+                unset($post[$className]);
+            }
+            if (isset($this->definition['elements'][$modelName]['elements'])) {
+                foreach ($this->definition['elements'][$modelName]['elements'] as $elementName => $element) {
+                    if (!empty($element['readonly']) && isset($post[$className][$elementName])) {
+                        // Remove a readonly field from the POST data
+                        unset($post[$className][$elementName]);
+                    }
+                }
+            }
+        }
+
+        return $post;
     }
 
     public function validate()
@@ -172,32 +197,27 @@ class HForm extends \yii\base\Component
 
     public function renderForm($element)
     {
-        $class = "";
-        if (isset($element['class'])) {
-            $class = $element['class'];
+        $output = Html::beginTag('fieldset', ['class' => $element['class'] ?? '']);
+
+        if (isset($element['title'])) {
+            $output .= Html::tag('legend', Html::encode($element['title']));
         }
 
-        $output = "<fieldset class='" . $class . "'>";
-        if (isset($element['title'])) {
-            $output .= "<legend>" . $element['title'] . "</legend>";
-        } else {
-            #$output .= "Untitled Form";
-        }
         return $output;
     }
 
     public function renderFormEnd($element)
     {
-        return "</fieldset>";
+        return Html::endTag('fieldset');
     }
 
     public function renderButtons($buttons)
     {
         $output = "";
         foreach ($buttons as $buttonName => $definition) {
-            $definition['isVisible'] = isset($definition['isVisible']) ? $definition['isVisible'] : true;
-            if ($definition['type'] == 'submit' && $definition['isVisible']) {
-                $output .= \yii\helpers\Html::submitButton($definition['label'], ['name' => $buttonName, 'class' => $definition['class'], 'data-ui-loader' => '']);
+            $isVisible = $definition['isVisible'] ?? true;
+            if ($definition['type'] == 'submit' && $isVisible) {
+                $output .= Html::submitButton($definition['label'], array_merge(['name' => $buttonName, 'class' => $definition['class'], 'data-ui-loader' => ''], $definition['options'] ?? []));
                 $output .= "&nbsp;";
             }
         }
@@ -225,30 +245,10 @@ class HForm extends \yii\base\Component
         }
 
         if ($model) {
-            $options = [];
+            $options = $this->getOptionsFromDefinition($definition);
 
-            if (isset($definition['id'])) {
-                $options['id'] = $definition['id'];
-            }
-
-            if (isset($definition['readonly']) && $definition['readonly']) {
-                $options['readOnly'] = true;
-                $options['disabled'] = true;
-            }
-
-            if (isset($definition['value'])) {
-                $options['value'] = $definition['value'];
-            }
-
-            if (isset($definition['prompt']) && $definition['prompt']) {
-                $options['prompt'] = $definition['prompt'];
-            }
-            if (isset($definition['label']) && $definition['label']) {
-                $options['label'] = $definition['label'];
-            }
-
-            if (isset($definition['htmlOptions']) && is_array($definition['htmlOptions'])) {
-                $options = array_merge($options, $definition['htmlOptions']);
+            if (isset($model->$name, $options['value'])) {
+                unset($options['value']);
             }
 
             if (isset($definition['type'])) {
@@ -259,7 +259,9 @@ class HForm extends \yii\base\Component
                     case 'multiselectdropdown':
                         $field = $this->form->field($model, $name)->widget(MultiSelect::class, [
                             'items' => $definition['items'],
-                            'options' => $definition['options']
+                            'options' => $definition['options'],
+                            'maxSelection' => $definition['maxSelection'] ?? 50,
+                            'lockedItems' => $definition['lockedItems'] ?? null,
                         ]);
                         break;
                     case 'dropdownlist':
@@ -273,14 +275,14 @@ class HForm extends \yii\base\Component
                         break;
                     case 'checkboxlist':
                         if (isset($options['readOnly']) && $options['readOnly']) {
-                            $options['disabled'] = 'disabled';
+                            $options['itemOptions']['disabled'] = 'disabled';
                         }
 
                         $value = $model->$name;
 
                         if (is_string($value)) {
-                            $delimiter = isset($definition['delimiter']) ? $definition['delimiter'] : ',';
-                            $model->$name = explode($delimiter, $model->$name);
+                            $delimiter = $definition['delimiter'] ?? ',';
+                            $model->$name = explode($delimiter, (string) $model->$name);
                         }
 
                         $field = $this->form->field($model, $name)->checkboxList($definition['items'], $options);
@@ -305,7 +307,7 @@ class HForm extends \yii\base\Component
                             $format = $definition['format'];
                         }
 
-                        $yearRange = isset($definition['yearRange']) ? $definition['yearRange'] : (date('Y') - 100) . ":" . (date('Y') + 100);
+                        $yearRange = $definition['yearRange'] ?? date('Y') - 100 . ":" . (date('Y') + 100);
 
                         $field = $this->form->field($model, $name)->widget(DatePicker::class, [
                             'dateFormat' => $format,
@@ -313,10 +315,10 @@ class HForm extends \yii\base\Component
                                 'changeYear' => true,
                                 'yearRange' => $yearRange,
                                 'changeMonth' => true,
-                                'disabled' => (isset($options['readOnly']) && $options['readOnly'])
+                                'disabled' => (isset($options['readOnly']) && $options['readOnly']),
                             ],
                             'options' => [
-                                'class' => 'form-control']
+                                'class' => 'form-control'],
                         ]);
                         break;
                     case 'markdown':
@@ -332,10 +334,15 @@ class HForm extends \yii\base\Component
                         $field = $this->form->field($model, $name)->widget(SortOrderField::class, $options);
                         break;
                     default:
+                        if (method_exists($definition['type'], 'widget')) {
+                            $field = $this->form->field($model, $name)->widget($definition['type'], $options);
+                            break;
+                        }
+
                         return "Field Type " . $definition['type'] . " not supported by Compat HForm";
                 }
 
-                if (isset($definition['label'])) {
+                if (isset($definition['label']) && $definition['type'] !== 'checkbox') {
                     $field->label($definition['label']);
                 }
 
@@ -352,5 +359,34 @@ class HForm extends \yii\base\Component
         }
 
         return $output;
+    }
+
+    /**
+     * Translates definition array into options.
+     *
+     * @param array $definition Input field definition.
+     *
+     * @return array The associated array of options.
+     */
+    private function getOptionsFromDefinition($definition)
+    {
+        $options = [];
+
+        foreach (['id', 'value', 'prompt', 'label', 'rows', 'cols'] as $name) {
+            if (isset($definition[$name])) {
+                $options[$name] = $definition[$name];
+            }
+        }
+
+        if (isset($definition['readonly']) && $definition['readonly']) {
+            $options['readOnly'] = true;
+            $options['disabled'] = true;
+        }
+
+        if (isset($definition['htmlOptions']) && is_array($definition['htmlOptions'])) {
+            $options = array_merge($options, $definition['htmlOptions']);
+        }
+
+        return $options;
     }
 }

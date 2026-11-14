@@ -22,14 +22,56 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $this->unapprovedUser = User::findOne(['id' => 6]);
     }
 
+    public function testDefaultSendMessage()
+    {
+        $this->becomeUser('Admin');
+        $form = new ApproveUserForm($this->unapprovedUser->id);
+        $form->setSendMessageDefaults();
+        $this->assertEquals("Hello UnApproved User,\n\nYour account creation is under review.\nCould you tell us the motivation behind your registration?\n\n"
+            . "Kind Regards\nAdmin Tester\n\n", $form->message);
+
+        $settings = new AuthenticationSettingsForm();
+        $this->assertEquals(ApproveUserForm::getDefaultSendMessageMailContent(), $settings->registrationSendMessageMailContent);
+    }
+
+    public function testSendMessageIsSentInUserLanguage()
+    {
+        $testLanguage = 'de';
+        $currentLanguage = Yii::$app->language;
+        Yii::$app->setLanguage($testLanguage);
+        $admin = User::findOne(['username' => 'Admin']);
+        $emailMessage = ApproveUserForm::getDefaultSendMessageMailContent($this->unapprovedUser->displayName, $admin->displayName);
+        Yii::$app->setLanguage($currentLanguage);
+
+        $this->becomeUser('Admin');
+
+        $this->unapprovedUser->setAttribute('language', $testLanguage);
+
+        $form = new ApproveUserForm($this->unapprovedUser->id);
+        $form->user->setAttribute('language', $testLanguage);
+        $form->setSendMessageDefaults();
+        $this->assertEquals($emailMessage, $form->message);
+    }
+
+    public function testOverwrittenSendMessage()
+    {
+        $this->becomeUser('Admin');
+
+        $this->setSendMessage('Hey {displayName}, {AdminName} has a question about your account creation.');
+
+        $form = new ApproveUserForm($this->unapprovedUser->id);
+        $form->setSendMessageDefaults();
+        $this->assertEquals("Hey UnApproved User, Admin Tester has a question about your account creation.", $form->message);
+    }
+
     public function testDefaultApproveMessage()
     {
         $this->becomeUser('Admin');
         $form = new ApproveUserForm($this->unapprovedUser->id);
         $form->setApprovalDefaults();
-        $this->assertEquals("Hello UnApproved User,<br><br>\nYour account has been activated.<br><br>\n" .
-            "Click here to login:<br>\n<a href=\"http://localhost/index-test.php?r=user%2Fauth%2Flogin\">http://localhost/index-test.php?r=user/auth/login</a><br><br>\n\n" .
-            "Kind Regards<br>\nAdmin Tester<br><br>", $form->message);
+        $this->assertEquals("Hello UnApproved User,\n\nYour account has been activated.\n\n"
+            . "Click here to login:\nhttp://localhost/index-test.php?r=user%2Fauth%2Flogin\n\n"
+            . "Kind Regards\nAdmin Tester\n\n", $form->message);
 
         $settings = new AuthenticationSettingsForm();
         $this->assertEquals(ApproveUserForm::getDefaultApprovalMessage(), $settings->registrationApprovalMailContent);
@@ -41,8 +83,18 @@ class ApproveUserFormTest extends HumHubDbTestCase
         Yii::$app->user->getIdentity()->setAttribute('language', 'de');
         Yii::$app->i18n->setUserLocale(Yii::$app->user->getIdentity());
 
-        $this->assertEquals('Hallo {displayName},<br /><br /> Dein Konto wurde aktiviert.<br /><br /> Klicke hier um dich einzuloggen:<br /> {loginLink}<br /><br /> Mit freundlichen Grüßen<br /> {AdminName}<br /><br />',
-            ApproveUserForm::getDefaultApprovalMessage());
+        $this->assertEquals(
+            'Hallo {displayName},
+
+Dein Konto wurde aktiviert.
+
+Klicke hier um dich einzuloggen:
+{loginUrl}
+
+Mit freundlichen Grüßen
+{AdminName}',
+            ApproveUserForm::getDefaultApprovalMessage(),
+        );
 
         $this->setApprovalMessage(ApproveUserForm::getDefaultApprovalMessage());
 
@@ -60,8 +112,7 @@ class ApproveUserFormTest extends HumHubDbTestCase
 
         $form = new ApproveUserForm($this->unapprovedUser->id);
         $form->setApprovalDefaults();
-        $this->assertEquals("Hey UnApproved User your account was approved by Admin Tester, please click <a href=\"http://localhost/index-test.php?r=user%2Fauth%2Flogin\">http://localhost/index-test.php?r=user/auth/login</a>"
-            , $form->message);
+        $this->assertEquals("Hey UnApproved User your account was approved by Admin Tester, please click <a href=\"http://localhost/index-test.php?r=user%2Fauth%2Flogin\">http://localhost/index-test.php?r=user/auth/login</a>", $form->message);
     }
 
     public function testApprovedMessageIsSentInUserLanguage()
@@ -73,7 +124,15 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $form = new ApproveUserForm($this->unapprovedUser->id);
         $form->user->setAttribute('language', 'de');
         $form->setApprovalDefaults();
-        $this->assertEquals("Hallo UnApproved User,<br /><br /> Dein Konto wurde aktiviert.<br /><br /> Klicke hier um dich einzuloggen:<br /> <a href=\"http://localhost/index-test.php?r=user%2Fauth%2Flogin\">http://localhost/index-test.php?r=user/auth/login</a><br /><br /> Mit freundlichen Grüßen<br /> Admin Tester<br /><br />", $form->message);
+        $this->assertEquals("Hallo UnApproved User,
+
+Dein Konto wurde aktiviert.
+
+Klicke hier um dich einzuloggen:
+http://localhost/index-test.php?r=user%2Fauth%2Flogin
+
+Mit freundlichen Grüßen
+Admin Tester", $form->message);
     }
 
     public function testDeclineMessageIsSentInUserLanguage()
@@ -85,7 +144,12 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $form = new ApproveUserForm($this->unapprovedUser->id);
         $form->user->setAttribute('language', 'de');
         $form->setDeclineDefaults();
-        $this->assertEquals("Hallo UnApproved User,<br /><br /> Deine Registrierungsanfrage wurde abgelehnt.<br /><br /> Mit freundlichen Grüßen<br /> Admin Tester <br /><br />", $form->message);
+        $this->assertEquals("Hallo UnApproved User,
+
+Deine Registrierungsanfrage wurde abgelehnt.
+
+Mit freundlichen Grüßen
+Admin Tester", $form->message);
     }
 
     public function testDefaultDeclineMessage()
@@ -93,10 +157,10 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $this->becomeUser('Admin');
         $form = new ApproveUserForm($this->unapprovedUser->id);
         $form->setDeclineDefaults();
-        $this->assertEquals("Hello UnApproved User,<br><br>\n" .
-            "Your account request has been declined.<br><br>\n\n" .
-            "Kind Regards<br>\n" .
-            "Admin Tester <br><br> ", $form->message);
+        $this->assertEquals("Hello UnApproved User,\n\n"
+            . "Your account request has been declined.\n\n"
+            . "Kind Regards\n"
+            . "Admin Tester\n\n", $form->message);
 
         $settings = new AuthenticationSettingsForm();
         $this->assertEquals(ApproveUserForm::getDefaultDeclineMessage(), $settings->registrationDenialMailContent);
@@ -110,8 +174,15 @@ class ApproveUserFormTest extends HumHubDbTestCase
 
         $form = new ApproveUserForm($this->unapprovedUser->id);
         $form->setDeclineDefaults();
-        $this->assertEquals("Hey UnApproved User your account was declined by Admin Tester."
-            , $form->message);
+        $this->assertEquals("Hey UnApproved User your account was declined by Admin Tester.", $form->message);
+    }
+
+    public function testAdminCanSendMessageToUnapprovedUser()
+    {
+        $this->becomeUser('Admin');
+        $form = new ApproveUserForm($this->unapprovedUser->id);
+        $this->assertTrue($form->sendMessage());
+        $this->assertSendMessage();
     }
 
     public function testAdminCanApproveUnapprovedUser()
@@ -137,7 +208,7 @@ class ApproveUserFormTest extends HumHubDbTestCase
             $form = new ApproveUserForm(2);
             $form->approve();
             $this->assertFalse(true);
-        } catch (NotFoundHttpException $e) {
+        } catch (NotFoundHttpException) {
             $this->assertTrue(true);
         }
     }
@@ -149,9 +220,18 @@ class ApproveUserFormTest extends HumHubDbTestCase
             $form = new ApproveUserForm(2);
             $form->decline();
             $this->assertFalse(true);
-        } catch (NotFoundHttpException $e) {
+        } catch (NotFoundHttpException) {
             $this->assertTrue(true);
         }
+    }
+
+    public function testGroupManagerCanSendMessageUnapprovedUser()
+    {
+        // User2 is group_manager of group 3, UnApproved User is member of group 3
+        $this->becomeUser('User2');
+        $form = new ApproveUserForm($this->unapprovedUser->id);
+        $this->assertTrue($form->sendMessage());
+        $this->assertSendMessage();
     }
 
     public function testGroupManagerCanApproveUnapprovedUser()
@@ -172,11 +252,25 @@ class ApproveUserFormTest extends HumHubDbTestCase
             $form = new ApproveUserForm($this->unapprovedUser->id);
             $form->approve();
             $this->assertFalse(true);
-        } catch (NotFoundHttpException $e) {
+        } catch (NotFoundHttpException) {
             $this->assertTrue(true);
         }
 
         $this->assertUnapproved();
+    }
+
+    public function testNonGroupManagerCannotSendMessageUnapprovedUser()
+    {
+        // User2 is group_manager of group 3, UnApproved User is member of group 3
+        $this->becomeUser('User1');
+
+        try {
+            $form = new ApproveUserForm($this->unapprovedUser->id);
+            $form->sendMessage();
+            $this->assertFalse(true);
+        } catch (NotFoundHttpException) {
+            $this->assertTrue(true);
+        }
     }
 
     public function testNonGroupManagerCannotDeclineUnapprovedUser()
@@ -188,14 +282,25 @@ class ApproveUserFormTest extends HumHubDbTestCase
             $form = new ApproveUserForm($this->unapprovedUser->id);
             $form->decline();
             $this->assertFalse(true);
-        } catch (NotFoundHttpException $e) {
+        } catch (NotFoundHttpException) {
             $this->assertTrue(true);
         }
 
         $this->assertUnapproved();
     }
 
-    private function assertDeclined(User $user = null)
+    private function assertSendMessage(?User $user = null)
+    {
+        if (!$user) {
+            $user = $this->unapprovedUser;
+        }
+
+        $this->assertMailSent(1);
+        $this->assertEqualsLastEmailSubject('About the account request for \'UnApproved User\'.');
+        $this->assertEqualsLastEmailTo($user->email);
+    }
+
+    private function assertDeclined(?User $user = null)
     {
         if (!$user) {
             $user = $this->unapprovedUser;
@@ -207,7 +312,7 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $this->assertNull(User::findOne(['id' => $this->unapprovedUser->id]));
     }
 
-    private function assertUnapproved(User $user = null)
+    private function assertUnapproved(?User $user = null)
     {
         if (!$user) {
             $user = $this->unapprovedUser;
@@ -217,7 +322,7 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $this->assertEquals(User::STATUS_NEED_APPROVAL, $user->status);
     }
 
-    private function assertApproved(User $user = null)
+    private function assertApproved(?User $user = null)
     {
         if (!$user) {
             $user = $this->unapprovedUser;
@@ -228,6 +333,13 @@ class ApproveUserFormTest extends HumHubDbTestCase
         $this->assertEqualsLastEmailTo($user->email);
         $user = User::findOne(['id' => $user->id]);
         $this->assertEquals(User::STATUS_ENABLED, $user->status);
+    }
+
+    private function setSendMessage($message)
+    {
+        $authSettings = new AuthenticationSettingsForm();
+        $authSettings->registrationSendMessageMailContent = $message;
+        $this->assertTrue($authSettings->save());
     }
 
     private function setApprovalMessage($message)

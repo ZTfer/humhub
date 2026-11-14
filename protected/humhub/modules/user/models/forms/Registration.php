@@ -14,8 +14,12 @@ use humhub\modules\user\models\GroupUser;
 use humhub\modules\user\models\Password;
 use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
+use humhub\modules\user\services\AuthClientUserService;
+use humhub\modules\user\services\UserSourceService;
 use Yii;
+use yii\authclient\ClientInterface;
 use yii\helpers\ArrayHelper;
+use humhub\modules\user\events\UserEvent;
 
 /**
  * Description of Registration
@@ -25,27 +29,18 @@ use yii\helpers\ArrayHelper;
 class Registration extends HForm
 {
     /**
-     * @event \yii\web\UserEvent triggered after successful registration.
+     * @event UserEvent triggered after successful registration via the form flow.
+     * Fires only for users created through `Registration::register()` (UI self-registration
+     * or AuthClient-driven auto-registration via LocalUserSource / LdapUserSource).
+     *
+     * For a generic "user was created by any UserSource" hook (covering SCIM and
+     * config-driven sources too), use `UserSourceService::EVENT_AFTER_CREATE`.
      */
-    const EVENT_AFTER_REGISTRATION = 'afterRegistration';
+    public const EVENT_AFTER_REGISTRATION = 'afterRegistration';
+    public const EVENT_AFTER_SET_FORM = 'afterSetForm';
 
     /**
-     * @var boolean show password creation form
-     */
-    public $enablePasswordForm = true;
-
-    /**
-     * @var boolean show checkbox to force to change password on first log in
-     */
-    public $enableMustChangePassword = false;
-
-    /**
-     * @var boolean show e-mail field
-     */
-    public $enableEmailField = false;
-
-    /**
-     * @var boolean|null require user approval by admin after registration.
+     * @var bool|null require user approval by admin after registration.
      */
     public $enableUserApproval = false;
 
@@ -69,6 +64,26 @@ class Registration extends HForm
      */
     private $_profile = null;
 
+    public function __construct(
+        $definition = [],
+        $primaryModel = null,
+        array $config = [],
+        /**
+         * @var bool show e-mail field
+         */
+        private readonly bool $enableEmailField = false,
+        /**
+         * @var bool show password creation form
+         */
+        private readonly bool $enablePasswordForm = true,
+        /**
+         * @var bool show checkbox to force to change password on first log in
+         */
+        private readonly bool $enableMustChangePassword = false,
+    ) {
+        parent::__construct($definition, $primaryModel, $config);
+    }
+
     /**
      * @inheritdoc
      */
@@ -80,16 +95,7 @@ class Registration extends HForm
             $this->enableUserApproval = false;
         }
 
-        return parent::init();
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function render($form)
-    {
-        $this->setFormDefinition();
-        return parent::render($form);
+        parent::init();
     }
 
     /**
@@ -97,14 +103,18 @@ class Registration extends HForm
      */
     protected function setFormDefinition()
     {
-        $this->definition = [];
-        $this->definition['elements'] = [];
+        if (!isset($this->definition['elements']) || !is_array($this->definition['elements'])) {
+            $this->definition['elements'] = [];
+        }
         $this->definition['elements']['User'] = $this->getUserFormDefinition();
         $this->definition['elements']['GroupUser'] = $this->getGroupFormDefinition();
         if ($this->enablePasswordForm) {
             $this->definition['elements']['Password'] = $this->getPasswordFormDefinition();
         }
-        $this->definition['elements']['Profile'] = array_merge(['type' => 'form'], $this->getProfile()->getFormDefinition());
+        $this->definition['elements']['Profile'] = array_merge(
+            ['type' => 'form'],
+            $this->getProfile()->getFormDefinition(),
+        );
         $this->definition['buttons'] = [
             'save' => [
                 'type' => 'submit',
@@ -127,10 +137,13 @@ class Registration extends HForm
             'elements' => [],
         ];
 
+        $managed = $this->getManagedAttributes();
+
         $form['elements']['username'] = [
             'type' => 'text',
             'class' => 'form-control',
             'maxlength' => 25,
+            'readonly' => in_array('username', $managed, true),
         ];
         $form['elements']['time_zone'] = [
             'type' => 'hidden',
@@ -140,10 +153,32 @@ class Registration extends HForm
             $form['elements']['email'] = [
                 'type' => 'text',
                 'class' => 'form-control',
+                'readonly' => in_array('email', $managed, true),
             ];
         }
 
         return $form;
+    }
+
+    /**
+     * Managed attributes from the UserSource that owns the new user (LDAP, SCIM…).
+     * Empty when the user has no source yet — i.e. anonymous self-registration
+     * via the form. Used to render source-owned fields (username, email) as
+     * readonly so the user can see what was pre-filled without overriding it.
+     */
+    private function getManagedAttributes(): array
+    {
+        $sourceId = $this->getUser()->user_source;
+        if (!is_string($sourceId) || $sourceId === '') {
+            return [];
+        }
+
+        $collection = Yii::$app->userSourceCollection ?? null;
+        if ($collection === null || !$collection->hasUserSource($sourceId)) {
+            return [];
+        }
+
+        return $collection->getUserSource($sourceId)->getManagedAttributes();
     }
 
     /**
@@ -181,32 +216,39 @@ class Registration extends HForm
 
     protected function getGroupFormDefinition()
     {
-        $groupModels = Group::getRegistrationGroups();
+        $groupModels = Group::getRegistrationGroups($this->getUser());
 
-        $groupFieldType = (Yii::$app->getModule('user')->settings->get('auth.showRegistrationUserGroup') && count($groupModels) > 1)
+        $isDropdown = Yii::$app->getModule('user')->settings->get('auth.showRegistrationUserGroup') && count($groupModels) > 1;
+        $groupFieldType = $isDropdown
             ? 'dropdownlist'
             : 'hidden'; // TODO: Completely hide the element instead of current <input type="hidden">
+
+        $groupIdDefinition = [
+            'label' => Yii::t('UserModule.auth', 'Group'),
+            'type' => $groupFieldType,
+            'class' => 'form-control',
+            'items' => ArrayHelper::map($groupModels, 'id', 'name'),
+        ];
+
+        if ($isDropdown) {
+            $groupIdDefinition['prompt'] = Yii::t('UserModule.auth', 'Select');
+        } else {
+            $groupIdDefinition['value'] = Yii::$app->getModule('user')->getDefaultGroupId();
+        }
 
         return [
             'type' => 'form',
             'elements' => [
-                'group_id' => [
-                    'label' => Yii::t('UserModule.auth', 'Group'),
-                    'type' => $groupFieldType,
-                    'class' => 'form-control',
-                    'items' => ArrayHelper::map($groupModels, 'id', 'name'),
-                    'value' => Yii::$app->getModule('user')->getDefaultGroupId(),
-                ]
-            ]
+                'group_id' => $groupIdDefinition,
+            ],
         ];
     }
 
     /**
-     * Set models User, Profile and Password to Form
+     * Set models User, Profile, GroupUser and Password to Form
      */
-    protected function setModels()
+    public function setModels(): void
     {
-        // Set Models
         $this->models['User'] = $this->getUser();
         $this->models['Profile'] = $this->getProfile();
         $this->models['GroupUser'] = $this->getGroupUser();
@@ -217,8 +259,6 @@ class Registration extends HForm
                 $this->models['Password']->mustChangePassword = true;
             }
         }
-
-        return true;
     }
 
     /**
@@ -226,49 +266,52 @@ class Registration extends HForm
      */
     public function validate()
     {
-        // Ensure Models
-        $this->setModels();
-
-        // Remove optional group assignment before validation
-        // GroupUser assignment is optional and will be validated on save
         $groupUser = $this->models['GroupUser'];
-        unset($this->models['GroupUser']);
+
+        // Only skip group validation when the selector is not shown as a dropdown.
+        // When a dropdown is visible, the user must actively select a group.
+        $groupFieldType = $this->definition['elements']['GroupUser']['elements']['group_id']['type'] ?? 'hidden';
+        if ($groupFieldType !== 'dropdownlist') {
+            // Group assignment is optional when not shown as a dropdown
+            unset($this->models['GroupUser']);
+        }
+
         $status = parent::validate();
         $this->models['GroupUser'] = $groupUser;
 
         return $status;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function submitted($buttonName = "")
+    public function setForm(): void
     {
-        // Ensure Models
+        $this->setFormDefinition();
         $this->setModels();
-
-        return parent::submitted($buttonName);
+        $this->trigger(static::EVENT_AFTER_SET_FORM);
     }
 
     /**
      * Registers users
      *
-     * @return boolean state
+     * @return bool state
      */
-    public function register(\yii\authclient\ClientInterface $authClient = null)
+    public function register(?ClientInterface $authClient = null)
     {
         if (!$this->validate()) {
             return false;
         }
 
-        $this->models['User']->language = Yii::$app->language;
+        $this->models['User']->language = Yii::$app->i18n->getAllowedLanguage();
         if ($this->enableUserApproval) {
             $this->models['User']->status = User::STATUS_NEED_APPROVAL;
             $this->models['User']->registrationGroupId = $this->models['GroupUser']->group_id;
         }
 
-        if ($this->models['User']->save()) {
+        if (!empty($this->models['GroupUser']->group_id)) {
+            // Skip adding of the user to a default group if some group is already selected on the registration form
+            $this->models['User']->allowAssignDefaultGroup(false);
+        }
 
+        if ($this->models['User']->save()) {
             // Save User Profile
             $this->models['Profile']->user_id = $this->models['User']->id;
             $this->models['Profile']->save();
@@ -284,18 +327,18 @@ class Registration extends HForm
                 // Save User Password
                 $this->models['Password']->user_id = $this->models['User']->id;
                 $this->models['Password']->setPassword($this->models['Password']->newPassword);
-                if ($this->models['Password']->save() &&
-                    $this->enableMustChangePassword) {
+                if ($this->models['Password']->save()
+                    && $this->enableMustChangePassword) {
                     $this->models['User']->setMustChangePassword($this->models['Password']->mustChangePassword);
                 }
             }
 
             if ($authClient !== null) {
-                \humhub\modules\user\authclient\AuthClientHelpers::storeAuthClientForUser($authClient, $this->models['User']);
-                $authClient->trigger(\humhub\modules\user\authclient\BaseClient::EVENT_CREATE_USER, new \yii\web\UserEvent(['identity' => $this->models['User']]));
+                (new AuthClientUserService($this->models['User']))->add($authClient);
             }
 
-            $this->trigger(self::EVENT_AFTER_REGISTRATION, new \yii\web\UserEvent(['identity' => $this->models['User']]));
+            UserSourceService::triggerAfterCreate($this->models['User']);
+            $this->trigger(self::EVENT_AFTER_REGISTRATION, new UserEvent(['user' => $this->models['User']]));
 
             return true;
         }
@@ -332,6 +375,12 @@ class Registration extends HForm
         if ($this->_profile === null) {
             $this->_profile = $this->getUser()->profile;
             $this->_profile->scenario = 'registration';
+            // Inverse-populate the user relation. Without this, Profile->user
+            // resolves via the hasOne(user_id) query and returns null for a
+            // not-yet-saved user — Profile::scenarios() / getFormDefinition()
+            // would then never see the UserSource and treat every managed
+            // attribute (LDAP firstname, etc.) as a writable registration field.
+            $this->_profile->populateRelation('user', $this->getUser());
         }
 
         return $this->_profile;
@@ -364,7 +413,7 @@ class Registration extends HForm
             $this->_groupUser->scenario = GroupUser::SCENARIO_REGISTRATION;
 
             // assign default value for group_id
-            $registrationGroups = Group::getRegistrationGroups();
+            $registrationGroups = Group::getRegistrationGroups($this->getUser());
             if (count($registrationGroups) == 1) {
                 $this->_groupUser->group_id = $registrationGroups[0]->id;
             }

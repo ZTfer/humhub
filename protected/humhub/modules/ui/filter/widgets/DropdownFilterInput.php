@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2020 HumHub GmbH & Co. KG
@@ -7,12 +8,11 @@
 
 namespace humhub\modules\ui\filter\widgets;
 
-use humhub\modules\ui\filter\widgets\FilterInput;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 
 /**
  * Dropdown stream filter input type.
- * 
+ *
  * @since 1.6
  * @package humhub\modules\ui\filter\widgets
  */
@@ -55,7 +55,7 @@ class DropdownFilterInput extends FilterInput
     {
         return array_merge(parent::getWidgetOptions(), [
             'selection' => $this->selection,
-            'items' => $this->items
+            'items' => $this->items,
         ]);
     }
 }

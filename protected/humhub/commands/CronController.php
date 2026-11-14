@@ -9,6 +9,8 @@
 namespace humhub\commands;
 
 use DateTime;
+use humhub\libs\SelfTest;
+use Throwable;
 use Yii;
 use yii\console\Controller;
 use yii\console\ExitCode;
@@ -21,22 +23,31 @@ use yii\helpers\Console;
  */
 class CronController extends Controller
 {
-
     /**
      * @event Event an event that is triggered when the hourly cron is started.
      */
-    const EVENT_ON_HOURLY_RUN = "hourly";
+    public const EVENT_ON_HOURLY_RUN = "hourly";
 
     /**
      * @event Event an event that is triggered when the daily cron is started.
      */
-    const EVENT_ON_DAILY_RUN = "daily";
+    public const EVENT_ON_DAILY_RUN = "daily";
 
 
     /**
      * @var string mutex to acquire
      */
-    const MUTEX_ID = 'cron-mutex';
+    public const MUTEX_ID = 'cron-mutex';
+
+    public function beforeAction($action)
+    {
+        Yii::$app->cache->set(SelfTest::PHP_INFO_CACHE_KEY, [
+            'version' => phpversion(),
+            'user' => get_current_user(),
+        ]);
+
+        return parent::beforeAction($action);
+    }
 
 
     /**
@@ -99,8 +110,15 @@ class CronController extends Controller
             }
         }
 
-        $this->trigger(self::EVENT_ON_HOURLY_RUN);
+        // Store the run time first: if a handler crashes, the run must not be repeated on every cron tick
         Yii::$app->settings->set('cronLastHourlyRun', time());
+
+        try {
+            $this->trigger(self::EVENT_ON_HOURLY_RUN);
+        } catch (Throwable $e) {
+            Yii::error('Hourly cron failed: ' . $e, 'cron');
+            $this->stderr('Hourly cron failed: ' . $e->getMessage() . "\n", Console::FG_RED);
+        }
     }
 
     /**
@@ -117,7 +135,7 @@ class CronController extends Controller
             $lastTime = new DateTime('@' . $lastRun);
             $todayTime = DateTime::createFromFormat(
                 'Y-m-d H:i',
-                date('Y-m-d') . ' ' . Yii::$app->params['dailyCronExecutionTime']
+                date('Y-m-d') . ' ' . Yii::$app->params['dailyCronExecutionTime'],
             );
             $nowTime = new DateTime();
 
@@ -127,7 +145,14 @@ class CronController extends Controller
             }
         }
 
-        $this->trigger(self::EVENT_ON_DAILY_RUN);
+        // Store the run time first: if a handler crashes, the run must not be repeated on every cron tick
         Yii::$app->settings->set('cronLastDailyRun', time());
+
+        try {
+            $this->trigger(self::EVENT_ON_DAILY_RUN);
+        } catch (Throwable $e) {
+            Yii::error('Daily cron failed: ' . $e, 'cron');
+            $this->stderr('Daily cron failed: ' . $e->getMessage() . "\n", Console::FG_RED);
+        }
     }
 }

@@ -1,0 +1,159 @@
+<?php
+
+use humhub\components\InstallationState;
+use humhub\helpers\ThemeHelper;
+use humhub\services\ModuleService;
+use humhub\modules\user\helpers\LoginBackgroundImageHelper;
+use yii\db\Migration;
+
+class m250405_072758_1_18_switch_to_humhub_theme_and_disable_themes extends Migration
+{
+    /**
+     * {@inheritdoc}
+     */
+    public function safeUp()
+    {
+        if (!Yii::$app->installationState->hasState(InstallationState::STATE_DATABASE_CREATED)) {
+            // Skip this migration on install a new instance because it needs only to update old themes
+            return;
+        }
+
+        $settingsManager = Yii::$app->settings;
+
+        // Copy Login Background image
+        /* Migration disabled after v.19
+        $oldThemeBasePath = $settingsManager->get('theme');
+        foreach (['login-bg.jpg', 'login-bg.png'] as $loginBgFile) {
+            $oldFile = $oldThemeBasePath . DIRECTORY_SEPARATOR . 'img' . DIRECTORY_SEPARATOR . $loginBgFile;
+            if (file_exists($oldFile)) {
+                LoginBackgroundImageHelper::set($oldFile);
+                break;
+            }
+        }
+        */
+
+        // Switch to HumHub theme
+        $themeAfterMigration = 'HumHub';
+        if ($this->currentThemeIsVariantOf('enterprise-white')) {
+            $themeAfterMigration = 'enterprise-white';
+            $primaryDefault = '#12a1b3';
+            // enterprise-white has no separate info color, it falls back to primary (see enterprise-white/scss/variables.scss)
+            $infoDefault = '#12a1b3';
+        } elseif ($this->currentThemeIsVariantOf('enterprise')) {
+            $themeAfterMigration = 'enterprise';
+            $primaryDefault = '#2d3340';
+            $infoDefault = '#0582FF';
+        } else {
+            $primaryDefault = '#435f6f';
+            $infoDefault = '#0582FF';
+        }
+
+        // Copy Theme colors vars to the Settings manager
+        $themeVariables = Yii::$app->view->theme->variables;
+
+        $currentPrimary = $themeVariables->get('primary');
+        $settingsManager->set('themePrimaryColor', $currentPrimary);
+        $settingsManager->set(
+            'useDefaultThemePrimaryColor',
+            ($currentPrimary && strcasecmp((string) $currentPrimary, $primaryDefault) == 0) ? 1 : 0,
+        );
+
+        // Note: pre-1.19 themes had no dedicated "accent" color, so we compare against
+        // the old theme's "info" default to detect customization, not the new accent default.
+        $currentInfo = $themeVariables->get('info');
+        $settingsManager->set('themeAccentColor', $currentInfo);
+        $settingsManager->set(
+            'useDefaultThemeAccentColor',
+            ($currentInfo && strcasecmp((string) $currentInfo, $infoDefault) == 0) ? 1 : 0,
+        );
+
+        $currentSuccess = $themeVariables->get('success');
+        $settingsManager->set('themeSuccessColor', $currentSuccess);
+        $settingsManager->set(
+            'useDefaultThemeSuccessColor',
+            ($currentSuccess && strcasecmp((string) $currentSuccess, '#52a11c') == 0) ? 1 : 0,
+        );
+
+        $currentDanger = $themeVariables->get('danger');
+        $settingsManager->set('themeDangerColor', $currentDanger);
+        $settingsManager->set(
+            'useDefaultThemeDangerColor',
+            ($currentDanger && strcasecmp((string) $currentDanger, '#FC4A64') == 0) ? 1 : 0,
+        );
+
+        $currentWarning = $themeVariables->get('warning');
+        $settingsManager->set('themeWarningColor', $currentWarning);
+        $settingsManager->set(
+            'useDefaultThemeWarningColor',
+            ($currentWarning && strcasecmp((string) $currentWarning, '#FFC107') == 0) ? 1 : 0,
+        );
+
+        $currentLight = $themeVariables->get('default');
+        $settingsManager->set('themeLightColor', $currentLight);
+        $settingsManager->set(
+            'useDefaultThemeLightColor',
+            ($currentLight && strcasecmp((string) $currentLight, '#e7e7e7') == 0) ? 1 : 0,
+        );
+
+        $hhTheme = ThemeHelper::getThemeByName($themeAfterMigration);
+        if ($hhTheme === null) {
+            // Fallback to Humhub theme
+            $hhTheme = ThemeHelper::getThemeByName("HumHub");
+        }
+        $hhTheme->activate();
+
+        // Uninstall the Theme Builder module1
+        $moduleManager = Yii::$app->moduleManager;
+        $themeBuilderModuleId = 'theme-builder';
+        $themeBuilderModule = $moduleManager->getModule($themeBuilderModuleId, false);
+        if ($themeBuilderModule) {
+            (new ModuleService($themeBuilderModule))->remove();
+        }
+
+        // Loop over all /themes/* folder and rename all old theme folders to e.g. /themes/Example.bs3.old
+        $themesPath = Yii::getAlias('@themes');
+        foreach (ThemeHelper::getThemesByPath($themesPath) as $theme) {
+            if ($theme->name === 'HumHub') {
+                // The webroot copy of the core theme is retired by m260918_112000 instead,
+                // which also repairs the theme setting this migration may have pointed at it
+                continue;
+            }
+            // Rename theme by adding .old
+            $oldThemePath = $themesPath . DIRECTORY_SEPARATOR . $theme->name . '.bs3.old';
+            if (!file_exists($oldThemePath)) {
+                rename($themesPath . DIRECTORY_SEPARATOR . $theme->name, $oldThemePath);
+            }
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function safeDown()
+    {
+        echo "m250405_072758_1_18_switch_to_humhub_theme_and_disable_themes cannot be reverted.\n";
+
+        return false;
+    }
+
+    private function currentThemeIsVariantOf(string $theme): bool
+    {
+        $currentThemePath = Yii::$app->settings->get('theme');
+        if ($currentThemePath && str_ends_with((string) $currentThemePath, $theme)) {
+            return true;
+        }
+
+        $parentPaths = Yii::$app->settings->getSerialized('themeParents');
+        if (!is_array($parentPaths)) {
+            return false;
+        }
+
+        foreach ($parentPaths as $parentPath) {
+            if (str_ends_with((string) $parentPath, $theme)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

@@ -8,11 +8,11 @@
 
 namespace humhub\modules\file\libs;
 
-
 use humhub\modules\file\models\File;
 use humhub\modules\file\Module;
 use Imagine\Image\ImageInterface;
 use Yii;
+use yii\base\Exception;
 use yii\base\InvalidConfigException;
 use yii\imagine\Image;
 
@@ -24,26 +24,34 @@ use yii\imagine\Image;
  */
 class ImageHelper
 {
-
     /**
      * Fix orientation of JPEG images based on EXIF information
      *
      * @see https://github.com/yiisoft/yii2-imagine/issues/44
      * @param $image ImageInterface
      * @param $file File|string
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public static function fixJpegOrientation($image, $file)
     {
-        $mimeType = '';
         if ($file instanceof File) {
-            $mimeType = $file->mime_type;
-            $file = $file->store->get();
+            if ($file->mime_type !== 'image/jpeg') {
+                return;
+            }
+            try {
+                $file = $file->store->getContentStream();
+            } catch (\Exception) {
+                return;
+            }
         } elseif (is_string($file) && file_exists($file)) {
-            $mimeType = FileHelper::getMimeType($file);
+            if (FileHelper::getMimeType($file) !== 'image/jpeg') {
+                return;
+            }
+        } else {
+            return;
         }
 
-        if ($mimeType === 'image/jpeg' && function_exists('exif_read_data')) {
+        if (function_exists('exif_read_data')) {
             $exif = @exif_read_data($file);
             if (!empty($exif['Orientation'])) {
                 switch ($exif['Orientation']) {
@@ -64,6 +72,10 @@ class ImageHelper
                 }
             }
         }
+
+        if (is_resource($file)) {
+            fclose($file);
+        }
     }
 
     /**
@@ -75,7 +87,7 @@ class ImageHelper
      */
     public static function downscaleImage($file)
     {
-        if (substr($file->mime_type, 0, 6) !== 'image/') {
+        if (!str_starts_with((string) $file->mime_type, 'image/')) {
             return;
         }
 
@@ -103,7 +115,7 @@ class ImageHelper
                 $imagineOptions['webp_quality'] = $module->imageWebpQuality;
                 $isModified = true;
             }
-            $imagineOptions = ['format' => 'webp'];
+            $imagineOptions['format'] = 'webp';
         } elseif ($file->mime_type === 'image/gif') {
             $imagineOptions = ['format' => 'gif'];
         } else {
@@ -111,7 +123,7 @@ class ImageHelper
         }
 
         try {
-            $image = Image::getImagine()->open($file->store->get());
+            $image = Image::getImagine()->load($file->store->getContent());
         } catch (\Exception $ex) {
             Yii::error('Could not open image ' . $file->store->get() . '. Error: ' . $ex->getMessage(), 'file');
             return;
@@ -137,10 +149,33 @@ class ImageHelper
         }
 
         if ($isModified) {
-            $image->save($file->store->get(), $imagineOptions);
-            $file->updateAttributes(['size' => filesize($file->store->get())]);
+            $file->store->setContent($image->get($imagineOptions['format'], $imagineOptions));
+            $file->updateAttributes(['size' => $file->store->fileSize()]);
         }
 
+    }
+
+    /**
+     * @param string $filePath
+     * @return bool
+     * @throws Exception
+     */
+    public static function checkMaxDimensions(string $filePath): bool
+    {
+        /* @var $module Module */
+        $module = Yii::$app->getModule('file');
+
+        // Don't allow to process an image more X megapixels
+        if (!empty($module->imageMaxProcessingMP)
+            && !empty($filePath)
+            && is_file($filePath)
+            && ($imageSize = @getimagesize($filePath))
+            && isset($imageSize[0], $imageSize[1])
+            && $imageSize[0] * $imageSize[1] > $module->imageMaxProcessingMP * 1024 * 1024) {
+            throw new Exception('Image more ' . $module->imageMaxProcessingMP . ' megapixels cannot be processed!');
+        }
+
+        return true;
     }
 
 }

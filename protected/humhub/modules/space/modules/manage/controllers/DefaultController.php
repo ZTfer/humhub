@@ -8,18 +8,18 @@
 
 namespace humhub\modules\space\modules\manage\controllers;
 
+use humhub\modules\activity\services\ActivityManager;
 use humhub\modules\content\components\ContentContainerControllerAccess;
 use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\space\components\UrlRule;
-use Yii;
 use humhub\modules\space\models\Space;
-use humhub\modules\space\modules\manage\models\AdvancedSettingsSpace;
 use humhub\modules\space\widgets\Menu;
 use humhub\modules\space\widgets\Chooser;
 use humhub\modules\space\modules\manage\components\Controller;
 use humhub\modules\space\modules\manage\models\DeleteForm;
-use humhub\modules\space\activities\SpaceArchived;
-use humhub\modules\space\activities\SpaceUnArchived;
+use humhub\modules\space\activities\SpaceArchivedActivity;
+use humhub\modules\space\activities\SpaceUnArchivedActivity;
+use Yii;
 use yii\helpers\Url;
 
 /**
@@ -29,16 +29,16 @@ use yii\helpers\Url;
  */
 class DefaultController extends Controller
 {
-
     /**
      * @inheritdoc
      */
-    protected function getAccessRules() {
+    protected function getAccessRules()
+    {
         return [
             ['login'],
             [ContentContainerControllerAccess::RULE_USER_GROUP_ONLY => [Space::USERGROUP_ADMIN], 'actions' => ['index', 'advanced']],
             [ContentContainerControllerAccess::RULE_USER_GROUP_ONLY => [Space::USERGROUP_OWNER], 'actions' => ['archive', 'unarchive', 'delete']],
-            [ContentContainerControllerAccess::RULE_POST => ['archive', 'unarchive']]
+            [ContentContainerControllerAccess::RULE_POST => ['archive', 'unarchive']],
         ];
     }
 
@@ -49,6 +49,7 @@ class DefaultController extends Controller
     {
         $space = $this->contentContainer;
         $space->scenario = 'edit';
+        $space->blockedUsersField = $space->getBlockedUserGuids();
 
         if ($space->load(Yii::$app->request->post()) && $space->validate() && $space->save()) {
             RichText::postProcess($space->about, $space);
@@ -61,25 +62,25 @@ class DefaultController extends Controller
 
     public function actionAdvanced()
     {
-        $space = AdvancedSettingsSpace::findOne(['id' => $this->contentContainer->id]);
-        $space->scenario = 'edit';
-        $space->indexUrl = Yii::$app->getModule('space')->settings->space()->get('indexUrl');
-        $space->indexGuestUrl = Yii::$app->getModule('space')->settings->space()->get('indexGuestUrl');
-        $space->hideMembersSidebar = Yii::$app->getModule('space')->settings->space()->get('hideMembersSidebar');
+        $model = $this->space->getAdvancedSettings();
 
-        if ($space->load(Yii::$app->request->post()) && $space->validate() && $space->save()) {
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            unset(UrlRule::$containerUrlMap[$this->contentContainer->guid]);
             $this->view->saved();
-            unset(UrlRule::$spaceUrlMap[$space->guid]);
-            return $this->redirect($space->createUrl('advanced'));
+            return $this->redirect($this->contentContainer->createUrl('advanced'));
         }
 
         $indexModuleSelection = Menu::getAvailablePages();
-        unset($indexModuleSelection[Url::to(['/space/home', 'container' => $space])]);
+        unset($indexModuleSelection[Url::to(['/space/space/home', 'container' => $this->contentContainer])]);
 
-        // To avoid infinit redirects of actionIndex we remove the stream value and set an empty selection instead
+        // To avoid infinite redirects of actionIndex we remove the stream value and set an empty selection instead
         $indexModuleSelection = ['' => Yii::t('SpaceModule.manage', 'Stream (Default)')] + $indexModuleSelection;
 
-        return $this->render('advanced', ['model' => $space, 'indexModuleSelection' => $indexModuleSelection]);
+        return $this->render('advanced', [
+            'model' => $model,
+            'space' => $this->contentContainer,
+            'indexModuleSelection' => $indexModuleSelection,
+        ]);
     }
 
     /**
@@ -91,11 +92,11 @@ class DefaultController extends Controller
         $space->archive();
 
         // Create Activity when the space in archived
-        SpaceArchived::instance()->from(Yii::$app->user->getIdentity())->about($space->owner)->save();
+        ActivityManager::dispatch(SpaceArchivedActivity::class, $space);
 
-        return $this->asJson( [
+        return $this->asJson([
             'success' => true,
-            'space' => Chooser::getSpaceResult($space, true, ['isMember' => true])
+            'space' => Chooser::getSpaceResult($space, true, ['isMember' => true]),
         ]);
     }
 
@@ -108,13 +109,13 @@ class DefaultController extends Controller
         $space->unarchive();
 
         // Create Activity when the space in unarchieved
-        SpaceUnArchived::instance()->from(Yii::$app->user->getIdentity())->about($space->owner)->save();
+        ActivityManager::dispatch(SpaceUnArchivedActivity::class, $space);
 
         if (Yii::$app->request->isAjax) {
             Yii::$app->response->format = 'json';
             return [
                 'success' => true,
-                'space' => Chooser::getSpaceResult($space, true, ['isMember' => true])
+                'space' => Chooser::getSpaceResult($space, true, ['isMember' => true]),
             ];
         }
 

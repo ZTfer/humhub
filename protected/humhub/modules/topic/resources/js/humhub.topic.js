@@ -17,7 +17,7 @@ humhub.module('topic', function (module, require, $) {
     var addTopic = function (evt) {
         var streamFilter = Widget.instance($('#wall-stream-filter-nav'));
 
-        if(!streamFilter || !streamFilter.getFilterById('topic') && evt.$trigger.data('topic-url')) {
+        if (!streamFilter || !streamFilter.getFilterById('topic') && evt.$trigger.data('topic-url')) {
             client.pjax.redirect(evt.$trigger.data('topic-url'));
             return;
         }
@@ -34,9 +34,10 @@ humhub.module('topic', function (module, require, $) {
     };
 
     var getTopicFromTrigger = function ($trigger) {
-        var id = $trigger.data('topic-id');
-        var name = $trigger.find('.label').text();
-        var $linked = getRemoveLabel({id:id, name:name});
+        const id = $trigger.data('topic-id');
+        const name = $trigger.text().trim();
+        const $linked = getRemoveLabel({id: id, name: name});
+
         return {
             id: $trigger.data('topic-id'),
             name: name,
@@ -45,8 +46,12 @@ humhub.module('topic', function (module, require, $) {
         };
     };
 
-    var getRemoveLabel = function(topic) {
-        return $(string.template(module.template.removeLabel, {id: topic.id, name: string.encode(topic.name), icon: module.config.icon}));
+    var getRemoveLabel = function (topic) {
+        return $(string.template(module.template.removeLabel, {
+            id: topic.id,
+            name: string.encode(topic.name),
+            icon: module.config.icon
+        }));
     };
 
     var removeTopic = function (evt) {
@@ -59,9 +64,9 @@ humhub.module('topic', function (module, require, $) {
         return $.extend({}, topics);
     };
 
-    var setTopics = function(newTopics) {
+    var setTopics = function (newTopics) {
         topics = {};
-        newTopics.forEach(function(topic) {
+        newTopics.forEach(function (topic) {
             topic.$label = getRemoveLabel(topic);
             topic.icon = module.config.icon;
             topics[topic.id] = topic;
@@ -70,7 +75,7 @@ humhub.module('topic', function (module, require, $) {
         updated();
     };
 
-    var updated = function() {
+    var updated = function () {
         event.trigger('humhub:topic:updated', [getTopicArray()]);
     }
 
@@ -78,38 +83,38 @@ humhub.module('topic', function (module, require, $) {
         return Object.keys(topics) || [];
     };
 
-    var getTopicArray = function() {
+    var getTopicArray = function () {
         var result = [];
-        $.each(topics, function(id, topic) {
+        $.each(topics, function (id, topic) {
             result.push(topic);
         });
         return result;
     };
 
-    var removeOverviewTopic = function(evt) {
+    var removeOverviewTopic = function (evt) {
         var $row = evt.$trigger.closest('[data-key]');
         var $nameTd = $row.find('td:first');
         var name = $nameTd.text();
-        var $loader = loader.set($('<span>').text(name),  {size: '10px', css: {padding: '0px'}});
+        var $loader = loader.set($('<span>').text(name), {size: '10px', css: {padding: '0px'}});
         $nameTd.html($loader);
-        client.post(evt).then(function(response) {
-            if(response.success) {
+        client.post(evt).then(function (response) {
+            if (response.success) {
                 $row.remove();
                 module.log.success(response.message, true);
             }
-        }).catch(function(e) {
+        }).catch(function (e) {
             module.log.error(e, true);
             loader.reset($loader);
         });
     };
 
-    var unload = function() {
+    var unload = function () {
         //Todo: remember active topics by space?
         topics = {};
     };
 
     module.template = {
-        'removeLabel': '<a href="#" class="topic-remove-label" data-action-click="topic.removeTopic" data-topic-id="{id}"><span class="label label-default animated bounceIn">{icon} {name}</span></a>'
+        'removeLabel': '<a href="#" class="topic-remove-label" data-action-click="topic.removeTopic" data-topic-id="{id}"><span class="badge text-bg-secondary animated bounceIn">{icon} {name}</span></a>'
     };
 
 

@@ -1,9 +1,10 @@
 <?php
 
 
-use yii\bootstrap\Html;
+use humhub\helpers\Html;
+use humhub\widgets\bootstrap\Button;
 
-
+/* @var array $modules */
 ?>
 <div id="name-form" class="panel panel-default animated fadeIn">
 
@@ -19,18 +20,23 @@ use yii\bootstrap\Html;
         <?= Html::beginForm(); ?>
 
         <?php foreach ($modules as $module): ?>
-            <label>
-                <?php echo Html::checkbox('enableModules[' . $module['id'] . ']', true); ?><?php echo $module['name']; ?>
-            </label>
-            <p class="help-block" style="margin: 0 0 10px 23px;"><?php echo $module['description']; ?></p>
+            <div class="mb-3">
+                <div class="checkbox">
+                    <label>
+                        <?= Html::checkbox('enableModules[' . $module['id'] . ']', true) ?>
+                        <?= $module['name'] ?>
+                    </label>
+                    <p class="text-body-secondary"><?= $module['description'] ?></p>
+                </div>
+            </div>
             <hr>
         <?php endforeach; ?>
 
-        <?php echo Html::submitButton(Yii::t('base', 'Next'), ['class' => 'btn btn-primary', 'data-loader' => "modal", 'data-message' => Yii::t('InstallerModule.base', 'Downloading & Installing Modules...')]); ?>
+        <?= Button::primary(Yii::t('InstallerModule.base', 'Next'))
+            ->loader(Yii::t('InstallerModule.base', 'Downloading & Installing Modules...'))
+            ->submit() ?>
 
         <?= Html::endForm(); ?>
 
     </div>
 </div>
-
-

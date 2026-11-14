@@ -1,13 +1,13 @@
 <?php
 return array (
   'New Content' => 'Nytt innehåll',
-  'Receive Notifications for new content you follow.' => 'Få notiser för innehåll du följer.',
+  'Receive Notifications for new content you follow.' => 'Få aviseringar för innehåll du följer.',
   'View Online' => 'Se online',
+  'Your {contentTitle} has been deleted by {displayName} for \'{reason}\'' => 'Ditt innehåll {contentTitle} har raderats av {displayName} på grund av \'{reason}\'',
   '{displayName} created {contentTitle}.' => '{displayName} skapade {contentTitle}.',
   '{displayName} posted on your profile {contentTitle}.' => '{displayName} postade på din profil {contentTitle}.',
   '{originator} just wrote {contentInfo}' => '{originator} skrev precis {contentInfo}',
-  '{originator} just wrote {contentInfo} in space {space}' => '
-{originator} skrev precis {contentInfo} i nätverket {space}',
-  '{originator} notifies you about {contentInfo}' => '{originator} skickar notis om {contentInfo}',
-  '{originator} notifies you about {contentInfo} in {space}' => '{originator} skickar notis om {contentInfo} i {space}',
+  '{originator} just wrote {contentInfo} in Space {space}' => '{originator} skrev precis {contentInfo} i forumet {space}',
+  '{originator} notifies you about {contentInfo}' => '{originator} notifierar dig om {contentInfo}',
+  '{originator} notifies you about {contentInfo} in {space}' => '{originator} notifierar dig om {contentInfo} i {space}',
 );

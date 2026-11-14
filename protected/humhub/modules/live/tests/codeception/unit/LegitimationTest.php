@@ -42,7 +42,10 @@ class LegitimationTest extends HumHubDbTestCase
         $module = Yii::$app->getModule('live');
         $user = User::findOne(['id' => 1]);
         $space1 = Space::findOne(['id' => 1]);
-        $space1->addMember($user->id);
+
+        static::assertTrue($space1->addMember($user->id));
+        static::assertInstanceOf(Membership::class, Membership::findOne(['user_id' => 1, 'space_id' => 1]));
+
         $legitimations = $module->getLegitimateContentContainerIds($user, false);
 
         static::assertCount(1, $legitimations[Content::VISIBILITY_OWNER]);
@@ -50,6 +53,46 @@ class LegitimationTest extends HumHubDbTestCase
         static::assertCount(1, $legitimations[Content::VISIBILITY_PRIVATE]);
         static::assertEquals($space1->contentcontainer_id, $legitimations[Content::VISIBILITY_PRIVATE][0]);
         static::assertEquals($user->contentcontainer_id, $legitimations[Content::VISIBILITY_OWNER][0]);
+    }
+
+    public function testInvitedUserCannotSeePrivateContent()
+    {
+        /* @var $module Module */
+        $module = Yii::$app->getModule('live');
+        $user = User::findOne(['id' => 1]);
+        $space1 = Space::findOne(['id' => 1]);
+
+        $space1->inviteMember($user->id, 2, false);
+        static::assertEquals(
+            Membership::STATUS_INVITED,
+            Membership::findOne(['user_id' => 1, 'space_id' => 1])->status,
+        );
+
+        $legitimations = $module->getLegitimateContentContainerIds($user, false);
+
+        static::assertCount(1, $legitimations[Content::VISIBILITY_OWNER]);
+        static::assertCount(0, $legitimations[Content::VISIBILITY_PRIVATE]);
+        static::assertCount(0, $legitimations[Content::VISIBILITY_PUBLIC]);
+    }
+
+    public function testApplicantCannotSeePrivateContent()
+    {
+        /* @var $module Module */
+        $module = Yii::$app->getModule('live');
+        $user = User::findOne(['id' => 1]);
+        $space1 = Space::findOne(['id' => 1]);
+
+        $space1->requestMembership($user->id);
+        static::assertEquals(
+            Membership::STATUS_APPLICANT,
+            Membership::findOne(['user_id' => 1, 'space_id' => 1])->status,
+        );
+
+        $legitimations = $module->getLegitimateContentContainerIds($user, false);
+
+        static::assertCount(1, $legitimations[Content::VISIBILITY_OWNER]);
+        static::assertCount(0, $legitimations[Content::VISIBILITY_PRIVATE]);
+        static::assertCount(0, $legitimations[Content::VISIBILITY_PUBLIC]);
     }
 
     public function testFriendUserCanSeePrivateContent()
@@ -65,7 +108,7 @@ class LegitimationTest extends HumHubDbTestCase
         $legitimations = $module->getLegitimateContentContainerIds($user1, false);
 
         static::assertCount(1, $legitimations[Content::VISIBILITY_OWNER]);
-        static::assertCount(0, $legitimations[Content::VISIBILITY_PUBLIC]);
+        static::assertCount(1, $legitimations[Content::VISIBILITY_PUBLIC]);
         static::assertCount(1, $legitimations[Content::VISIBILITY_PRIVATE]);
         static::assertEquals($user2->contentcontainer_id, $legitimations[Content::VISIBILITY_PRIVATE][0]);
         static::assertEquals($user1->contentcontainer_id, $legitimations[Content::VISIBILITY_OWNER][0]);

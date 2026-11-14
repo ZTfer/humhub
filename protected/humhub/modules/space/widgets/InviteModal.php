@@ -2,7 +2,9 @@
 
 namespace humhub\modules\space\widgets;
 
+use humhub\modules\admin\permissions\ManageSpaces;
 use humhub\modules\admin\permissions\ManageUsers;
+use humhub\modules\space\models\forms\InviteForm;
 use Yii;
 use yii\base\Widget;
 
@@ -17,12 +19,14 @@ class InviteModal extends Widget
     public $submitAction;
 
     /**
-     * @var \humhub\modules\space\models\forms\InviteForm
+     * @var InviteForm
      */
     public $model;
 
     public $attribute;
     public $searchUrl;
+
+    public bool $allowAddAsDefaultSpace = true;
 
     public function run()
     {
@@ -31,13 +35,16 @@ class InviteModal extends Widget
         }
 
         return $this->render('inviteModal', [
-            'canInviteExternal' => Yii::$app->getModule('user')->settings->get('auth.internalUsersCanInvite'),
+            'canInviteByEmail' => $this->model->canInviteByEmail(),
+            'canInviteByLink' => $this->model->canInviteByLink(),
             'submitText' => $this->submitText,
             'submitAction' => $this->submitAction,
             'model' => $this->model,
             'attribute' => $this->attribute,
             'searchUrl' => $this->searchUrl,
-            'canManageMembers' => Yii::$app->user->can(ManageUsers::class),
+            'canSelectAllRegisteredUsers' => Yii::$app->user->can(ManageUsers::class),
+            'canAddWithoutInvite' => Yii::$app->user->can(ManageUsers::class) || Yii::$app->getModule('space')->membersCanAddWithoutInvite === true,
+            'canAddAsDefaultSpace' => $this->allowAddAsDefaultSpace && Yii::$app->user->can(ManageSpaces::class),
         ]);
     }
 }

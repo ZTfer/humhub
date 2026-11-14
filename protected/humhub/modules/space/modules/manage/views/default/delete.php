@@ -1,11 +1,13 @@
 <?php
 
-use humhub\modules\ui\form\widgets\ActiveForm;
+use humhub\components\View;
+use humhub\modules\space\modules\manage\models\DeleteForm;
 use humhub\modules\space\modules\manage\widgets\DefaultMenu;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
 
-/* @var $this \humhub\modules\ui\view\components\View
- * @var $model \humhub\modules\space\modules\manage\models\DeleteForm
+/* @var $this View
+ * @var $model DeleteForm
  */
 
 ?>

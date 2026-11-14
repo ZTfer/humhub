@@ -8,20 +8,19 @@
 
 namespace humhub\modules\user\controllers;
 
+use humhub\components\behaviors\AccessControl;
+use humhub\modules\content\components\ContentContainerController;
+use humhub\modules\space\models\Membership;
+use humhub\modules\space\models\Space;
+use humhub\modules\space\widgets\ListBox;
 use humhub\modules\user\actions\ProfileStreamAction;
 use humhub\modules\user\Module;
+use humhub\modules\user\models\User;
+use humhub\modules\user\widgets\UserListBox;
+use humhub\modules\user\permissions\ViewAboutPage;
 use Yii;
 use yii\helpers\Url;
 use yii\web\HttpException;
-use yii\db\Expression;
-use humhub\modules\content\components\ContentContainerController;
-use humhub\modules\user\models\User;
-use humhub\modules\user\widgets\UserListBox;
-use humhub\modules\space\widgets\ListBox;
-use humhub\components\behaviors\AccessControl;
-use humhub\modules\user\permissions\ViewAboutPage;
-use humhub\modules\space\models\Membership;
-use humhub\modules\space\models\Space;
 
 /**
  * ProfileController is responsible for all user profiles.
@@ -33,7 +32,6 @@ use humhub\modules\space\models\Space;
  */
 class ProfileController extends ContentContainerController
 {
-
     /**
      * @inheritdoc
      */
@@ -42,8 +40,8 @@ class ProfileController extends ContentContainerController
         return [
             'acl' => [
                 'class' => AccessControl::class,
-                'guestAllowedActions' => ['index', 'stream', 'about', 'home']
-            ]
+                'guestAllowedActions' => ['index', 'stream', 'about', 'home'],
+            ],
         ];
     }
 
@@ -55,7 +53,7 @@ class ProfileController extends ContentContainerController
         return [
             'stream' => [
                 'class' => ProfileStreamAction::class,
-                'contentContainer' => $this->contentContainer
+                'contentContainer' => $this->contentContainer,
             ],
         ];
     }
@@ -81,7 +79,10 @@ class ProfileController extends ContentContainerController
             return $this->redirect(Url::to(['/user/profile/about', 'container' => $this->getUser()]));
         }
 
-        return $this->render('home', ['user' => $this->contentContainer]);
+        return $this->render('home', [
+            'user' => $this->contentContainer,
+            'isSingleContentRequest' => !empty(Yii::$app->request->getQueryParam('contentId')),
+        ]);
     }
 
     public function actionAbout()
@@ -100,7 +101,7 @@ class ProfileController extends ContentContainerController
         }
 
         $this->forcePostRequest();
-        $this->getUser()->follow(Yii::$app->user->getIdentity(), false);
+        $this->getUser()->follow(Yii::$app->user->getIdentity());
 
         if (Yii::$app->request->isAjax) {
             Yii::$app->response->format = 'json';
@@ -114,8 +115,9 @@ class ProfileController extends ContentContainerController
     {
         $this->forcePostRequest();
         $this->getUser()->unfollow();
+        $redirect = Yii::$app->request->get('redirect', false);
 
-        if (Yii::$app->request->isAjax) {
+        if (Yii::$app->request->isAjax && !$redirect) {
             Yii::$app->response->format = 'json';
             return ['success' => true];
         }
@@ -125,27 +127,18 @@ class ProfileController extends ContentContainerController
 
     public function actionFollowerList()
     {
-        $query = User::find();
-        $query->leftJoin('user_follow', 'user.id=user_follow.user_id AND object_model=:userClass AND user_follow.object_id=:userId', [':userClass' => User::class, ':userId' => $this->getUser()->id]);
-        $query->orderBy(['user_follow.id' => SORT_DESC]);
-        $query->andWhere(['IS NOT', 'user_follow.id', new Expression('NULL')]);
-        $query->active();
-
-        $title = Yii::t('UserModule.base', '<strong>User</strong> followers');
-
-        return $this->renderAjaxContent(UserListBox::widget(['query' => $query, 'title' => $title]));
+        return $this->renderAjaxContent(UserListBox::widget([
+            'query' => $this->getUser()->getFollowersQuery()->orderBy(['user_follow.id' => SORT_DESC]),
+            'title' => Yii::t('UserModule.base', '<strong>Followers</strong>'),
+        ]));
     }
 
     public function actionFollowedUsersList()
     {
-        $query = User::find();
-        $query->leftJoin('user_follow', 'user.id=user_follow.object_id AND object_model=:userClass AND user_follow.user_id=:userId', [':userClass' => User::class, ':userId' => $this->getUser()->id]);
-        $query->orderBy(['user_follow.id' => SORT_DESC]);
-        $query->andWhere(['IS NOT', 'user_follow.id', new Expression('NULL')]);
-        $query->active();
-
-        $title = Yii::t('UserModule.base', '<strong>Following</strong> user');
-        return $this->renderAjaxContent(UserListBox::widget(['query' => $query, 'title' => $title]));
+        return $this->renderAjaxContent(UserListBox::widget([
+            'query' => $this->getUser()->getFollowingQuery(User::find())->orderBy(['user_follow.id' => SORT_DESC]),
+            'title' => Yii::t('UserModule.base', '<strong>Following</strong>'),
+        ]));
     }
 
     public function actionSpaceMembershipList()
@@ -158,6 +151,28 @@ class ProfileController extends ContentContainerController
 
         $title = Yii::t('UserModule.base', '<strong>Member</strong> in these spaces');
         return $this->renderAjaxContent(ListBox::widget(['query' => $query, 'title' => $title]));
+    }
+
+    public function actionBlock()
+    {
+        $this->forcePostRequest();
+
+        if ($this->contentContainer->blockForUser()) {
+            $this->view->warn(Yii::t('UserModule.base', 'The user has been blocked for you.'));
+        }
+
+        return $this->redirect($this->contentContainer->createUrl());
+    }
+
+    public function actionUnblock()
+    {
+        $this->forcePostRequest();
+
+        if ($this->contentContainer->unblockForUser()) {
+            $this->view->success(Yii::t('UserModule.base', 'The user has been unblocked for you.'));
+        }
+
+        return $this->redirect($this->contentContainer->createUrl());
     }
 
 }

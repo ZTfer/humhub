@@ -1,23 +1,26 @@
 <?php
 
-use humhub\modules\content\Module;
-use humhub\modules\ui\form\widgets\ActiveForm;
-use humhub\modules\ui\view\components\View;
-use humhub\widgets\Button;
-use yii\helpers\Html;
-use yii\helpers\Url;
-use humhub\modules\content\widgets\richtext\RichTextField;
-use humhub\modules\file\widgets\UploadButton;
-use humhub\modules\file\widgets\FilePreview;
+use humhub\components\View;
+use humhub\helpers\Html;
 use humhub\modules\comment\models\Comment;
+use humhub\modules\content\Module;
+use humhub\modules\content\widgets\richtext\RichTextField;
+use humhub\modules\file\handler\BaseFileHandler;
+use humhub\modules\file\widgets\FileHandlerButtonDropdown;
+use humhub\modules\file\widgets\FilePreview;
+use humhub\modules\file\widgets\UploadButton;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+use yii\helpers\Url;
 
 /* @var $this View */
-/* @var $objectModel string */
-/* @var $objectId integer */
 /* @var $model Comment */
 /* @var $id string unique object id */
-/* @var $isNestedComment boolean */
-/** @var Module $contentModule */
+/* @var $isNestedComment bool */
+/* @var $contentModule Module */
+/* @var $mentioningUrl string */
+/* @var $isHidden bool */
+/* @var $fileHandlers BaseFileHandler[] */
 
 $contentModule = Yii::$app->getModule('content');
 $submitUrl = Url::to(['/comment/comment/post']);
@@ -25,47 +28,58 @@ $submitUrl = Url::to(['/comment/comment/post']);
 $placeholder = ($isNestedComment)
     ? Yii::t('CommentModule.base', 'Write a new reply...')
     : Yii::t('CommentModule.base', 'Write a new comment...');
-
-// Hide the comment form for sub comments until the button is clicked
-$isHidden = ($objectModel === Comment::class);
 ?>
 
-<div id="comment_create_form_<?= $id ?>" class="comment_create" data-ui-widget="comment.Form"
+<div id="comment_create_form_<?= $id ?>" class="comment_create content_create" data-ui-widget="comment.Form"
      style="<?php if ($isHidden): ?>display:none<?php endif; ?>">
 
     <hr>
 
-    <?php $form = ActiveForm::begin(['action' => $submitUrl]) ?>
+    <?php $form = ActiveForm::begin([
+        'action' => $submitUrl,
+        'acknowledge' => true,
+    ]) ?>
+    <?= Html::hiddenInput('contentId', $model->content_id) ?>
+    <?= Html::hiddenInput('parentCommentId', $model->parent_comment_id) ?>
 
-    <?= Html::hiddenInput('objectModel', $objectModel) ?>
-    <?= Html::hiddenInput('objectId', $objectId) ?>
-
-    <div class="comment-create-input-group">
+    <div class="richtext-create-input-group input-group">
         <?= $form->field($model, 'message')->widget(RichTextField::class, [
             'id' => 'newCommentForm_' . $id,
+            'form' => $form,
             'layout' => RichTextField::LAYOUT_INLINE,
             'pluginOptions' => ['maxHeight' => '300px'],
+            'mentioningUrl' => $mentioningUrl,
             'placeholder' => $placeholder,
             'events' => [
                 'scroll-active' => 'comment.scrollActive',
-                'scroll-inactive' => 'comment.scrollInactive'
-            ]
+                'scroll-inactive' => 'comment.scrollInactive',
+            ],
         ])->label(false) ?>
 
-        <div class="comment-buttons">
-            <?= UploadButton::widget([
+        <div class="richtext-create-buttons">
+            <?php $uploadButton = UploadButton::widget([
                 'id' => 'comment_create_upload_' . $id,
+                'model' => $model,
+                'attribute' => 'fileList',
                 'tooltip' => Yii::t('ContentModule.base', 'Attach Files'),
                 'options' => ['class' => 'main_comment_upload'],
                 'progress' => '#comment_create_upload_progress_' . $id,
                 'preview' => '#comment_create_upload_preview_' . $id,
                 'dropZone' => '#comment_create_form_' . $id,
-                'max' => $contentModule->maxAttachedFiles
-            ]); ?>
-
-            <?= Button::defaultType(Yii::t('CommentModule.base', 'Send'))
-                ->cssClass('btn-comment-submit')
-                ->action('submit', $submitUrl)->submit()->sm() ?>
+                'max' => $contentModule->maxAttachedFiles,
+            ]) ?>
+            <?= FileHandlerButtonDropdown::widget([
+                'primaryButton' => $uploadButton,
+                'handlers' => $fileHandlers,
+                'cssClass' => 'btn-group btn-group-sm',
+                'cssButtonClass' => 'btn-light',
+                'pullRight' => true,
+            ]) ?>
+            <?= Button::accent()
+                ->icon('send')
+                ->options(['aria-label' => Yii::t('ContentModule.base', 'Submit')])
+                ->cssClass('btn-comment-submit')->sm()
+                ->action('submit', $submitUrl)->submit() ?>
         </div>
     </div>
 
@@ -74,7 +88,7 @@ $isHidden = ($objectModel === Comment::class);
     <?= FilePreview::widget([
         'id' => 'comment_create_upload_preview_' . $id,
         'options' => ['style' => 'margin-top:10px'],
-        'edit' => true
+        'edit' => true,
     ]) ?>
 
     <?php ActiveForm::end() ?>

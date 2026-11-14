@@ -8,8 +8,8 @@
 
 namespace humhub\assets;
 
-use humhub\components\assets\WebStaticAssetBundle;
-use humhub\modules\ui\view\components\View;
+use humhub\components\assets\AssetBundle;
+use humhub\components\View;
 
 /**
  * OpenSans Font
@@ -17,12 +17,28 @@ use humhub\modules\ui\view\components\View;
  * @since 1.3
  * @author luke
  */
-class OpenSansAsset extends WebStaticAssetBundle
+class OpenSansAsset extends AssetBundle
 {
     /**
      * @inheritdoc
      */
-    public $defaultDepends = false;
+    public $sourcePath = '@npm/fontsource--open-sans';
+
+    /**
+     * @inheritdoc
+     *
+     * Only the latin/latin-ext subsets registered below are published;
+     * `files/open-sans-latin-*` covers both subsets' font files.
+     */
+    public $publishOptions = [
+        'only' => [
+            'latin.css',
+            'latin-ext.css',
+            'latin-italic.css',
+            'latin-ext-italic.css',
+            'files/open-sans-latin-*',
+        ],
+    ];
 
     /**
      * @inheritdoc
@@ -33,13 +49,19 @@ class OpenSansAsset extends WebStaticAssetBundle
      * @inheritdoc
      */
     public $preload = [
-        'css/open-sans.css'
+        'latin.css',
+        'latin-ext.css',
+        'latin-ext-italic.css',
+        'latin-italic.css',
     ];
 
     /**
      * @inheritdoc
      */
     public $css = [
-        'css/open-sans.css',
+        'latin.css',
+        'latin-ext.css',
+        'latin-ext-italic.css',
+        'latin-italic.css',
     ];
 }

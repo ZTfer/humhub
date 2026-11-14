@@ -17,11 +17,19 @@ use yii\web\AssetBundle;
  */
 class JqueryCookieAsset extends AssetBundle
 {
-
     /**
      * @inheritdoc
      */
     public $sourcePath = '@npm/jquery.cookie';
+
+    /**
+     * @inheritdoc
+     */
+    public $publishOptions = [
+        'only' => [
+            'jquery.cookie.js',
+        ],
+    ];
 
     /**
      * @inheritdoc

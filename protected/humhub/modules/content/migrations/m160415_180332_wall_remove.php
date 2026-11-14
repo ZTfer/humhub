@@ -5,7 +5,6 @@ use yii\db\Expression;
 
 class m160415_180332_wall_remove extends Migration
 {
-
     public function up()
     {
 
@@ -15,26 +14,26 @@ class m160415_180332_wall_remove extends Migration
         try {
             $this->addColumn('content', 'show_in_stream', $this->boolean()->defaultValue(true));
             $this->addColumn('content', 'stream_sort_date', $this->dateTime());
-        } catch (Exception $ex) {
-            
+        } catch (Exception) {
+
         }
 
         /**
          * Populate stream_updated_at attribute
          */
         /*
-        $this->db->createCommand('UPDATE content LEFT JOIN wall_entry ON wall_entry.content_id=content.id 
+        $this->db->createCommand('UPDATE content LEFT JOIN wall_entry ON wall_entry.content_id=content.id
                 SET content.stream_sort_date=wall_entry.updated_at
         WHERE content.stream_sort_date IS NULL')->excute();
         */
-        
+
         $this->update('content', ['stream_sort_date' => new Expression('created_at')], ['IS', 'stream_sort_date', new Expression('NULL')]);
 
         /**
          * Populate show_in_stream attribute
          */
         /*
-        $this->db->createCommand('UPDATE content LEFT JOIN wall_entry ON wall_entry.content_id=content.id 
+        $this->db->createCommand('UPDATE content LEFT JOIN wall_entry ON wall_entry.content_id=content.id
                 SET content.show_in_stream=0
         WHERE wall_entry.id IS NULL')->excute();
         */

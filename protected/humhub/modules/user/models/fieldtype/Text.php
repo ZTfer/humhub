@@ -8,6 +8,9 @@
 
 namespace humhub\modules\user\models\fieldtype;
 
+use humhub\helpers\Html;
+use humhub\modules\user\models\Profile;
+use humhub\modules\user\models\User;
 use Yii;
 
 /**
@@ -18,9 +21,8 @@ use Yii;
  */
 class Text extends BaseType
 {
-
-    const VALIDATOR_EMAIL = "email";
-    const VALIDATOR_URL = "url";
+    public const VALIDATOR_EMAIL = "email";
+    public const VALIDATOR_URL = "url";
 
     /**
      * Minimum Text Length
@@ -65,6 +67,19 @@ class Text extends BaseType
     public $regexpErrorMessage;
 
     /**
+     * @inerhitdoc
+     */
+    public $canBeDirectoryFilter = true;
+
+    /**
+     * LinkPrefix - tel://, sip://, xmpp:// etc
+     *
+     * @since 1.11
+     * @var string
+     */
+    public $linkPrefix;
+
+    /**
      * Rules for validating the Field Type Settings Form
      *
      * @return array
@@ -75,6 +90,7 @@ class Text extends BaseType
             [['default', 'minLength', 'maxLength', 'validator', 'regexp', 'regexpErrorMessage'], 'safe'],
             [['maxLength', 'minLength'], 'integer', 'min' => 1, 'max' => 255],
             [['default'], 'string', 'max' => 255],
+            [['linkPrefix'], 'string', 'max' => 10],
         ];
     }
 
@@ -87,47 +103,52 @@ class Text extends BaseType
     public function getFormDefinition($definition = [])
     {
         return parent::getFormDefinition([
-                    get_class($this) => [
-                        'type' => 'form',
-                        'title' => Yii::t('UserModule.profile', 'Text Field Options'),
-                        'elements' => [
-                            'validator' => [
-                                'label' => Yii::t('UserModule.profile', 'Validator'),
-                                'type' => 'dropdownlist',
-                                'class' => 'form-control',
-                                'items' => [
-                                    '' => 'None',
-                                    self::VALIDATOR_EMAIL => 'E-Mail Address',
-                                    self::VALIDATOR_URL => 'URL',
-                                ],
-                            ],
-                            'minLength' => [
-                                'label' => Yii::t('UserModule.profile', 'Minimum length'),
-                                'type' => 'text',
-                                'class' => 'form-control',
-                            ],
-                            'maxLength' => [
-                                'label' => Yii::t('UserModule.profile', 'Maximum length'),
-                                'class' => 'form-control',
-                                'type' => 'text',
-                            ],
-                            'default' => [
-                                'label' => Yii::t('UserModule.profile', 'Default value'),
-                                'class' => 'form-control',
-                                'type' => 'text',
-                            ],
-                            'regexp' => [
-                                'label' => Yii::t('UserModule.profile', 'Regular Expression: Validator'),
-                                'class' => 'form-control',
-                                'type' => 'text',
-                            ],
-                            'regexpErrorMessage' => [
-                                'label' => Yii::t('UserModule.profile', 'Regular Expression: Error message'),
-                                'class' => 'form-control',
-                                'type' => 'text',
-                            ],
-                        ]
-                    ]]);
+            static::class => [
+                'type' => 'form',
+                'title' => Yii::t('UserModule.profile', 'Text Field Options'),
+                'elements' => [
+                    'validator' => [
+                        'label' => Yii::t('UserModule.profile', 'Validator'),
+                        'type' => 'dropdownlist',
+                        'class' => 'form-control',
+                        'items' => [
+                            '' => 'None',
+                            self::VALIDATOR_EMAIL => 'E-Mail Address',
+                            self::VALIDATOR_URL => 'URL',
+                        ],
+                    ],
+                    'linkPrefix' => [
+                        'label' => Yii::t('UserModule.profile', 'Link Prefix (e.g. https://, mailto:, tel://)'),
+                        'type' => 'text',
+                        'class' => 'form-control',
+                    ],
+                    'minLength' => [
+                        'label' => Yii::t('UserModule.profile', 'Minimum length'),
+                        'type' => 'text',
+                        'class' => 'form-control',
+                    ],
+                    'maxLength' => [
+                        'label' => Yii::t('UserModule.profile', 'Maximum length'),
+                        'class' => 'form-control',
+                        'type' => 'text',
+                    ],
+                    'default' => [
+                        'label' => Yii::t('UserModule.profile', 'Default value'),
+                        'class' => 'form-control',
+                        'type' => 'text',
+                    ],
+                    'regexp' => [
+                        'label' => Yii::t('UserModule.profile', 'Regular Expression: Validator'),
+                        'class' => 'form-control',
+                        'type' => 'text',
+                    ],
+                    'regexpErrorMessage' => [
+                        'label' => Yii::t('UserModule.profile', 'Regular Expression: Error message'),
+                        'class' => 'form-control',
+                        'type' => 'text',
+                    ],
+                ],
+            ]]);
     }
 
     /**
@@ -136,8 +157,8 @@ class Text extends BaseType
     public function save()
     {
         $columnName = $this->profileField->internal_name;
-        if (!\humhub\modules\user\models\Profile::columnExists($columnName)) {
-            $query = Yii::$app->db->getQueryBuilder()->addColumn(\humhub\modules\user\models\Profile::tableName(), $columnName, 'VARCHAR(255)');
+        if (!Profile::columnExists($columnName)) {
+            $query = Yii::$app->db->getQueryBuilder()->addColumn(Profile::tableName(), $columnName, 'VARCHAR(255)');
             Yii::$app->db->createCommand($query)->execute();
         }
 
@@ -156,6 +177,13 @@ class Text extends BaseType
         if ($this->validator == self::VALIDATOR_EMAIL) {
             $rules[] = [$this->profileField->internal_name, 'email'];
         } elseif ($this->validator == self::VALIDATOR_URL) {
+            $linkPrefix = $this->linkPrefix;
+            $rules[] = [$this->profileField->internal_name, function ($attribute) use ($linkPrefix): void {
+                // Prepend the value with the Link Prefix (e.g. https://)
+                if ($linkPrefix && $this->$attribute && !str_starts_with((string) $this->$attribute, $linkPrefix)) {
+                    $this->$attribute = $linkPrefix . $this->$attribute;
+                }
+            }];
             $rules[] = [$this->profileField->internal_name, 'url'];
         }
 
@@ -172,7 +200,7 @@ class Text extends BaseType
         if ($this->regexp != "") {
             $errorMsg = $this->regexpErrorMessage;
             if (empty($errorMsg)) {
-                $errorMsg = Yii::t('UserModule.profile',"Invalid!");
+                $errorMsg = Yii::t('UserModule.profile', "Invalid!");
             } else {
                 $errorMsg = Yii::t($this->profileField->getTranslationCategory(), $errorMsg);
             }
@@ -183,20 +211,21 @@ class Text extends BaseType
         return parent::getFieldRules($rules);
     }
 
-    public function getUserValue($user, $raw = true)
+    /**
+     * @inheritdoc
+     */
+    public function getUserValue(User $user, bool $raw = true, bool $encode = true): ?string
     {
         $internalName = $this->profileField->internal_name;
-        $value = $user->profile->$internalName;
+        $value = $user->profile->$internalName ?? '';
+        $valueFormatted = $encode ? Html::encode($value) : $value;
 
-        if (!$raw && $this->validator == self::VALIDATOR_EMAIL) {
-            return \yii\helpers\Html::a(\yii\helpers\Html::encode($value), 'mailto:' . $value);
-        } elseif (!$raw && $this->validator == self::VALIDATOR_URL) {
-            return \yii\helpers\Html::a(\yii\helpers\Html::encode($value), $value, ['target' => '_blank']);
+        if (!$raw && (in_array($this->validator, [self::VALIDATOR_EMAIL, self::VALIDATOR_URL]) || !empty($this->linkPrefix))) {
+            $url = ($this->validator === self::VALIDATOR_EMAIL) ? 'mailto:' . $value : $value;
+            return Html::a($valueFormatted, $url);
         }
 
-        return \yii\helpers\Html::encode($value);
+        return $valueFormatted;
     }
 
 }
-
-?>

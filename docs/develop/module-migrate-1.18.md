@@ -1,0 +1,101 @@
+# Module Migration — Version 1.18
+
+See also [module-migrate-1.18-bs5.md](module-migrate-1.18-bs5.md)
+
+## Version 1.18.6
+
+### Removed
+- `humhub\assets\DatePickerRussianLanguageAsset` and `static/js/compat/date/i18n/datepicker-ru.js`: the jQuery UI DatePicker now derives the month names used by the input format from ICU for every locale ([see PR #8442](https://github.com/humhub/humhub/pull/8442))
+
+## Version 1.18.5
+
+### Changed
+- `Space::getUserGroup()` reports memberships whose stored group is not one of `admin`, `moderator` or `member` as `member` ([see PR #8376](https://github.com/humhub/humhub/pull/8376))
+- User groups not known to the content container no longer satisfy non-strict `userGroup` access rules in `UserGroupAccessValidator`. Custom content containers defining additional user groups have to extend `$spaceGroupLevel` / `$profileGroupLevel` ([see PR #8376](https://github.com/humhub/humhub/pull/8376))
+
+### New
+- `Membership::SCENARIO_EDIT_ROLE` limiting mass assignment to `group_id` when editing the role of an existing space membership
+- `Membership::getAssignableUserGroups()` returning the space user groups a membership can be assigned to
+- `UserGroupAccessValidator::getUserGroupLevels()` returning the known user groups of the current content container
+
+## Version 1.18.3
+
+### Changed
+- `$_params_` variable is no longer available in views of email notification templates ([see PR #8148](https://github.com/humhub/humhub/pull/8148))
+
+## Version 1.18.1
+
+### New
+- `AltchaCaptchaInput::$showOnFocusElement` and `YiiCaptchaInput::$showOnFocusElement` allowing hiding the Captcha input until a form field is focused
+- HTML classes in views using the `user/views/layouts/main.php` layout to set the container width ([see PR #8054](https://github.com/humhub/humhub/pull/8054)): `.container-registration`, `.container-login` and `.container-password`
+
+### Changed
+- `humhub\widgets\bootstrap\Button`, `humhub\widgets\bootstrap\Link`, `humhub\widgets\bootstrap\Badge`, `humhub\modules\ui\menu\widgets\DropdownMenu` labels are now HTML encoded by default. Set `encodeLabel` to `false` if already encoded.
+
+## Version 1.18
+
+Updated minimum required PHP version to 8.2.
+
+### New
+- `\humhub\components\captcha\CaptchaInterface`
+- `\humhub\components\captcha\AltchaCaptcha`
+- `\humhub\components\captcha\AltchaCaptchaInput`
+- `\humhub\components\captcha\AltchaCaptchaValidator`
+- `\humhub\components\captcha\AltchaCaptchaAction`
+- `\humhub\components\captcha\AltchaCaptchaAsset`
+- `\humhub\components\captcha\YiiCaptcha`
+- `\humhub\components\captcha\YiiCaptchaInput`
+- `\humhub\components\captcha\YiiCaptchaValidator`
+- `Yii::$app->captcha` component
+- `\humhub\assets\DriverJsAsset` (driver.js)
+- `\humhub\modules\tour\Module::tourConfigFiles` (allows customizing the introduction tour)
+- `\humhub\modules\tour\Module::driverJsOptions`
+- `\humhub\widgets\mails\MailHeaderImage` widget for displaying a header image in emails
+- `humhub\helpers\MailStyleHelper` to get Sass variable values in email templates
+- `\humhub\components\Theme::CORE_THEME_NAME`
+- `\humhub\modules\user\models\forms\EVENT_AFTER_SET_FORM`
+- `\humhub\components\Migration::safeAlterColumn()`
+
+### Deprecated
+- `\humhub\components\Application::isInstalled()` use `\humhub\components\Application::hasState()` instead
+- `\humhub\components\Application::isDatabaseInstalled()` use `\humhub\components\Application::hasState()` instead
+- `\humhub\components\Application::setInstalled()` use `\humhub\components\Application::setState()` instead
+- `humhub\modules\ui\mail\DefaultMailStyle` use `humhub\helpers\MailStyleHelper` instead
+
+### Changed
+
+- The following Mailer settings keys have been renamed to work with `.env`:
+
+| Old Key                          | New Key                        |
+|----------------------------------|--------------------------------|
+| `mailer.transportType`           | `mailerTransportType`          |
+| `mailer.dsn`                     | `mailerDsn`                    |
+| `mailer.hostname`                | `mailerHostname`               |
+| `mailer.username`                | `mailerUsername`               |
+| `mailer.password`                | `mailerPassword`               |
+| `mailer.useSmtps`                | `mailerUseSmtps`               |
+| `mailer.port`                    | `mailerPort`                   |
+| `mailer.encryption`              | `mailerEncryption`             |
+| `mailer.allowSelfSignedCerts`    | `mailerAllowSelfSignedCerts`   |
+| `mailer.systemEmailAddress`      | `mailerSystemEmailAddress`     |
+| `mailer.systemEmailName`         | `mailerSystemEmailName`        |
+| `mailer.systemEmailReplyTo`      | `mailerSystemEmailReplyTo`     |
+| `proxy.*`                        | `proxy*`     |
+
+- `tour` module:
+  - Library [bootstrap-tour](https://github.com/sorich87/bootstrap-tour/) replaced Wwith [driver.js](https://driverjs.com/)
+  - Widget view files rewritten
+
+### Removed deprecations
+- Widget class `\humhub\widgets\DataSaved`, the related code `Yii::$app->getSession()->setFlash('data-saved', Yii::t('base', 'Saved'));` must be replaced with `$this->view->saved();` on controllers
+
+### Module tests for Codeception v5
+- Update the file `tests/codeception.yml`: `log: codeception/_output` => `output: codeception/_output`
+- Update files `tests/codeception/*.suite.yml`: `class_name: *Tester` => `actor: *Tester`
+- `$I->waitFor*('Text', null)` => `$I->waitFor*('Text', 10)`, the second param can be only integer for the methods:
+  - `waitForText()`
+  - `waitForElement()`
+  - `waitForElementVisible()`
+  - `waitForElementNotVisible()`
+  - `waitForElementClickable()`
+- Functional tests: `$I->amOnPage(['/some/page/url', 'id' => 1])` => `$I->amOnRoute('/some/page/url', ['id' => 1])`

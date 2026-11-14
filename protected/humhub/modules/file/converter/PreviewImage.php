@@ -8,12 +8,15 @@
 
 namespace humhub\modules\file\converter;
 
+use Exception;
+use humhub\helpers\Html;
+use humhub\modules\admin\models\Log;
 use humhub\modules\file\libs\ImageHelper;
+use humhub\modules\file\models\File;
 use humhub\modules\file\Module;
+use Imagine\Image\Format;
 use Imagine\Image\ImageInterface;
 use Yii;
-use humhub\modules\file\models\File;
-use humhub\libs\Html;
 use yii\imagine\Image;
 
 /**
@@ -24,7 +27,6 @@ use yii\imagine\Image;
  */
 class PreviewImage extends BaseConverter
 {
-
     /**
      * @var ImageInterface
      */
@@ -87,9 +89,9 @@ class PreviewImage extends BaseConverter
     protected function convert($fileName)
     {
         try {
+            if (!$this->file->store->has($fileName)) {
 
-            if (!is_file($this->file->store->get($fileName))) {
-                $image = Image::getImagine()->open($this->file->store->get());
+                $image = Image::getImagine()->load($this->file->store->getContent());
                 ImageHelper::fixJpegOrientation($image, $this->file);
 
                 if ($image->getSize()->getHeight() > $this->options['height']) {
@@ -105,10 +107,16 @@ class PreviewImage extends BaseConverter
                     $options = ['format' => 'gif', 'animated' => true];
                 }
 
-                $image->save($this->file->store->get($fileName), $options);
+
+                $this->file->store->setContent($image->get(Format::ID_PNG, $options), $fileName);
             }
-        } catch (\Exception $ex) {
-            Yii::warning('Could not convert file with id ' . $this->file->id . '. Error: ' . $ex->getMessage());
+        } catch (Exception $ex) {
+            $message = 'Could not convert file with id ' . $this->file->id . '. Error: ' . $ex->getMessage();
+            $count = Log::find()->where(['message' => $message])->count();
+
+            if ($count == 0) {
+                Yii::warning($message);
+            }
         }
     }
 
@@ -117,52 +125,11 @@ class PreviewImage extends BaseConverter
      */
     protected function canConvert(File $file)
     {
-        $originalFile = $file->store->get();
-
-        if (substr($file->mime_type, 0, 6) !== 'image/' || !is_file($originalFile)) {
+        if (!str_starts_with($file->mime_type, 'image/') || !$file->store->has()) {
             return false;
         }
 
         return true;
-    }
-
-    /**
-     * @return int the image width or 0 if not valid
-     * @deprecated since 1.5
-     */
-    public function getWidth()
-    {
-        if ($this->image !== null) {
-            return $this->image->getSize()->getWidth();
-        }
-        return 0;
-    }
-
-    /**
-     * @return int the image height or 0 if not valid
-     * @deprecated since 1.5
-     */
-    public function getHeight()
-    {
-        if ($this->image !== null) {
-            return $this->image->getSize()->getHeight();
-        }
-        return 0;
-    }
-
-    /**
-     * @return ImageInterface
-     * @deprecated since 1.5
-     */
-    public function getImage()
-    {
-        $fileName = $this->file->store->get($this->getFilename());
-        if ($this->_image === null || $fileName !== $this->_imageFile) {
-            $this->_image = Image::getImagine()->open($fileName);
-            $this->_imageFile = $fileName;
-        }
-
-        return $this->_image;
     }
 
     /**
@@ -175,5 +142,4 @@ class PreviewImage extends BaseConverter
     {
         return Html::a($this->render(), $this->file->getUrl(), array_merge($htmlOptions, ['data-ui-gallery' => 'gallery-' . $this->file->guid]));
     }
-
 }

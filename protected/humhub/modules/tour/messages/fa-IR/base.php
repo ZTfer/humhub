@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'حذف پنل',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => 'منوی <strong>حساب کاربری</strong>',
   '<strong>Getting</strong> Started' => '<strong>شروع</strong>',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>راهنما:</strong> مدیریت (ماژول‌ها)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '<strong>شروع</strong> راهنمای انجمن',
   'Cancel' => 'انصراف',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => 'رد چیزی را گم نکنید!  این آیکن به شما درباره‌ی فعالیت‌ها و پست‌هایی که مربوط به شماست اطلاعات می‌دهد.',
+  'Done' => 'انجام شد',
   'Drag a photo here or click to browse your files' => 'تصويری به اينجا بكشيد يا برای دستچین کردن پرونده‌هایتان كليک كنيد',
-  'End guide' => 'پایان راهنما',
   'Get to know your way around the site\'s most important features with the following guides:' => 'توسط راهنماهای زیر با مهم‌ترین ویژگی‌های سایت آشنا شوید:',
   'Hide my year of birth' => 'سال تولد مرا پنهان كن',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => '',
-  'Next »' => 'بعدی »',
+  'Next &rarr;' => '',
   'Ok' => 'باشه',
   'Save and close' => 'ذخیره و بستن',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'منوی حساب کاربری شما به شما توانایی دسترسی به تنظیمات خصوصی و مدیریت پروفایل عمومی‌تان را می‌دهد.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'نام خانوادگی شما',
   'Your mobile phone number' => 'شماره همراه',
   'Your phone number at work' => 'شماره محل کار',
-  'Your skills, knowledge and experience (comma seperated)' => 'توانايی‌ها، دانش و تجربه‌های شما (جدا شده با کاما)',
+  'Your skills, knowledge and experience' => '',
   'Your title or position' => 'عنوان شغلی',
-  '« Prev' => '« قبلی',
-);
+  '{{current}} of {{total}}' => '',
+];

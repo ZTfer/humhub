@@ -1,15 +1,9 @@
 <?php
 
-
 namespace humhub\components\assets;
 
-use Yii;
-use yii\helpers\ArrayHelper;
-use yii\web\Application;
+use humhub\components\View;
 use yii\web\AssetBundle as BaseAssetBundle;
-use humhub\assets\CoreBundleAsset;
-use humhub\modules\ui\view\components\View;
-
 
 /**
  * This base asset bundle class adds some additional properties as well ass default loading behavior for HumHub assets.
@@ -59,6 +53,24 @@ use humhub\modules\ui\view\components\View;
 class AssetBundle extends BaseAssetBundle
 {
     /**
+     * Default publish options for all bundles publishing the whole `@humhub/resources`
+     * tree. The AssetManager keys the published copy by source path, so every bundle
+     * sharing this sourcePath must publish with identical options — whichever bundle
+     * publishes first defines the copied file set.
+     *
+     * `build/` holds the pre-built production bundles, which are only published through
+     * the compressed asset configuration (see `config/assets.php`); `scss/` only
+     * contains sources. Neither is referenced at runtime outside a production build.
+     */
+    public const HUMHUB_RESOURCES_PUBLISH_OPTIONS = [
+        'except' => [
+            'build/',
+            'scss/',
+            '.gitignore',
+        ],
+    ];
+
+    /**
      * @var bool can be used to force production asset usage while testing
      */
     protected static $forceProductionAssets = false;
@@ -100,14 +112,6 @@ class AssetBundle extends BaseAssetBundle
     public $preload = [];
 
     /**
-     * @var array|false default dependencies not required to be mentioned in $depends. Normally only deactivated in some
-     * core assets.
-     */
-    public $defaultDepends = [
-        CoreBundleAsset::class
-    ];
-
-    /**
      * @inheritDoc
      */
     public function init()
@@ -116,34 +120,38 @@ class AssetBundle extends BaseAssetBundle
 
         $useProdAssets = static::useProductionAssets();
 
-        if($this->isAsync()) {
+        if ($this->isAsync()) {
             $this->defer = false;
         }
 
-        if($this->jsProd !== null && $useProdAssets) {
+        if ($this->jsProd !== null && $useProdAssets) {
             $this->js = $this->jsProd;
         }
 
-        if($this->cssProd !== null && $useProdAssets) {
+        if ($this->cssProd !== null && $useProdAssets) {
             $this->css = $this->cssProd;
         }
 
-        if(!$this->isAsync() && $this->isDefer()) {
+        if (!$this->isAsync() && $this->isDefer()) {
             $this->jsOptions['defer'] = 'defer';
-        } else if($this->isAsync()) {
+        } elseif ($this->isAsync()) {
             $this->jsOptions['async'] = 'async';
         }
 
         $this->jsOptions['position'] = $this->getJsPosition();
 
-        if(!$useProdAssets && $this->forceCopy && !isset($this->publishOptions['forceCopy'])) {
-            $this->publishOptions['forceCopy'] = true;
-        } else if(!isset($this->publishOptions['forceCopy'])) {
-            $this->publishOptions['forceCopy'] = false;
+        if (
+            $this->sourcePath === '@humhub/resources'
+            && !isset($this->publishOptions['only'])
+            && !isset($this->publishOptions['except'])
+        ) {
+            $this->publishOptions += self::HUMHUB_RESOURCES_PUBLISH_OPTIONS;
         }
 
-        if((!(Yii::$app instanceof Application) || !Yii::$app->request->isAjax) && !empty($this->dependsDefault)) {
-            $this->depends[] = ArrayHelper::merge($this->depends, $this->defaultDepends);
+        if (!$useProdAssets && $this->forceCopy && !isset($this->publishOptions['forceCopy'])) {
+            $this->publishOptions['forceCopy'] = true;
+        } elseif (!isset($this->publishOptions['forceCopy'])) {
+            $this->publishOptions['forceCopy'] = false;
         }
     }
 
@@ -154,15 +162,15 @@ class AssetBundle extends BaseAssetBundle
      */
     protected function getJsPosition()
     {
-        if(isset($this->publishOptions['position'])) {
+        if (isset($this->publishOptions['position'])) {
             return $this->publishOptions['position'];
         }
 
-        if($this->jsPosition !== null) {
+        if ($this->jsPosition !== null) {
             return $this->jsPosition;
         }
 
-        if($this->isAsync() || $this->isDefer()) {
+        if ($this->isAsync() || $this->isDefer()) {
             return View::POS_HEAD;
         }
 

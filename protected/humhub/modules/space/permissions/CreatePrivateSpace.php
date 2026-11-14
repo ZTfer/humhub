@@ -8,44 +8,39 @@
 
 namespace humhub\modules\space\permissions;
 
-use humhub\libs\BasePermission;
+use humhub\modules\admin\components\BaseAdminPermission;
 use Yii;
 
 /**
  * CreatePrivateSpace Permission
  */
-class CreatePrivateSpace extends BasePermission
+class CreatePrivateSpace extends BaseAdminPermission
 {
-
     /**
      * @inheritdoc
      */
     protected $id = 'create_private_space';
-    
-    /**
-     * @inheritdoc
-     */
-    protected $title = 'Create private space';
 
     /**
      * @inheritdoc
      */
-    protected $description = 'Can create hidden (private) spaces.';
+    protected $title = 'Create Private Spaces';
+
+    /**
+     * @inheritdoc
+     */
+    protected $description = 'Can create hidden (private) Spaces.';
 
     /**
      * @inheritdoc
      */
     protected $moduleId = 'space';
 
-    /**
-     * @inheritdoc
-     */
-    protected $defaultState = self::STATE_ALLOW;
-
-    public function __construct($config = []) {
+    public function __construct($config = [])
+    {
         parent::__construct($config);
-        
-        $this->title = Yii::t('SpaceModule.permissions', 'Create private space');
-        $this->description = Yii::t('SpaceModule.permissions', 'Can create hidden (private) spaces.');
-    }    
+
+        $this->title = Yii::t('SpaceModule.permissions', 'Create Private Spaces');
+        $this->description = Yii::t('SpaceModule.permissions', 'Can create hidden (private) Spaces.');
+    }
 }

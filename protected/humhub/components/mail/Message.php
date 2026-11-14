@@ -8,22 +8,40 @@
 
 namespace humhub\components\mail;
 
+use humhub\services\MailLinkService;
+
 /**
  * Message
  *
  * @since 1.2
  * @author Luke
  */
-class Message extends \yii\swiftmailer\Message
+class Message extends \yii\symfonymailer\Message
 {
-    public function setSmimeSigner($signingCertificatePath, $signingPrivateKeyPath, $signingOptions = PKCS7_DETACHED, $extraCerts = null)
-	{
-		$signer = \Swift_Signers_SMimeSigner::newInstance();
+    private ?MailLinkService $linkService = null;
 
-		$signer->setSignCertificate($signingCertificatePath, $signingPrivateKeyPath, $signingOptions, $extraCerts);
+    /**
+     * @inheritdoc
+     */
+    public function init()
+    {
+        parent::init();
+        $this->linkService = new MailLinkService();
+    }
 
-		$this->getSwiftMessage()->attachSigner($signer);
+    /**
+     * @inheritdoc
+     */
+    public function setHtmlBody($html): Message
+    {
+        return parent::setHtmlBody($this->linkService->processLinks($html));
+    }
 
-        return $this;
-	}
+    /**
+     * @inheritdoc
+     */
+    public function setTextBody($text): Message
+    {
+        return parent::setTextBody($this->linkService->processUrls($text));
+    }
 }

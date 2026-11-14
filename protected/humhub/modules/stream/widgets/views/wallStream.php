@@ -1,22 +1,25 @@
 <?php
 
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\content\components\ContentContainerActiveRecord;
 use humhub\modules\stream\assets\StreamAsset;
-use humhub\widgets\Button;
-use yii\helpers\Html;
-use yii\helpers\Url;
+use humhub\widgets\bootstrap\Badge;
+use humhub\widgets\bootstrap\Button;
 
-/* @var $this \humhub\modules\ui\view\components\View */
+/* @var $this View */
 /* @var $filterNav string */
-/* @var $contentContainer \humhub\modules\content\components\ContentContainerActiveRecord */
+/* @var $contentContainer ContentContainerActiveRecord */
+/* @var $options array */
 
 StreamAsset::register($this);
 
 ?>
 
 <?php if ($contentContainer && $contentContainer->isArchived()) : ?>
-    <span class="label label-warning pull-right" style="margin-top:10px;">
-        <?= Yii::t('ContentModule.base', 'Archived'); ?>
-    </span>
+    <?= Badge::warning(Yii::t('ContentModule.base', 'Archived'))
+        ->left()
+        ->style('margin-top:10px;') ?>
 <?php endif; ?>
 
 <!-- Stream filter section -->
@@ -36,10 +39,10 @@ StreamAsset::register($this);
 <?= Html::endTag('div') ?>
 
 <!-- show "Load More" button on mobile devices -->
-<div class="col-md-12 text-center visible-xs visible-sm">
+<div class="col-lg-12 text-center d-lg-none">
     <?= Button::primary(Yii::t('ContentModule.base', 'Load more'))
         ->id('btn-load-more')
-        ->action('loadMore', null, '#wallStream')
+        ->action('loadMore', null, '#' . $options['id'])
         ->lg() ?>
     <br/><br/>
 </div>

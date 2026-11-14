@@ -23,7 +23,6 @@ use humhub\modules\live\models\Live;
  */
 class Poll extends BaseDriver
 {
-
     /**
      * Defines the minimum polling interval in seconds if the default polling client is active.
      */
@@ -59,7 +58,6 @@ class Poll extends BaseDriver
         $model->created_at = time();
         $model->visibility = $liveEvent->visibility;
         $model->contentcontainer_id = $liveEvent->contentContainerId;
-        $model->created_at = time();
         return $model->save();
     }
 
@@ -76,8 +74,8 @@ class Poll extends BaseDriver
                 'minInterval' => $this->minPollInterval, // Minimal polling request interval in seconds.
                 'maxInterval' => $this->maxPollInterval, // Maximal polling request interval in seconds.
                 'idleFactor' => $this->idleFactor, // Factor used in the actual interval calculation in case of user idle.
-                'idleInterval' => $this->idleInterval //  Interval for updating the update delay in case of user idle in seconds.
-            ]
+                'idleInterval' => $this->idleInterval, //  Interval for updating the update delay in case of user idle in seconds.
+            ],
         ];
     }
 

@@ -1,0 +1,22 @@
+//
+// Links
+// --------------------------------------------------
+
+@if not $prev-link {
+    a.link {
+        &:not(.link-icon-only) i.fa {
+            margin-right: 0.4rem;
+        }
+        &.link-topic i.fa {
+            margin-right: 0.2rem;
+        }
+    }
+
+    @each $color, $value in $theme-colors {
+        .link-#{$color} {
+            @if contrast-ratio($background-color-main, $value) < $min-contrast-ratio {
+                color: var(--text-color-highlight) !important;
+            }
+        }
+    }
+}

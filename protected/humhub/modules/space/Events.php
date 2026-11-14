@@ -8,13 +8,18 @@
 
 namespace humhub\modules\space;
 
-use humhub\modules\user\events\UserEvent;
-use humhub\modules\space\models\Space;
-use humhub\modules\space\models\Membership;
+use humhub\components\Event;
+use humhub\helpers\ControllerHelper;
 use humhub\modules\space\helpers\MembershipHelper;
+use humhub\modules\space\models\Membership;
+use humhub\modules\space\models\Space;
+use humhub\modules\space\permissions\SpaceDirectoryAccess;
+use humhub\modules\space\widgets\HeaderControlsMenu;
+use humhub\modules\ui\menu\MenuLink;
+use humhub\modules\user\events\UserEvent;
+use humhub\modules\user\models\Follow;
 use Yii;
 use yii\base\BaseObject;
-use humhub\components\Event;
 
 /**
  * Events provides callbacks for all defined module events.
@@ -23,19 +28,6 @@ use humhub\components\Event;
  */
 class Events extends BaseObject
 {
-
-    /**
-     * On rebuild of the search index, rebuild all space records
-     *
-     * @param Event $event
-     */
-    public static function onSearchRebuild($event)
-    {
-        foreach (Space::find()->each() as $space) {
-            Yii::$app->search->add($space);
-        }
-    }
-
     /**
      * Callback on user soft deletion
      *
@@ -88,6 +80,7 @@ class Events extends BaseObject
             if ($membership->space == null) {
                 if ($integrityController->showFix("Deleting space membership " . $membership->space_id . " without existing space!")) {
                     $membership->delete();
+                    continue;
                 }
             }
             if ($membership->user == null) {
@@ -96,6 +89,63 @@ class Events extends BaseObject
                 }
             }
         }
+
+        $integrityController->showTestHeadline('Space Module - Follow (' . Follow::find()->where(['object_model' => Space::class])->count() . ' entries)');
+        $follows = Follow::find()
+            ->innerJoin('space_membership', 'space_membership.user_id = user_follow.user_id AND space_membership.space_id = user_follow.object_id')
+            ->where(['user_follow.object_model' => Space::class])
+            ->andWhere(['space_membership.status' => Membership::STATUS_MEMBER]);
+        foreach ($follows->each() as $follow) {
+            /* @var Follow $follow */
+            if ($integrityController->showFix('Deleting a following of user #' . $follow->user_id . ' to space #' . $follow->object_id . ' because of membership!')) {
+                $follow->delete();
+            }
+        }
+    }
+
+    /**
+     * On build of the TopMenu
+     *
+     * @param Event $event
+     */
+    public static function onTopMenuInit($event)
+    {
+        /** @var Module $module */
+        $module = Yii::$app->getModule('space');
+        if ($module->hideSpacesPage) {
+            return;
+        }
+
+        if (!Yii::$app->user->isGuest
+            && !Yii::$app->user->can(SpaceDirectoryAccess::class)) {
+            return;
+        }
+
+        $event->sender->addEntry(new MenuLink([
+            'id' => 'spaces',
+            'icon' => 'dot-circle-o',
+            'label' => Yii::t('SpaceModule.base', 'Spaces'),
+            'url' => ['/space/spaces'],
+            'sortOrder' => 250,
+            'isActive' => ControllerHelper::isActivePath('space', 'spaces'),
+        ]));
+    }
+
+    public static function onSpaceHeaderControlsMenuInit($event)
+    {
+        /* @var HeaderControlsMenu $menu */
+        $menu = $event->sender;
+
+        if ($menu->space->getAdvancedSettings()->hideAbout) {
+            return;
+        }
+
+        $menu->addEntry(new MenuLink([
+            'label' => Yii::t('SpaceModule.base', 'About'),
+            'url' => $menu->space->createUrl('/space/space/about'),
+            'icon' => 'about',
+            'sortOrder' => 10000,
+        ]));
     }
 
 }

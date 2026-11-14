@@ -1,8 +1,10 @@
 <?php
 
+use humhub\helpers\Html;
+use humhub\modules\installer\forms\SampleDataForm;
+use humhub\widgets\form\ActiveForm;
 
-use yii\widgets\ActiveForm;
-use yii\bootstrap\Html;
+/* @var SampleDataForm $model */
 ?>
 <div id="name-form" class="panel panel-default animated fadeIn">
 
@@ -25,5 +27,3 @@ use yii\bootstrap\Html;
         <?php ActiveForm::end(); ?>
     </div>
 </div>
-
-

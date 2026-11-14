@@ -7,7 +7,7 @@ use yii\helpers\ArrayHelper;
 
 /**
  * UploadButtonWidget renders an upload button with integrated file input.
- * 
+ *
  * @package humhub.modules_core.file.widgets
  * @since 1.2
  */
@@ -15,32 +15,38 @@ class UploadButton extends UploadInput
 {
     /**
      * Additional button html options.
-     * @var array 
+     * @var array
      */
     public $buttonOptions = [];
-    
+
     /**
      * Show button tooltip on mousover.
-     * @var boolean 
+     * @var bool
      */
     public $tooltip = true;
-    
+
     /**
      * Tooltip position.
-     * @var string 
+     * @var string
      */
     public $tooltipPosition = 'bottom';
-    
+
     /**
-     * Defines the button color class like btn-default, btn-primary
-     * @var type 
+     * Defines the button color class like btn-light, btn-primary
+     * @var string
      */
-    public $cssButtonClass = 'btn-default';
-    
+    public $cssButtonClass = 'btn-light';
+
+    /**
+     * Render as link instead of a button
+     * @var bool
+     */
+    public $asLink = false;
+
     /**
      * Either defines a label string or true to use the default label.
      * If set to false, no button label is printed.
-     * @var type 
+     * @var bool
      */
     public $label = false;
 
@@ -48,31 +54,50 @@ class UploadButton extends UploadInput
      * Draws the Upload Button output.
      */
     public function run()
-    {   
-        if($this->label === true) {
-            $this->label = '&nbsp;'.Yii::t('base', 'Upload');
-        } elseif($this->label === false) {
+    {
+        if ($this->label === true) {
+            $this->label = '&nbsp;' . Yii::t('base', 'Upload');
+        } elseif ($this->label === false) {
             $this->label = '';
         } else {
-            $this->label = '&nbsp;'.$this->label;
+            $this->label = '&nbsp;' . $this->label;
         }
-        
+
+        $classPrefix = 'btn';
+        if ($this->asLink) {
+            $classPrefix = '';
+            if ($this->cssButtonClass === 'btn-light') {
+                $this->cssButtonClass = '';
+            }
+        }
+
         $defaultButtonOptions = [
-            'class' => ($this->tooltip) ? 'btn '.$this->cssButtonClass.' fileinput-button tt' : 'btn '.$this->cssButtonClass.'  fileinput-button',
+            'class' => trim($classPrefix . ' ' . $this->cssButtonClass . ' fileinput-button'),
             'title' => ($this->tooltip === true) ? Yii::t('FileModule.base', 'Upload files') : $this->tooltip,
+            // Rendered as a <span>, which cannot receive focus or be operated via
+            // keyboard (Enter/Space) by default, unlike a real <button> (e.g. the
+            // adjacent dropdown-toggle). tabindex makes it focusable/reachable via
+            // Tab, role announces it correctly to assistive tech, and
+            // humhub.file.js adds the matching Enter/Space -> click handling.
+            'tabindex' => '0',
+            'role' => 'button',
             'data' => [
                 'placement' => $this->tooltipPosition,
-                'action-click' => "file.upload", 
-                'action-target' => '#'.$this->getId(true)
-            ]
+                'action-click' => "file.upload",
+                'action-target' => '#' . $this->getId(true),
+            ],
         ];
-        
+
+        if ($this->tooltip) {
+            $defaultButtonOptions['data-bs-toggle'] = 'tooltip';
+        }
+
         $options = ArrayHelper::merge($defaultButtonOptions, $this->buttonOptions);
-        
+
         return $this->render('uploadButton', [
-                    'input' => parent::run(),
-                    'options' => $options,
-                    'label' => $this->label
+            'input' => parent::run(),
+            'options' => $options,
+            'label' => $this->label,
         ]);
     }
 }

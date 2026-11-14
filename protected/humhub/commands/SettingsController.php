@@ -8,15 +8,13 @@
 
 namespace humhub\commands;
 
-use humhub\components\Module;
+use humhub\components\console\WithoutModuleAutoload;
 use humhub\components\SettingsManager;
-use humhub\libs\DynamicConfig;
 use humhub\models\Setting;
-use Yii;
 use yii\console\Controller;
 use yii\console\ExitCode;
-use yii\helpers\Console;
 use yii\console\widgets\Table;
+use yii\helpers\Console;
 
 /**
  * SettingsController provides CLI access to database settings
@@ -24,9 +22,9 @@ use yii\console\widgets\Table;
  * @since 1.4
  * @author Luke
  */
+#[WithoutModuleAutoload]
 class SettingsController extends Controller
 {
-
     /**
      * Lists all stored settings
      *
@@ -89,8 +87,6 @@ class SettingsController extends Controller
         $settingsManager = new SettingsManager(['moduleId' => $moduleId]);
         $settingsManager->set($name, $value);
 
-        $this->handleDynamicConfig($moduleId, $name);
-
         $this->stdout("\n*** Successfully set setting\n\n", Console::FG_GREEN);
         $this->stdout("Name:\t\t" . $name . "\n");
         $this->stdout("Module ID:\t" . $moduleId . "\n\n");
@@ -113,7 +109,6 @@ class SettingsController extends Controller
 
         $settingsManager = new SettingsManager(['moduleId' => $moduleId]);
         $settingsManager->delete($name);
-        $this->handleDynamicConfig($moduleId, $name);
 
         $this->stdout("\n*** Successfully deleted setting\n\n", Console::FG_GREEN);
         $this->stdout("Name:\t\t" . $name . "\n");
@@ -121,21 +116,4 @@ class SettingsController extends Controller
 
         return ExitCode::OK;
     }
-
-    /**
-     * Handles dynamic config rewrite if required
-     *
-     * @param $moduleId
-     * @param $name
-     */
-    private function handleDynamicConfig($moduleId, $name)
-    {
-        if (DynamicConfig::needRewrite($moduleId, $name)) {
-            // Force reload
-            Yii::$app->settings->init();
-            DynamicConfig::rewrite();
-        }
-    }
-
 }
-

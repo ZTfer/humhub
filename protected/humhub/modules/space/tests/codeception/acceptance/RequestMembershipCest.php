@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -7,13 +8,14 @@
 
 namespace space\acceptance;
 
+use Exception;
 use space\AcceptanceTester;
 
 class RequestMembershipCest
 {
     /**
      * @param AcceptanceTester $I
-     * @throws \Exception
+     * @throws Exception
      */
     public function testRequestMembershipAccept(AcceptanceTester $I)
     {
@@ -21,35 +23,35 @@ class RequestMembershipCest
 
         $I->amUser1();
         $I->amOnSpace1();
-        $I->seeElement('#requestMembershipButton');
-        $I->click('#requestMembershipButton');
+        $I->seeElement('[data-space-request-membership]');
+        $I->click('[data-space-request-membership]');
 
-        $I->waitForText('Request space membership', null,'#globalModal');
+        $I->waitForText('Request Membership', 10, '#globalModal');
         $I->fillField('#request-message', 'Hi, I want to join this space.');
         $I->click('Send', '#globalModal');
         $I->waitForText('Your request was successfully submitted to the space administrators.');
         $I->click('Close', '#globalModal');
 
-        $I->waitForText('Cancel pending membership application');
+        $I->waitForText('Pending');
 
         $I->amAdmin(true);
         $I->seeInNotifications('Peter Tester requests membership for the space Space 1', true);
 
-        $I->waitForText('New member request',null, '.panel-danger');
-        $I->see('Hi, I want to join this space.', '.panel-danger');
-        $I->click('Accept', '.panel-danger');
+        $I->waitForText('Pending Approvals', 10, '.tab-menu .active');
+        $I->see('Hi, I want to join this space.', '.grid-view');
+        $I->click('Accept', '.grid-view');
 
         $I->wait(1);
 
         $I->amUser1(true);
 
         $I->seeInNotifications('Admin Tester approved your membership for the space Space 1', true);
-        $I->waitForText('User 1 Space 1 Post Private', null, '#wallStream');
+        $I->waitForText('User 1 Space 1 Post Private', 10, '#wallStream');
     }
 
     /**
      * @param AcceptanceTester $I
-     * @throws \Exception
+     * @throws Exception
      */
     public function testRequestMembershipDecline(AcceptanceTester $I)
     {
@@ -57,32 +59,32 @@ class RequestMembershipCest
 
         $I->amUser1();
         $I->amOnSpace1();
-        $I->seeElement('#requestMembershipButton');
-        $I->click('#requestMembershipButton');
+        $I->seeElement('[data-space-request-membership]');
+        $I->click('[data-space-request-membership]');
 
-        $I->waitForText('Request space membership', null,'#globalModal');
+        $I->waitForText('Request Membership', 10, '#globalModal');
         $I->fillField('#request-message', 'Hi, I want to join this space.');
         $I->click('Send', '#globalModal');
         $I->waitForText('Your request was successfully submitted to the space administrators.');
         $I->click('Close', '#globalModal');
 
-        $I->waitForText('Cancel pending membership application');
+        $I->waitForText('Pending');
 
         $I->amAdmin(true);
         $I->seeInNotifications('Peter Tester requests membership for the space Space 1', true);
 
-        $I->waitForText('New member request', null, '.panel-danger');
+        $I->waitForText('Pending Approvals', 10, '.tab-menu .active');
 
-        $I->click('.dropdown-navigation', '.controls-header');
-        $I->waitForText('Members', null, '.controls-header');
+        $I->click('.dropdown', '.controls-header');
+        $I->waitForText('Members', 10, '.controls-header');
         $I->click('Members', '.controls-header');
 
-        $I->waitForText('Manage members');
+        $I->waitForText('Member since');
         $I->see('Pending Approvals');
         $I->click('Pending Approvals');
 
-        $I->waitForText('Reject');
-        $I->click('Reject');
+        $I->waitForText('Decline');
+        $I->click('Decline');
 
         $I->waitForElementVisible('#wallStream');
         $I->dontSeeInNotifications('Peter Tester requests membership for the space Space 1');
@@ -90,12 +92,12 @@ class RequestMembershipCest
         $I->amUser1(true);
 
         $I->seeInNotifications('Admin Tester declined your membership request for the space Space 1', true);
-        $I->waitForElementVisible('#requestMembershipButton');
+        $I->waitForElementVisible('[data-space-request-membership]');
     }
 
     /**
      * @param AcceptanceTester $I
-     * @throws \Exception
+     * @throws Exception
      */
     public function testRequestMembershipRevoke(AcceptanceTester $I)
     {
@@ -103,28 +105,30 @@ class RequestMembershipCest
 
         $I->amUser1();
         $I->amOnSpace1();
-        $I->seeElement('#requestMembershipButton');
-        $I->click('#requestMembershipButton');
+        $I->seeElement('[data-space-request-membership]');
+        $I->click('[data-space-request-membership]');
 
-        $I->waitForText('Request space membership', null,'#globalModal');
+        $I->waitForText('Request Membership', 10, '#globalModal');
         $I->fillField('#request-message', 'Hi, I want to join this space.');
         $I->click('Send', '#globalModal');
         $I->waitForText('Your request was successfully submitted to the space administrators.');
         $I->click('Close', '#globalModal');
 
-        $I->waitForText('Cancel pending membership application');
-        $I->click('Cancel pending membership application');
-        $I->waitForText('Admin Space 2 Post Private', null,'#wallStream'); // Back to dashboard
+        $I->waitForText('Pending');
+        $I->click('Pending');
+        $I->waitForText('Confirm');
+        $I->click('Confirm');
+        $I->waitForText('Join'); // Back to dashboard
         $I->amOnSpace1();
-        $I->waitForText('Request membership', null,'#requestMembershipButton');
+        $I->waitForText('Join', 10, '[data-space-request-membership]');
 
         $I->amAdmin(true);
         $I->dontSeeInNotifications('Peter Tester requests membership for the space Space 1');
         $I->amOnSpace1();
         $I->dontSeeElement('.panel-danger');
 
-        $I->click('.dropdown-navigation', '.controls-header');
-        $I->waitForText('Members', null, '.controls-header');
+        $I->click('.dropdown', '.controls-header');
+        $I->waitForText('Members', 10, '.controls-header');
         $I->click('Members', '.controls-header');
 
         $I->waitForText('Manage members');

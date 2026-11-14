@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2021 HumHub GmbH & Co. KG
@@ -8,7 +9,7 @@
 namespace humhub\modules\admin\widgets;
 
 use humhub\components\Widget;
-use Yii;
+use humhub\modules\user\components\MaintenanceModeGate;
 
 /**
  * MaintenanceModeWarning shows a snippet in the dashboard
@@ -18,13 +19,12 @@ use Yii;
  */
 class MaintenanceModeWarning extends Widget
 {
-
     /**
      * {@inheritdoc}
      */
     public function run()
     {
-        if (!Yii::$app->settings->get('maintenanceMode')) {
+        if (!MaintenanceModeGate::isActive()) {
             return;
         }
 

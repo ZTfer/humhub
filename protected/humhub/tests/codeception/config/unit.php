@@ -7,32 +7,36 @@ $testConfig = [
     'class' => 'humhub\components\Application',
     'timeZone' => 'UTC',
     'components' => [
-        'cache' => [
-            'class' => \yii\caching\DummyCache::class,
-        ],
         'session' => [
             'class' => \yii\web\CacheSession::class,
         ],
         'request' => [
-            'cookieValidationKey' => 'test'
+            'cookieValidationKey' => 'test',
         ],
         'user' => [
-        	'enableSession' => false
+            'enableSession' => false,
         ],
         'assetManager' => [
-            'basePath' => '@root/assets/'
-        ]
+            'basePath' => '@root/assets/',
+        ],
+    ],
+    'params' => [
+        'fixed-settings' => [
+            'base' => [
+                'baseUrl' => 'http://localhost',
+            ],
+        ],
     ],
 ];
 
-defined('YII_APP_BASE_PATH') or define('YII_APP_BASE_PATH', dirname(dirname(dirname(dirname(__DIR__)))));
+defined('YII_APP_BASE_PATH') or define('YII_APP_BASE_PATH', dirname(__DIR__, 4));
 return yii\helpers\ArrayHelper::merge(
-                // Common Config
-                require(YII_APP_BASE_PATH . '/humhub/config/common.php'),
-                // Web Config
-                require(YII_APP_BASE_PATH . '/humhub/config/web.php'),
-                // Test Common Config
-                require(__DIR__ . '/config.php'),
-                // Unit Test Config
-                $testConfig
+    // Common Config
+    require(YII_APP_BASE_PATH . '/humhub/config/common.php'),
+    // Web Config
+    require(YII_APP_BASE_PATH . '/humhub/config/web.php'),
+    // Test Common Config
+    require(__DIR__ . '/config.php'),
+    // Unit Test Config
+    $testConfig,
 );

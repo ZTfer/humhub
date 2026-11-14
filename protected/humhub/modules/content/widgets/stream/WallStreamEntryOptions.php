@@ -1,11 +1,9 @@
 <?php
 
-
 namespace humhub\modules\content\widgets\stream;
 
 use humhub\modules\comment\widgets\Comments;
 use humhub\modules\content\components\ContentActiveRecord;
-use humhub\modules\content\helpers\ContentContainerHelper;
 use humhub\modules\content\widgets\ArchiveLink;
 use humhub\modules\content\widgets\DeleteLink;
 use humhub\modules\content\widgets\EditLink;
@@ -16,10 +14,9 @@ use humhub\modules\content\widgets\PinLink;
 use humhub\modules\content\widgets\VisibilityLink;
 use humhub\modules\content\widgets\WallEntryLinks;
 use humhub\modules\file\widgets\ShowFiles;
-use humhub\modules\space\models\Space;
 use humhub\modules\topic\widgets\ContentTopicButton;
 use humhub\modules\ui\menu\MenuEntry;
-use yii\base\Model;
+use Yii;
 
 /**
  * This option class can be used to influence the rendering of a wall entry.
@@ -45,7 +42,7 @@ class WallStreamEntryOptions extends StreamEntryOptions
     /**
      * Used when rendering the entry on the dashboard
      */
-    const VIEW_CONTEXT_SEARCH = 'search';
+    public const VIEW_CONTEXT_SEARCH = 'search';
 
     /**
      * @var array contains option settings for wall entry addons widgets, e.g. used to disable widgets
@@ -81,6 +78,20 @@ class WallStreamEntryOptions extends StreamEntryOptions
      * @var bool whether or not the container information should be rendered in the main title
      */
     public $enableContainerInformationInTitle = false;
+
+    public static function getInstanceFromRequest(): ?self
+    {
+        $viewContext = Yii::$app->request->get('viewContext');
+        if (empty($viewContext)) {
+            $viewContext = Yii::$app->request->post('viewContext');
+        }
+
+        if (empty($viewContext)) {
+            return null;
+        }
+
+        return (new self())->viewContext($viewContext);
+    }
 
     /**
      * Defines if the sub headline author information should be enabled
@@ -239,8 +250,8 @@ class WallStreamEntryOptions extends StreamEntryOptions
      */
     public function isContextMenuEntryDisabled(MenuEntry $entry)
     {
-        return (isset($this->controlsMenuOptions[$entry->getId()]) && $this->controlsMenuOptions[$entry->getId()] === false)
-            || (isset($this->controlsMenuOptions[$entry->getEntryClass()]) && $this->controlsMenuOptions[$entry->getEntryClass()] === false);
+        return (isset($this->controlsMenuOptions[$entry->getId() ?? '']) && $this->controlsMenuOptions[$entry->getId()] === false)
+            || (isset($this->controlsMenuOptions[$entry->getEntryClass() ?? '']) && $this->controlsMenuOptions[$entry->getEntryClass()] === false);
     }
 
     /**
@@ -314,7 +325,7 @@ class WallStreamEntryOptions extends StreamEntryOptions
     }
 
     /**
-     * @return boolean checks if the given addon widget class is disabled
+     * @return bool checks if the given addon widget class is disabled
      */
     public function isAddonDisabled($widgetClass)
     {

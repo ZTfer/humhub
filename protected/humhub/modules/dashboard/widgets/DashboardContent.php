@@ -2,11 +2,11 @@
 
 namespace humhub\modules\dashboard\widgets;
 
-use humhub\modules\post\widgets\Form;
-use Yii;
-use humhub\modules\stream\widgets\StreamViewer;
 use humhub\components\Widget;
 use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\post\widgets\Form;
+use humhub\modules\stream\widgets\StreamViewer;
+use Yii;
 
 class DashboardContent extends Widget
 {
@@ -16,7 +16,7 @@ class DashboardContent extends Widget
     public $contentContainer;
 
     /**
-     * @var boolean
+     * @var bool
      */
     public $showProfilePostForm = false;
 
@@ -33,9 +33,12 @@ class DashboardContent extends Widget
         }
 
         echo StreamViewer::widget([
+            'options' => ['class' => 'dashboard-wall-stream'],
             'streamAction' => '//dashboard/dashboard/stream',
-            'showFilters' => (boolean) Yii::$app->getModule('dashboard')->settings->get('showProfilePostForm'),
-            'messageStreamEmpty' => $messageStreamEmpty
+            'showFilters' => (bool) Yii::$app->getModule('dashboard')->settings->get('showProfilePostForm')
+                || (!is_null(Yii::$app->request->getQueryParam('filters_visible')) && !empty(Yii::$app->request->getQueryParam('includes')))
+                || !empty(Yii::$app->request->getQueryParam('topics')),
+            'messageStreamEmpty' => $messageStreamEmpty,
         ]);
     }
 }

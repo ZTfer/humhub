@@ -1,0 +1,382 @@
+//
+// Sass variables
+// For CSS variables, see _root.scss
+// All variables must have the !default flag to allow child-themes to overwrite them
+//
+// Bootstrap defaults must be customized here, by overwriting the Sass variable
+// (see @humhub/protected/vendor/twbs/bootstrap/scss/_variables.scss), and not by
+// redeclaring the generated `--bs-*` CSS variable in a component file. Only
+// customizations that are scoped to a specific selector (e.g. `.navbar.topbar`)
+// belong in a component file as a `--bs-*` override.
+// --------------------------------------------------
+
+$isFluid: false;
+
+
+//
+// Default Bootstrap base colors (can be overwritten in Administration -> Settings -> Appearance)
+// --------------------------------------------------
+
+$primary: #435f6f !default;
+$secondary: #7a7a7a !default;
+$info: #0582FF !default;
+$success: #52a11c !default;
+$warning: #FFC107 !default;
+$danger: #FC4A64 !default;
+$light: #e7e7e7 !default;
+$dark: #333 !default;
+
+
+//
+// HumHub Accent color (can be overwritten in Administration -> Settings -> Appearance)
+// --------------------------------------------------
+
+$accent: #21A1B3 !default;
+$accent-text-emphasis: shade-color($accent, 60%) !default;
+$accent-bg-subtle: tint-color($accent, 80%) !default;
+$accent-border-subtle: tint-color($accent, 60%) !default;
+$accent-text-emphasis-dark: tint-color($accent, 60%) !default;
+$accent-bg-subtle-dark: shade-color($accent, 80%) !default;
+$accent-border-subtle-dark: shade-color($accent, 60%) !default;
+
+
+//
+// Color Bootstrap overwritten variables
+// --------------------------------------------------
+
+$link-color: #000000 !default;
+$link-hover-color: $link-color;
+$code-color: mix(black, $accent, 10%) !default;
+$body-color: #555 !default;
+$body-bg: #ededed !default;
+$input-border-color: #e9ecef !default;
+$input-bg: #fff !default; // default is $body-bg
+
+
+//
+// HumHub Text colors
+// --------------------------------------------------
+
+// Default body text color.
+$text-color-main: $body-color !default;
+
+// used for default icons and buttons etc.
+$text-color-default: #4b4b4b !default;
+
+// used for some icons and buttons etc. - former $font2
+$text-color-secondary: #7a7a7a !default;
+
+// highlighted text like some active links hovered links etc. - former $font3
+$text-color-highlight: #000 !default;
+
+// side information like dates, placeholder, some dropdown headers - former $font4
+$text-color-soft: #555555 !default;
+
+// also side information wall entry links (like/comment), help blocks in forms etc.  - former $font5
+$text-color-soft2: #aeaeae !default;
+
+// used in gridview summary and installer - former $font1
+$text-color-soft3: #bac2c7 !default;
+
+
+//
+// Background colors
+// --------------------------------------------------
+
+// main content background color should be in contrast with $text-color-main, $text-color-secondary and other text colors
+$background-color-main: #fff !default;
+
+// used beside others for tabs - former $background1
+$background-color-secondary: #f9f9f9 !default;
+
+// page background which is also used for other ui components as comment box etc. - former $background2
+$background-color-page: $body-bg !default;
+
+// Informative highlighting color
+// (e.g. Comment Permalink, Shared Item, Calendar CurDay, Wiki Active Page Nav, Mail Module Speech Bubble)
+$background-color-highlight: rgba($accent, 0.2) !default;
+
+// Informative highlighting soft color
+// (e.g. Wiki Active Category)
+$background-color-highlight-soft: lighten(desaturate(adjust-hue($accent, 6), 16%), 55%) !default;
+
+// Additional background colors
+$background3: #d7d7d7 !default;
+$background4: #b2b2b2 !default;
+
+
+//
+// HumHub Text contrast colors
+// --------------------------------------------------
+
+//
+// Contrast ratio to reach against white
+// Determines if color changes from "light" to "dark".
+// Acceptable values for WCAG 2.2 are 3, 4.5 and 7.
+// See https://www.w3.org/TR/WCAG/#contrast-minimum
+//
+$min-contrast-ratio: 3 !default;
+
+// Required for color-contrast():
+$white: #fff !default;
+$black: #000 !default;
+$color-contrast-dark: $black !default;
+$color-contrast-light: $white !default;
+
+// Text contrast colors for each Bootstrap background color:
+$text-color-accent-contrast: color-contrast($accent);
+$text-color-primary-contrast: color-contrast($primary);
+$text-color-secondary-contrast: color-contrast($secondary);
+$text-color-info-contrast: color-contrast($info);
+$text-color-success-contrast: color-contrast($success);
+$text-color-warning-contrast: color-contrast($warning);
+$text-color-danger-contrast: color-contrast($danger);
+$text-color-light-contrast: color-contrast($light);
+$text-color-dark-contrast: color-contrast($dark);
+
+
+//
+// Bootstrap Alert boxes
+// --------------------------------------------------
+
+// Alert box success (used in forms)
+$background-color-success: #f7fbf4 !default;
+$text-color-success: #84be5e !default;
+$border-color-success: #97d271 !default;
+
+// Alert box warning (used in forms)
+$background-color-warning: #fffbf7 !default;
+$text-color-warning: #e9b168 !default;
+$border-color-warning: #fdd198 !default;
+
+// Alert box danger (used in forms)
+$background-color-danger: #fff6f6 !default;
+$text-color-danger: #ff8989 !default;
+$border-color-danger: #ff8989 !default;
+
+
+//
+// Fonts
+// --------------------------------------------------
+
+$font-family-base: 'Open Sans', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !default;
+$font-family-sans-serif: $font-family-base !default;
+$font-size-root: 14px !default; // affects the value of `rem`, which is used for as well font sizes, paddings, and margins
+$font-weight-base: 400 !default;
+$mail-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', ’Helvetica Neue’, Helvetica, Arial, sans-serif !default;
+
+
+//
+// Grid containers
+// Define the maximum width of `.container` for different screen sizes.
+// --------------------------------------------------
+
+// Must be in ascending order
+$container-max-widths: (
+    sm: 768px, // fullwidth
+    md: 770px,
+    lg: 970px,
+    xl: 1170px,
+    xxl: 1200px
+) !default;
+
+
+//
+// Badges
+//
+
+$badge-font-size: 0.75rem !default;
+$badge-font-weight: normal !default;
+$badge-padding-y: 3px !default;
+$badge-padding-x: 5px !default;
+$badge-border-radius: 2px !default;
+
+
+//
+// Buttons
+// --------------------------------------------------
+
+$btn-padding-y: 0.5rem !default;
+$btn-padding-x: 1.1rem !default;
+$btn-padding-y-sm: 0.2rem !default;
+$btn-padding-x-sm: 0.5rem !default;
+$btn-padding-y-lg: 0.9rem !default;
+$btn-padding-x-lg: 1.75rem !default;
+$btn-font-size-lg: 1.1rem !default;
+$btn-font-weight: 600 !default;
+$btn-white-space: nowrap !default;
+$btn-transition: color 0.3s, background-color 0.3s, border-color 0.3s !default;
+$btn-border-radius: 3px !default;
+$btn-border-radius-sm: $btn-border-radius !default;
+$btn-border-radius-lg: $btn-border-radius !default;
+
+
+//
+// Dropdowns
+// --------------------------------------------------
+
+$dropdown-bg: var(--hh-background-color-main) !default;
+
+
+//
+// List groups
+// --------------------------------------------------
+
+$list-group-bg: var(--hh-background-color-main) !default;
+$list-group-border-width: 0 !default;
+$list-group-active-color: var(--hh-text-color-highlight) !default;
+$list-group-active-bg: var(--hh-background-color-secondary) !default;
+
+
+//
+// Navs
+// --------------------------------------------------
+
+$nav-link-hover-color: var(--bs-link-color) !default;
+$nav-tabs-link-active-bg: var(--hh-background-color-main) !default;
+
+
+//
+// Popovers
+// --------------------------------------------------
+
+$popover-border-width: 1px !default;
+$popover-border-color: rgba(0, 0, 0, 0.15) !default;
+$popover-border-radius: 4px !default;
+$popover-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175) !default;
+
+
+//
+// Progress bars
+// --------------------------------------------------
+
+$progress-height: 10px !default;
+$progress-bg: var(--hh-background-color-page) !default;
+$progress-border-radius: 10px !default;
+$progress-box-shadow: none !default;
+
+
+//
+// Tables
+// --------------------------------------------------
+
+$table-color: var(--bs-body-color) !default;
+$table-bg: var(--hh-background-color-main) !default;
+
+
+//
+// Tooltips
+// --------------------------------------------------
+
+$tooltip-max-width: 400px !default;
+// 12px. Bootstrap passes font sizes through RFS, which converts `px` to `rem`
+// assuming a 16px root font size, so font sizes must be expressed in `rem`
+// relatively to $font-size-root.
+$tooltip-font-size: divide(12px, $font-size-root) * 1rem !default;
+$tooltip-color: var(--hh-primary-contrast) !default;
+$tooltip-bg: var(--bs-primary) !default;
+
+
+//
+// Other Bootstrap overwritten variables
+// --------------------------------------------------
+
+$enable-shadows: true !default;
+$grid-gutter-width: 30px !default;
+$line-height-base: 1.5 !default;
+$form-check-padding-start: 2em !default; // Fix checkbox with multiple lines label
+$focus-ring-box-shadow: none !default;
+$component-active-color: $text-color-primary-contrast !default; // Because $component-active-bg has Primary color
+
+//
+// @deprecated since 1.18
+// --------------------------------------------------
+
+$default: #e7e7e7 !default;
+$link: $primary !default;
+$text-color-contrast: #fff !default;
+$text-color-contrast-dark: #fff !default;
+
+// Dark color mode variables
+//
+// Custom variables for the `[data-bs-theme="dark"]` theme.
+
+//
+// Color Bootstrap overwritten variables
+// --------------------------------------------------
+
+$link-hover-color-dark: mix(white, $primary, 10%) !default;
+$code-color-dark: mix(white, $accent, 10%) !default;
+$body-color-dark: #ddd !default;
+$body-bg-dark: #000 !default;
+$input-border-color-dark: #1f2225 !default;
+$input-bg-dark: #000 !default; // default is $body-bg-dark
+
+//
+// HumHub Text colors
+// --------------------------------------------------
+
+// Default body text color.
+$text-color-main-dark: $body-color-dark !default;
+
+// used for default icons and buttons etc.
+$text-color-default-dark: #f0f0f0 !default;
+
+// used for some icons and buttons etc. - former $font2
+$text-color-secondary-dark: #bbb !default;
+
+// highlighted text like some active links hovered links etc. - former $font3
+$text-color-highlight-dark: #fff !default;
+
+// side information like dates, placeholder, some dropdown headers - former $font4
+$text-color-soft-dark: #ddd !default;
+
+// also side information wall entry links (like/comment), help blocks in forms etc.  - former $font5
+$text-color-soft2-dark: #ccc !default;
+
+// used in gridview summary and installer - former $font1
+$text-color-soft3-dark: #7b7773 !default;
+
+//
+// Background colors
+// --------------------------------------------------
+
+// main content background color should be in contrast with $text-color-main-dark, $text-color-secondary-dark and other text colors
+$background-color-main-dark: #222 !default;
+
+// used beside others for tabs - former $background1
+$background-color-secondary-dark: #333 !default;
+
+// page background which is also used for other ui components as comment box etc. - former $background2
+$background-color-page-dark: $body-bg-dark !default;
+
+// Informative highlighting color
+// (e.g. Comment Permalink, Shared Item, Calendar CurDay, Wiki Active Page Nav, Mail Module Speech Bubble)
+$background-color-highlight-dark: rgba($accent, 0.2) !default;
+
+// Informative highlighting soft color
+// (e.g. Wiki Active Category)
+$background-color-highlight-soft-dark: darken(desaturate(adjust-hue($accent, 6), 16%), 55%) !default;
+
+// Additional background colors
+$background3-dark: #393939 !default;
+$background4-dark: #5e5e5e !default;
+
+//
+// Bootstrap Alert boxes
+// --------------------------------------------------
+
+// Alert box success (used in forms)
+$background-color-success-dark: #3e423b !default;
+$text-color-success-dark: #84be5e !default;
+$border-color-success-dark: #97d271 !default;
+
+// Alert box warning (used in forms)
+$background-color-warning-dark: #4d443b !default;
+$text-color-warning-dark: #e9b168 !default;
+$border-color-warning-dark: #fdd198 !default;
+
+// Alert box danger (used in forms)
+$background-color-danger-dark: #372a2a !default;
+$text-color-danger-dark: #ff8989 !default;
+$border-color-danger-dark: #ff8989 !default;

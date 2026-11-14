@@ -1,6 +1,10 @@
 <?php
-return array (
-  'Collapse' => 'Strânge',
-  'Read more' => '',
-  'User Interface' => 'Interfața utilizatorului',
-);
+
+return [
+    'Collapse' => 'Strânge',
+    'User Interface' => 'Interfața utilizatorului',
+    'Read more' => '',
+    'Reset filters' => '',
+    'Select' => '',
+    'Toggle filters' => '',
+];

@@ -1,23 +1,31 @@
 <?php
 
+use humhub\helpers\Html;
 use humhub\libs\ActionColumn;
 use humhub\modules\admin\models\GroupSearch;
+use humhub\modules\admin\permissions\ManageGroups;
 use humhub\modules\admin\widgets\GroupMenu;
+use humhub\modules\user\models\forms\EditGroupForm;
 use humhub\modules\user\models\Group;
-use humhub\widgets\Link;
-use yii\helpers\Url;
+use humhub\widgets\bootstrap\Badge;
+use humhub\widgets\bootstrap\Link;
 use humhub\widgets\GridView;
+use yii\data\ActiveDataProvider;
 
-/* @var $searchModel GroupSearch*/
+/* @var $dataProvider ActiveDataProvider */
+/* @var $searchModel GroupSearch */
 ?>
 <div class="panel-body">
-    <div class="pull-right">
-        <?= Link::success(Yii::t('AdminModule.user', 'Create new group'))->href(Url::to(['edit']))->sm()->icon('add') ?>
-    </div>
+    <?php if (Yii::$app->user->can(ManageGroups::class)): ?>
+        <?= Link::success(Yii::t('AdminModule.user', 'Create new group'))
+            ->link(['edit'])
+            ->icon('add')
+            ->sm()->right() ?>
+    <?php endif ?>
 
     <h4><?= Yii::t('AdminModule.user', 'Manage groups'); ?></h4>
 
-    <div class="help-block">
+    <div class="text-body-secondary">
         <?= Yii::t('AdminModule.user', 'Users can be assigned to different groups (e.g. teams, departments etc.) with specific standard spaces, group managers and permissions.'); ?>
     </div>
 </div>
@@ -34,35 +42,66 @@ use humhub\widgets\GridView;
             [
                 'attribute' => 'name',
                 'format' => 'html',
-                'value' => function (Group $group) {
-                    return $group->name .
-                        ($group->is_default_group ? ' <span class="badge">' . Yii::t('AdminModule.user', 'Default') . '</span>' : '');
-                }
+                'headerOptions' => ['style' => 'min-width:100px'],
+                'value' => fn(Group $group) =>
+                    // Yii::t is available for default texts
+                    Yii::t('AdminModule.base', $group->name) .
+                    ($group->is_default_group ? ' ' . Badge::light(Yii::t('AdminModule.user', 'Default')) : '') .
+                    ($group->is_protected ? ' ' . Badge::light(Yii::t('AdminModule.user', 'Protected')) : '')
             ],
-            'description',
+            [
+                'attribute' => 'description',
+                'headerOptions' => ['class' => 'text-nowrap'],
+                'value' => fn(Group $group) =>
+                    // Yii::t is available for default texts
+                    Yii::t('AdminModule.base', $group->description)
+            ],
+            [
+                'attribute' => 'type',
+                'label' => Yii::t('AdminModule.user', 'Type'),
+                'format' => 'raw',
+                'headerOptions' => ['class' => 'text-nowrap'],
+                'filterOptions' => ['class' => 'text-nowrap'],
+                'contentOptions' => ['class' => 'text-center'],
+                'value' => fn(Group $group) => Badge::light($group->getTypeTitle()),
+                'filter' => Html::activeDropDownList($searchModel, 'type', [
+                    '' => Yii::t('AdminModule.base', 'All')
+                ] + EditGroupForm::getTypeOptions()),
+            ],
             [
                 'attribute' => 'members',
                 'label' => Yii::t('AdminModule.user', 'Members'),
                 'format' => 'raw',
-                'options' => ['style' => 'text-align:center;'],
-                'value' => function (Group $data) {
-                    return $data->getGroupUsers()->count();
+                'headerOptions' => ['class' => 'text-nowrap'],
+                'contentOptions' => ['class' => 'text-nowrap text-center'],
+                'value' => function (Group $group) {
+                    $usersCount = $group->getGroupUsers()->count();
+                    if ($subGroupUsersCount = $group->getSubGroupUsersCount()) {
+                        $usersCount .= ' (+' . $subGroupUsersCount . ')';
+                    }
+                    return $usersCount;
                 }
             ],
             [
                 'class' => ActionColumn::class,
-                'actions' => function($group, $key, $index) {
+                'actions' => function ($group, $key, $index) {
                     /* @var $group Group */
-                    if($group->is_admin_group && !Yii::$app->user->isAdmin()) {
+                    if ($group->is_admin_group && !Yii::$app->user->isAdmin()) {
                         return [];
                     }
 
-                    return  [
+                    $items = [
                         Yii::t('AdminModule.user', 'Settings') => ['edit'],
                         '---',
-                        Yii::t('AdminModule.user', 'Permissions') => ['manage-permissions'],
-                        Yii::t('AdminModule.user', 'Members') => ['manage-group-users'],
                     ];
+
+                    if (Yii::$app->user->can(ManageGroups::class)) {
+                        $items[Yii::t('AdminModule.user', 'Permissions')] = ['manage-permissions'];
+                    }
+
+                    $items[Yii::t('AdminModule.user', 'Members')] = ['manage-group-users'];
+
+                    return $items;
                 }
             ],
         ],

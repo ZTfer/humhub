@@ -9,6 +9,9 @@
 namespace humhub\modules\content;
 
 use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\content\search\driver\AbstractDriver;
+use humhub\modules\content\search\driver\MysqlDriver;
+use humhub\modules\content\search\SearchRequest;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use Yii;
@@ -16,27 +19,15 @@ use Yii;
 /**
  * Content Module
  *
+ * @property AbstractDriver $search
  * @author Luke
  */
 class Module extends \humhub\components\Module
 {
-
     /**
      * @inheritdoc
      */
     public $controllerNamespace = 'humhub\modules\content\controllers';
-
-    /**
-     * @since 1.1
-     * @var boolean global admin can see all content
-     */
-    public $adminCanViewAllContent = false;
-
-    /**
-     * @since 1.1
-     * @var boolean global admin can edit/delete all content
-     */
-    public $adminCanEditAllContent = true;
 
     /**
      * @since 1.1
@@ -52,13 +43,13 @@ class Module extends \humhub\components\Module
 
     /**
      * @since 1.2
-     * @var integer Maximum allowed file uploads for posts/comments
+     * @var int Maximum allowed file uploads for posts/comments
      */
     public $maxAttachedFiles = 50;
 
     /**
      * @since 1.3
-     * @var integer Maximum allowed number of oembeds in richtexts
+     * @var int Maximum allowed number of oembeds in richtexts
      */
     public $maxOembeds = 5;
 
@@ -86,17 +77,45 @@ class Module extends \humhub\components\Module
     public $richtextCompatMode = true;
 
     /**
+     * @var int Interval in minutes to run a publishing of the scheduled contents
+     * @since 1.14
+     */
+    public $publishScheduledInterval = 10;
+
+    /**
+     * @var string Class name of the searching driver
+     * @since 1.16
+     */
+    public $searchDriverClass = MysqlDriver::class;
+
+    /**
+     * @var string Column name for ordering of the searching results
+     * @since 1.18
+     */
+    public string $searchOrderBy = SearchRequest::ORDER_BY_SCORE;
+
+    /**
+     * @inheritdoc
+     */
+    public function init()
+    {
+        parent::init();
+
+        $this->set('search', ['class' => $this->searchDriverClass]);
+    }
+
+    /**
      * @param ContentContainerActiveRecord $container
-     * @since 1.6
      * @return int
+     * @since 1.6
      */
     public function getMaxPinnedContent(ContentContainerActiveRecord $container)
     {
-        if($container instanceof User) {
+        if ($container instanceof User) {
             return $this->maxPinnedProfileContent;
         }
 
-        if($container instanceof Space) {
+        if ($container instanceof Space) {
             return $this->maxPinnedSpaceContent;
         }
 
@@ -120,7 +139,7 @@ class Module extends \humhub\components\Module
             return [
                 // Note: we do not return CreatePrivateContent Permission since its not writable at the moment
                 new permissions\ManageContent(),
-                new permissions\CreatePublicContent()
+                new permissions\CreatePublicContent(),
             ];
         }
 
@@ -133,8 +152,12 @@ class Module extends \humhub\components\Module
     public function getNotifications()
     {
         return [
-            'humhub\modules\content\notifications\ContentCreated'
+            'humhub\modules\content\notifications\ContentCreated',
         ];
     }
 
+    public function getSearchDriver(): AbstractDriver
+    {
+        return $this->search;
+    }
 }

@@ -8,59 +8,44 @@
 
 namespace humhub\widgets;
 
-use yii\helpers\Html;
-use yii\web\JsExpression;
+use yii\bootstrap5\Html;
+use yii\helpers\ArrayHelper;
 
 /**
  * AjaxLinkPager
- * 
+ *
  * @inheritdoc
  * @author luke
  */
-class AjaxLinkPager extends \humhub\widgets\LinkPager
+class AjaxLinkPager extends \humhub\widgets\bootstrap\LinkPager
 {
-
     /**
-     * Js Expression which is called before Ajax request is sent
-     * 
-     * @var string
+     * @inerhitdoc
      */
-    public $jsBeforeSend = 'function(){ setModalLoader(); }';
-
-    /**
-     * Success Javascript Expression
-     * 
-     * @var string 
-     */
-    public $jsSuccess = 'function(html){ $("#globalModal").html(html); }';
-
-    /**
-     * @inheritdoc
-     */
-    protected function renderPageButton($label, $page, $class, $disabled, $active)
+    protected function renderPageButton(string $label, int $page, string $class, bool $disabled, bool $active): string
     {
-        $options = ['class' => $class === '' ? null : $class];
+        // Same code as parent:
+        $options = $this->linkContainerOptions;
+        $linkWrapTag = ArrayHelper::remove($options, 'tag', 'li');
+        Html::addCssClass($options, $class ?: $this->pageCssClass);
+
+        $linkOptions = $this->linkOptions;
+        $linkOptions['data']['page'] = $page;
+
         if ($active) {
+            $options['aria'] = ['current' => 'page'];
             Html::addCssClass($options, $this->activePageCssClass);
         }
         if ($disabled) {
             Html::addCssClass($options, $this->disabledPageCssClass);
-
-            return Html::tag('li', Html::tag('span', $label), $options);
+            $disabledItemOptions = $this->disabledListItemSubTagOptions;
+            $linkOptions = ArrayHelper::merge($linkOptions, $disabledItemOptions);
+            $linkOptions['tabindex'] = '-1';
         }
-        $linkOptions = $this->linkOptions;
-        $linkOptions['data-page'] = $page;
 
-        return Html::tag('li', AjaxButton::widget([
-                            'label' => $label,
-                            'tag' => 'a',
-                            'ajaxOptions' => [
-                                'type' => 'POST',
-                                'beforeSend' => new JsExpression($this->jsBeforeSend),
-                                'success' => new JsExpression($this->jsSuccess),
-                                'url' => $this->pagination->createUrl($page),
-                            ],
-                            'htmlOptions' => $linkOptions]), $options);
+        // Modifications for Ajax:
+        $linkOptions['data']['action-click'] = 'ui.modal.post';
+        $linkOptions['data']['action-url'] = $this->pagination->createUrl($page);
+        return Html::tag($linkWrapTag, Html::a($label, '#', $linkOptions), $options);
     }
-
 }

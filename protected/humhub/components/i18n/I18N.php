@@ -8,7 +8,11 @@
 
 namespace humhub\components\i18n;
 
+use DateTimeZone;
+use Exception;
+use humhub\components\InstallationState;
 use humhub\libs\I18NHelper;
+use humhub\libs\TimezoneHelper;
 use Yii;
 use yii\base\InvalidArgumentException;
 use humhub\models\forms\ChooseLanguage;
@@ -21,7 +25,6 @@ use yii\i18n\I18N as BaseI18N;
  */
 class I18N extends BaseI18N
 {
-
     /**
      * @var string path which contains message overwrites
      */
@@ -50,7 +53,7 @@ class I18N extends BaseI18N
      */
     public function autosetLocale()
     {
-        if (!Yii::$app->params['installed'] || Yii::$app->user->isGuest) {
+        if (!Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED) || Yii::$app->user->isGuest) {
             $this->setGuestLocale();
         } else {
             $this->setUserLocale(Yii::$app->user->getIdentity());
@@ -75,12 +78,18 @@ class I18N extends BaseI18N
             $this->setDefaultLocale();
         }
 
-        if (!empty($user->time_zone)) {
-            Yii::$app->formatter->timeZone = $user->time_zone;
-        } else {
-            Yii::$app->formatter->timeZone = Yii::$app->timeZone;
+        $timeZone = $user->time_zone;
+        try {
+            new DateTimeZone($timeZone);
+        } catch (Exception) {
+            // e.g. `Europe/Kiev` on systems without legacy tz data: replace, store and log it once
+            $defaultTimeZone = Yii::$app->settings->get('defaultTimeZone');
+            $fallback = TimezoneHelper::isValid($defaultTimeZone) ? $defaultTimeZone : Yii::$app->timeZone;
+            $timeZone = TimezoneHelper::replaceUnknown($timeZone, $fallback);
+            $user->updateAttributes(['time_zone' => $timeZone]);
         }
 
+        Yii::$app->formatter->timeZone = $timeZone;
         Yii::$app->formatter->defaultTimeZone = Yii::$app->timeZone;
     }
 
@@ -141,8 +150,8 @@ class I18N extends BaseI18N
         }
 
         if (is_callable($this->beforeTranslateCallback)) {
-            list($category, $message, $params, $language) =
-                $this->beforeTranslateCallback->call($this, $category, $message, $params, $language);
+            [$category, $message, $params, $language]
+                = $this->beforeTranslateCallback->call($this, $category, $message, $params, $language);
         }
 
         return parent::translate($category, $message, $params, $language);
@@ -161,10 +170,10 @@ class I18N extends BaseI18N
         // Try to automatically assign Module->MessageSource
         foreach (Yii::$app->moduleManager->getModules(['includeCoreModules' => true, 'returnClass' => true]) as $moduleId => $className) {
             $moduleCategory = I18NHelper::getModuleTranslationCategory($moduleId);
-            if (substr($category, 0, strlen($moduleCategory)) === $moduleCategory) {
+            if (str_starts_with($category, $moduleCategory)) {
                 $this->translations[$moduleCategory . '*'] = [
                     'class' => 'humhub\components\i18n\ModuleMessageSource',
-                    'moduleId' => $moduleId
+                    'moduleId' => $moduleId,
                 ];
             }
         }
@@ -193,6 +202,26 @@ class I18N extends BaseI18N
     }
 
     /**
+     * Check if the provided or browser language is allowed in system, otherwise return default language
+     *
+     * @since 1.12.2
+     * @param string|null $language NULL - to get a language from browser
+     * @return string|null
+     */
+    public function getAllowedLanguage(?string $language = null): ?string
+    {
+        if (empty($language)) {
+            $language = Yii::$app->language;
+        }
+
+        if (array_key_exists($language, $this->getAllowedLanguages())) {
+            return $language;
+        }
+
+        return Yii::$app->settings->get('defaultLanguage');
+    }
+
+    /**
      * @inheritdoc
      */
     public function format($message, $params, $language)
@@ -201,21 +230,21 @@ class I18N extends BaseI18N
             $fixedParams = [];
             // Try to fix old placeholder formats
             foreach ($params as $param => $value) {
-                if (substr($param, 0, 1) === "%" && substr($param, -1, 1) === "%" && strlen($param) > 2) {
+                if (str_starts_with((string) $param, "%") && str_ends_with((string) $param, "%") && strlen((string) $param) > 2) {
                     // Fix: %param% style params
                     $fixedParam = str_replace("%", "", $param);
                     $fixedParams[$fixedParam] = $value;
                     $message = str_replace('%' . $fixedParam . '%', '{' . $fixedParam . '}', $message);
-                } elseif (substr($param, 0, 1) == "%") {
+                } elseif (str_starts_with((string) $param, "%")) {
                     // Fix: %param style params
                     $fixedParam = str_replace("%", "", $param);
                     $fixedParams[$fixedParam] = $value;
                     $message = str_replace('%' . $fixedParam, '{' . $fixedParam . '}', $message);
-                } elseif (substr($param, 0, 1) === "{" && substr($param, -1, 1) === "}") {
+                } elseif (str_starts_with((string) $param, "{") && str_ends_with((string) $param, "}")) {
                     // Fix: {param} style params
                     $fixedParam = str_replace(['{', '}'], "", $param);
                     $fixedParams[$fixedParam] = $value;
-                } elseif (substr($param, 0, 1) === ":") {
+                } elseif (str_starts_with((string) $param, ":")) {
                     // Fix: :param style params
                     $fixedParam = str_replace(':', "", $param);
                     $fixedParams[$fixedParam] = $value;

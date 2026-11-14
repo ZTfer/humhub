@@ -6,18 +6,16 @@
  *
  */
 
+use humhub\components\View;
 use humhub\modules\ui\filter\widgets\FilterBlock;
 
-/* @var $this \humhub\modules\ui\view\components\View */
-/* @var $span integer */
+/* @var $this View */
 /* @var $blocks [] */
-
-$colSpan = $span <= 4 ? 12 / $span : 6;
 
 ?>
 
-<div class="filter-panel col-md-<?= $colSpan?>">
+<div class="filter-panel col">
     <?php foreach ($blocks as $block): ?>
-        <?= FilterBlock::widget($block)?>
+        <?= FilterBlock::widget($block) ?>
     <?php endforeach; ?>
 </div>

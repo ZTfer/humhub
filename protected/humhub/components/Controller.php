@@ -11,9 +11,12 @@ namespace humhub\components;
 use humhub\components\access\ControllerAccess;
 use humhub\components\access\StrictAccess;
 use humhub\components\behaviors\AccessControl;
+use humhub\components\gates\GateFilter;
+use humhub\modules\user\services\IsOnlineService;
+use humhub\widgets\TopMenu;
 use Yii;
-use yii\helpers\Url;
 use yii\helpers\Html;
+use yii\helpers\Url;
 use yii\web\ForbiddenHttpException;
 
 /**
@@ -26,11 +29,10 @@ use yii\web\ForbiddenHttpException;
  */
 class Controller extends \yii\web\Controller
 {
-
     /**
      * @event \yii\base\Event an event raised on init a controller.
      */
-    const EVENT_INIT = 'init';
+    public const EVENT_INIT = 'init';
 
     /**
      * @var null|string the name of the sub layout to be applied to this controller's views.
@@ -49,7 +51,7 @@ class Controller extends \yii\web\Controller
     public $actionTitlesMap = [];
 
     /**
-     * @var boolean append page title
+     * @var bool append page title
      */
     public $prependActionTitles = true;
 
@@ -62,8 +64,8 @@ class Controller extends \yii\web\Controller
     /**
      * Returns access rules for the standard access control behavior.
      *
-     * @see AccessControl
      * @return array the access permissions
+     * @see AccessControl
      */
     protected function getAccessRules()
     {
@@ -88,6 +90,12 @@ class Controller extends \yii\web\Controller
     public function init()
     {
         parent::init();
+
+        // Attached here instead of behaviors() so that controllers overriding behaviors()
+        // without merging the parent cannot accidentally disable gate enforcement.
+        // Declared behaviors (e.g. 'acl') are attached first, so gates run after access control.
+        $this->attachBehavior('gates', ['class' => GateFilter::class]);
+
         $this->trigger(self::EVENT_INIT);
     }
 
@@ -96,8 +104,8 @@ class Controller extends \yii\web\Controller
         return [
             'acl' => [
                 'class' => AccessControl::class,
-                'rules' => $this->getAccessRules()
-            ]
+                'rules' => $this->getAccessRules(),
+            ],
         ];
     }
 
@@ -106,13 +114,26 @@ class Controller extends \yii\web\Controller
      */
     public function renderAjaxContent($content)
     {
-        return $this->getView()->renderAjaxContent($content, $this);
+        return $this->getView()->renderAjaxContent($content);
+    }
+
+    /**
+     * Renders a string as Ajax including assets without end page so it can be called several times.
+     *
+     * @param string $content
+     *
+     * @return string Rendered content
+     */
+    public function renderAjaxPartial(string $content): string
+    {
+        return $this->getView()->renderAjaxPartial($content);
     }
 
     /**
      * Renders a static string by applying the layouts (sublayout + layout.
      *
      * @param string $content the static string being rendered
+     *
      * @return string the rendering result of the layout with the given static string as the `$content` variable.
      * If the layout is disabled, the string will be returned back.
      *
@@ -142,8 +163,8 @@ class Controller extends \yii\web\Controller
     /**
      * Throws HttpException in case the request is not an post request, otherwise returns true.
      *
+     * @return bool returns true in case the current request is a POST
      * @throws \yii\web\HttpException
-     * @return boolean returns true in case the current request is a POST
      */
     public function forcePostRequest()
     {
@@ -161,7 +182,7 @@ class Controller extends \yii\web\Controller
     public function htmlRedirect($url = "")
     {
         return $this->renderPartial('@humhub/views/htmlRedirect.php', [
-            'url' => Url::to($url)
+            'url' => Url::to($url),
         ]);
     }
 
@@ -169,7 +190,7 @@ class Controller extends \yii\web\Controller
      * @throws ForbiddenHttpException
      * @since 1.2
      */
-    protected function forbidden()
+    protected function forbidden(): never
     {
         throw new ForbiddenHttpException(Yii::t('error', 'You are not allowed to perform this action.'));
     }
@@ -198,11 +219,16 @@ class Controller extends \yii\web\Controller
             }
 
             if (!empty($this->pageTitle)) {
-                $this->getView()->pageTitle = $this->pageTitle;
+                $this->getView()->setPageTitle($this->pageTitle);
             }
 
             if (!Yii::$app->request->isAjax || Yii::$app->request->isPjax) {
                 $this->setJsViewStatus();
+
+                if (Yii::$app->installationState->hasState(InstallationState::STATE_INSTALLED)) {
+                    // Update "is online" status ony on full page loads
+                    (new IsOnlineService(Yii::$app->user->identity))->updateStatus();
+                }
             }
 
             return true;
@@ -247,7 +273,7 @@ class Controller extends \yii\web\Controller
      *
      * @param array $map
      *            [action_id => action_page_title]
-     * @param boolean $prependActionTitles set to false if the action titles should rather be appended
+     * @param bool $prependActionTitles set to false if the action titles should rather be appended
      */
     public function setActionTitles($map = [], $prependActionTitles = true)
     {
@@ -281,7 +307,7 @@ class Controller extends \yii\web\Controller
         $this->view->registerJs('humhub.modules.ui.view.setState("' . $moduleId . '", "' . Yii::$app->controller->id . '", "' . Yii::$app->controller->action->id . '");', \yii\web\View::POS_BEGIN);
 
         if (Yii::$app->request->isPjax) {
-            \humhub\widgets\TopMenu::setViewState();
+            TopMenu::registerActiveState();
         }
     }
 }

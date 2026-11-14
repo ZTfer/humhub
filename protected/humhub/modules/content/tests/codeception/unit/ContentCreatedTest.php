@@ -3,6 +3,9 @@
 namespace tests\codeception\unit;
 
 use humhub\modules\content\models\Content;
+use humhub\modules\content\notifications\ContentCreated as ContentCreatedNotification;
+use humhub\modules\notification\models\Notification;
+use humhub\modules\notification\models\forms\NotificationSettings;
 use humhub\modules\post\models\Post;
 use Yii;
 use tests\codeception\_support\HumHubDbTestCase;
@@ -12,7 +15,6 @@ use humhub\modules\user\models\User;
 
 class ContentCreatedTest extends HumHubDbTestCase
 {
-
     use Specify;
 
     /**
@@ -28,7 +30,50 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(1, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(1);
+    }
+
+    /**
+     * The profile visibility is relative to the author (User2 is not an admin),
+     * it must not prevent a space follower from being notified.
+     */
+    public function testHiddenFollowerContentNotification()
+    {
+        User::updateAll(['visibility' => User::VISIBILITY_HIDDEN], ['id' => 1]);
+
+        $this->becomeUser('User2');
+
+        $post = new Post(['message' => 'MyTestContent']);
+        $post->content->setContainer(Space::findOne(['id' => 2]));
+        $post->content->visibility = Content::VISIBILITY_PUBLIC;
+        $post->save();
+
+        // Admin is following Space2 so we expect one notification mail.
+        $this->assertMailSent(1);
+    }
+
+    /**
+     * Same for a follower of a user profile.
+     */
+    public function testHiddenFollowerProfileContentNotification()
+    {
+        // Admin follows the profile of User2
+        $this->assertTrue(User::findOne(['id' => 3])->follow(1, true));
+        User::updateAll(['visibility' => User::VISIBILITY_HIDDEN], ['id' => 1]);
+
+        $this->becomeUser('User2');
+
+        $post = new Post(['message' => 'MyTestContent']);
+        $post->content->setContainer(User::findOne(['id' => 3]));
+        $post->content->visibility = Content::VISIBILITY_PUBLIC;
+        $this->assertTrue($post->save());
+
+        $this->assertEquals(1, Notification::find()->where([
+            'class' => ContentCreatedNotification::class,
+            'user_id' => 1,
+            'source_class' => Post::class,
+            'source_pk' => $post->id,
+        ])->count());
     }
 
     public function testSilentContentCreation()
@@ -42,7 +87,7 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(0, 'ContentCreated Notification Mail not sent');
+        $this->assertMailSent(0);
     }
 
     /**
@@ -63,7 +108,7 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
-        $this->assertMailSent(0, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(0);
     }
 
     /**
@@ -81,7 +126,7 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // We expect two notification mails one for following User1 and one for notifyUserOfNewContent User3.
-        $this->assertMailSent(2, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(2);
     }
 
     /**
@@ -99,7 +144,7 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // We expect two notification mails one for following User1 and one for notifyUserOfNewContent User3.
-        $this->assertMailSent(1, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(1);
     }
 
     /**
@@ -117,7 +162,55 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // We only one notification
-        $this->assertMailSent(1, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(1);
+    }
+
+    /**
+     * Check that unauthorized explicit notify users are excluded for private profile content.
+     */
+    public function testExcludeUnauthorizedExplicitNotifyUserOnPrivateProfileContent()
+    {
+        $this->becomeUser('Admin');
+
+        $post = new Post(['message' => 'MyTestContent']);
+        $post->content->setContainer(User::findOne(['id' => 1]));
+        $post->content->visibility = Content::VISIBILITY_PRIVATE;
+        $post->content->notifyUsersOfNewContent = [User::findOne(['id' => 4])];
+        $this->assertTrue($post->save());
+
+        $this->assertMailSent(0);
+        $this->assertEquals(0, Notification::find()->where([
+            'class' => ContentCreatedNotification::class,
+            'user_id' => 4,
+            'source_class' => Post::class,
+            'source_pk' => $post->id,
+        ])->count());
+    }
+
+    /**
+     * Check that notification preview is suppressed for unauthorized recipients.
+     */
+    public function testSuppressPreviewForUnauthorizedRecipient()
+    {
+        $this->becomeUser('Admin');
+
+        $post = new Post(['message' => 'MyTestContent']);
+        $post->content->setContainer(User::findOne(['id' => 1]));
+        $post->content->visibility = Content::VISIBILITY_PRIVATE;
+        $this->assertTrue($post->save());
+
+        $recipient = User::findOne(['id' => 4]);
+        $notification = ContentCreatedNotification::instance()->from(User::findOne(['id' => 1]))->about($post);
+
+        $this->assertTrue($notification->isBlockedForUser($recipient));
+        $notification->send($recipient);
+
+        $this->assertNull(Notification::find()->where([
+            'class' => ContentCreatedNotification::class,
+            'user_id' => $recipient->id,
+            'source_class' => Post::class,
+            'source_pk' => $post->id,
+        ])->one());
     }
 
     /**
@@ -132,7 +225,7 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
-        $this->assertMailSent(1, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(1);
     }
 
     /**
@@ -147,7 +240,7 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
-        $this->assertMailSent(0, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(0);
     }
 
     /**
@@ -165,9 +258,9 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
-        $this->assertMailSent(0, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(0);
     }
-    
+
     /**
      * Admin and User2 are member of Space1 -> Space1 is set to default notification space.
      * After User2 posts new content Admin user should automatically be notified.
@@ -183,9 +276,9 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(1, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(1);
     }
-    
+
     /**
      * Admin and User2 are member of Space1 -> Space1 is set to default notification space.
      * Admin explicitly removes the default notification space.
@@ -195,22 +288,22 @@ class ContentCreatedTest extends HumHubDbTestCase
         $this->becomeUser('Admin');
 
         Yii::$app->notification->setSpaces(['5396d499-20d6-4233-800b-c6c86e5fa34a']);
-        
+
         // Setting empty spaceguids settings
-        $settings = new \humhub\modules\notification\models\forms\NotificationSettings(['user' => User::findOne(['id' => 1])]);
+        $settings = new NotificationSettings(['user' => User::findOne(['id' => 1])]);
         $settings->save();
-        
+
         $this->becomeUser('User2');
-        
+
         $post = new Post(['message' => 'MyTestContent']);
         $post->content->setContainer(Space::findOne(['id' => 1]));
         $post->content->visibility = Content::VISIBILITY_PRIVATE;
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(0, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(0);
     }
-    
+
     /**
      * After User2 posts new public post Admin all other users should be notified.
      */
@@ -225,9 +318,9 @@ class ContentCreatedTest extends HumHubDbTestCase
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(4, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(4);
     }
-    
+
     /**
      * Disable space as member and post public content.
      */
@@ -236,22 +329,22 @@ class ContentCreatedTest extends HumHubDbTestCase
         $this->becomeUser('Admin');
 
         Yii::$app->notification->setSpaces(['5396d499-20d6-4233-800b-c6c86e5fa34a']);
-        
+
         // Setting empty spaceguids settings
-        $settings = new \humhub\modules\notification\models\forms\NotificationSettings(['user' => User::findOne(['id' => 1])]);
+        $settings = new NotificationSettings(['user' => User::findOne(['id' => 1])]);
         $settings->save();
-        
+
         $this->becomeUser('User2');
-        
+
         $post = new Post(['message' => 'MyTestContent']);
         $post->content->setContainer(Space::findOne(['id' => 1]));
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(3, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(3);
     }
-    
+
     /**
      * Disable space as member and post public content.
      */
@@ -260,22 +353,22 @@ class ContentCreatedTest extends HumHubDbTestCase
         $this->becomeUser('User1');
 
         Yii::$app->notification->setSpaces(['5396d499-20d6-4233-800b-c6c86e5fa34a']);
-        
+
         // Setting empty spaceguids settings
-        $settings = new \humhub\modules\notification\models\forms\NotificationSettings(['user' => User::findOne(['id' => 2])]);
+        $settings = new NotificationSettings(['user' => User::findOne(['id' => 2])]);
         $settings->save();
-        
+
         $this->becomeUser('User2');
-        
+
         $post = new Post(['message' => 'MyTestContent']);
         $post->content->setContainer(Space::findOne(['id' => 1]));
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(3, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(3);
     }
-    
+
     /**
      * Disable space as member and post public content.
      */
@@ -284,27 +377,27 @@ class ContentCreatedTest extends HumHubDbTestCase
         $this->becomeUser('User1');
 
         Yii::$app->notification->setSpaces(['5396d499-20d6-4233-800b-c6c86e5fa34a']);
-        
+
         // Setting empty spaceguids settings
-        $settings = new \humhub\modules\notification\models\forms\NotificationSettings(['user' => User::findOne(['id' => 2])]);
+        $settings = new NotificationSettings(['user' => User::findOne(['id' => 2])]);
         $settings->save();
-        
+
         $this->becomeUser('Admin');
 
         Yii::$app->notification->setSpaces(['5396d499-20d6-4233-800b-c6c86e5fa34a']);
-        
+
         // Setting empty spaceguids settings
-        $settings = new \humhub\modules\notification\models\forms\NotificationSettings(['user' => User::findOne(['id' => 1])]);
+        $settings = new NotificationSettings(['user' => User::findOne(['id' => 1])]);
         $settings->save();
-        
+
         $this->becomeUser('User2');
-        
+
         $post = new Post(['message' => 'MyTestContent']);
         $post->content->setContainer(Space::findOne(['id' => 1]));
         $post->content->visibility = Content::VISIBILITY_PUBLIC;
         $post->save();
 
         // Note Admin is following Space2 so we expect one notification mail.
-        $this->assertMailSent(2, 'ContentCreated Notification Mail sent');
+        $this->assertMailSent(2);
     }
 }

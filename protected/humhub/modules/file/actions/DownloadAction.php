@@ -8,56 +8,66 @@
 
 namespace humhub\modules\file\actions;
 
+use DateTimeImmutable;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use humhub\components\fs\LocalMountConfig;
+use humhub\components\fs\MountConfigInterface;
+use humhub\modules\file\libs\FileHelper;
+use humhub\modules\file\models\File;
 use humhub\modules\file\Module;
 use humhub\modules\user\models\User;
 use Yii;
-use yii\helpers\Url;
-use yii\web\HttpException;
 use yii\base\Action;
-use humhub\modules\file\models\File;
-use humhub\modules\file\libs\FileHelper;
+use yii\base\Exception;
 use yii\filters\HttpCache;
+use yii\web\HttpException;
 
 /**
  * DownloadAction
  *
  * @since 1.2
- * @author Luke
+ *
+ * @property-read string $storedFilePath
+ * @property-read string $fileName
+ * @property-read Module $module
  */
 class DownloadAction extends Action
 {
-
     /**
      * @see HttpCache
-     * @var boolean enable Http Caching
+     * @var bool enable Http Caching
      */
-    public $enableHttpCache = true;
+    public bool $enableHttpCache = true;
 
     /**
-     * @var File the requested file object
+     * @var File|null the requested file object
      */
-    protected $file;
+    protected ?File $file = null;
 
     /**
-     * @var string the requested file variant
+     * @var string|null the requested file variant
      */
-    protected $variant;
+    protected ?string $variant = null;
 
     /**
-     * @var boolean force download response
+     * @var bool force download response
      */
-    protected $download = false;
+    protected bool $download = false;
 
     /**
      * @inheritdoc
+     * @throws HttpException
      */
     public function init()
     {
         $this->loadFile(Yii::$app->request->get('guid'), Yii::$app->request->get('token'));
-        $this->download = (boolean)Yii::$app->request->get('download', false);
-        $this->loadVariant(Yii::$app->request->get('variant', null));
-        $this->checkFileExists();
+        $this->download = (bool)Yii::$app->request->get('download', false);
+        $this->loadVariant(Yii::$app->request->get('variant'));
+
+        if (!$this->file->store->has($this->variant)) {
+            throw new HttpException(404, Yii::t('FileModule.base', 'Could not find requested file!'));
+        }
     }
 
     /**
@@ -73,20 +83,14 @@ class DownloadAction extends Action
         if (!parent::beforeRun()) {
             return false;
         }
+
         if (!$this->enableHttpCache) {
             return true;
         }
 
         $httpCache = new HttpCache();
-        $httpCache->lastModified = function () {
-            return Yii::$app->formatter->asTimestamp($this->file->updated_at);
-        };
-        $httpCache->etagSeed = function () {
-            if (file_exists($this->getStoredFilePath())) {
-                return md5_file($this->getStoredFilePath());
-            }
-            return null;
-        };
+        $httpCache->lastModified = (fn() => Yii::$app->formatter->asTimestamp($this->file->updated_at));
+        $httpCache->etagSeed = (fn() => $this->file->store->checksum($this->variant, 'md5'));
         if (!$httpCache->beforeAction($this)) {
             return false;
         }
@@ -100,17 +104,42 @@ class DownloadAction extends Action
     public function run()
     {
         $fileName = $this->getFileName();
-        $mimeType = FileHelper::getMimeTypeByExtension($fileName);
+        $mimeType = $this->file->store->mimeType($this->variant);
 
         $options = [
-            'inline' => (!$this->download && in_array($mimeType, $this->getModule()->inlineMimeTypes)),
-            'mimeType' => $mimeType
+            'inline' => (!$this->download && in_array($mimeType, $this->getModule()->inlineMimeTypes, true)),
+            'mimeType' => $mimeType,
         ];
 
-        if ($this->useXSendFile()) {
-            Yii::$app->response->xSendFile($this->getStoredFilePath(), $fileName, $options);
+        $dataMountConfig = Yii::$app->fs->getDataMountConfig();
+        if ($this->getModule()->settings->get('useXSendfile') && $dataMountConfig instanceof LocalMountConfig) {
+            Yii::$app->response->xSendFile(
+                Yii::getAlias($dataMountConfig->path) . DIRECTORY_SEPARATOR . $this->file->store->get($this->variant),
+                $fileName,
+                $options,
+            );
+        } elseif ($dataMountConfig->useTemporaryUrls()) {
+            // The object key ends in `file`, so the backend has to be told the real file name and
+            // mime type - otherwise the browser derives both from the redirect target's path.
+            $url = Yii::$app->fs->getDataMount()->temporaryUrl(
+                $this->file->store->get($this->variant),
+                new DateTimeImmutable('+1 hour'),
+                [
+                    MountConfigInterface::CONFIG_CONTENT_DISPOSITION => FileHelper::getContentDispositionHeaderValue(
+                        $options['inline'] ? 'inline' : 'attachment',
+                        $fileName,
+                    ),
+                    MountConfigInterface::CONFIG_CONTENT_TYPE => $mimeType,
+                ],
+            );
+            Yii::$app->response->redirect($url);
         } else {
-            Yii::$app->response->sendFile($this->getStoredFilePath(), $fileName, $options);
+            $options['fileSize'] = $this->file->store->fileSize($this->variant);
+            Yii::$app->response->sendStreamAsFile(
+                $this->file->store->getContentStream($this->variant),
+                $fileName,
+                $options,
+            );
         }
     }
 
@@ -118,49 +147,60 @@ class DownloadAction extends Action
      * Loads the file by given guid
      *
      * @param string $guid
-     * @param string $token
-     * @return File the loaded file instance
+     * @param string|null $token
+     *
      * @throws HttpException
      */
-    protected function loadFile($guid, $token = null)
+    protected function loadFile(?string $guid, ?string $token = null)
     {
         $file = File::findOne(['guid' => $guid]);
 
-        if ($file == null) {
+        if ($file === null) {
             throw new HttpException(404, Yii::t('FileModule.base', 'Could not find requested file!'));
         }
 
-        $user = nulL;
-        if ($token !== null) {
-            $user = static::getUserByDownloadToken($token, $file);
-        }
+        $user = $token !== null
+            ? static::getUserByDownloadToken($token, $file)
+            : Yii::$app->user->identity;
 
-        if (!$file->canRead($user)) {
+        if (!$this->checkAccess($file, $user)) {
             throw new HttpException(401, Yii::t('FileModule.base', 'Insufficient permissions!'));
         }
 
         $this->file = $file;
     }
 
+    /**
+     * Checks if the given user may download the file.
+     *
+     * Modules serving standalone files with custom access rules can subclass
+     * this action and override this method.
+     *
+     * @since 1.18.4
+     */
+    protected function checkAccess(File $file, ?User $user): bool
+    {
+        return $file->canView($user);
+    }
+
 
     /**
      * Loads a variant and verifies
      *
-     * @param string $variant
+     * @param string|null $variant
+     *
      * @throws HttpException
      */
     protected function loadVariant($variant)
     {
         // For compatibility reasons (prior 1.1) check the old 'suffix' parameter
         if ($variant === null) {
-            $variant = Yii::$app->request->get('suffix', null);
+            $variant = Yii::$app->request->get('suffix');
         }
 
-        if ($variant !== null) {
-            // Check if variant is available by file
-            if (!in_array($variant, $this->file->store->getVariants())) {
-                throw new HttpException(404, Yii::t('FileModule.base', 'Could not find requested file variant!'));
-            }
+        // Check if variant is available by file
+        if (($variant !== null) && !in_array($variant, $this->file->store->getVariants(), true)) {
+            throw new HttpException(404, Yii::t('FileModule.base', 'Could not find requested file variant!'));
         }
 
         $this->variant = $variant;
@@ -169,23 +209,11 @@ class DownloadAction extends Action
     /**
      * Returns the file module
      *
-     * @return \humhub\modules\file\Module
+     * @return Module
      */
-    protected function getModule()
+    protected function getModule(): Module
     {
         return Yii::$app->getModule('file');
-    }
-
-    /**
-     * Check if requested file exists
-     *
-     * @throws HttpException
-     */
-    protected function checkFileExists()
-    {
-        if (!file_exists($this->file->store->get($this->variant))) {
-            throw new HttpException(404, Yii::t('FileModule.base', 'Could not find requested file!'));
-        }
     }
 
     /**
@@ -215,26 +243,6 @@ class DownloadAction extends Action
     }
 
     /**
-     * Checks if XSendFile downloads are enabled
-     *
-     * @return boolean
-     */
-    protected function useXSendFile()
-    {
-        return ($this->getModule()->settings->get('useXSendfile'));
-    }
-
-    /**
-     * Returns the file path of the stored file
-     *
-     * @return string path to the saved file
-     */
-    protected function getStoredFilePath()
-    {
-        return $this->file->store->get($this->variant);
-    }
-
-    /**
      * Returns the User model by given JWT token
      *
      * @param string $token
@@ -244,7 +252,7 @@ class DownloadAction extends Action
     public static function getUserByDownloadToken(string $token, File $file)
     {
         try {
-            $decoded = JWT::decode($token, static::getDownloadTokenKey(), ['HS256']);
+            $decoded = JWT::decode($token, new Key(static::getDownloadTokenKey(), 'HS256'));
         } catch (\Exception $ex) {
             Yii::warning('Could not decode provided JWT token. ' . $ex->getMessage());
         }
@@ -267,15 +275,15 @@ class DownloadAction extends Action
         $token = [
             'iss' => 'dld-token-v1',
             'sub' => $user->id,
-            'aud' => $file->id
+            'aud' => $file->id,
         ];
-        return JWT::encode($token, static::getDownloadTokenKey());
+        return JWT::encode($token, static::getDownloadTokenKey(), 'HS256');
     }
 
 
     /**
      * @return string the secret key for file download tokens
-     * @throws \yii\base\Exception
+     * @throws Exception
      */
     private static function getDownloadTokenKey()
     {

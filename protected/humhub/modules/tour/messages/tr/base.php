@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'Paneli kaldır',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => '<strong>Hesap</strong> Menüsü',
   '<strong>Getting</strong> Started' => '<strong>Başlarken</strong>',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Rehber:</strong> Yönetim (Modüller)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => 'Mekan rehberine <strong>Başla</strong>',
   'Cancel' => 'İptal',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => 'Hiçbirşeyi kaçırma!<br /><br />Bu ikon seni ilgilendiren aktiviteler ve gönderiler hakkında seni doğrudan bilgilendirecek.',
+  'Done' => 'Tamamla',
   'Drag a photo here or click to browse your files' => 'Buraya bir fotoğraf sürükleyin veya dosyalarınıza göz atmak için tıklayın',
-  'End guide' => 'Klavuz sonu',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Adımları takip ederek özelliklerini tanıyın:',
   'Hide my year of birth' => 'Doğum yılımı gizle',
   'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => '',
-  'Next »' => 'İleri »',
+  'Next &rarr;' => '',
   'Ok' => 'Tamam',
   'Save and close' => 'Kaydet ve kapat',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'Hesap menüsü sana gizli ayarlarına erişim hakkı ve açık profilini yönetmeni sağlar.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Soyadınız',
   'Your mobile phone number' => 'Cep telefonu numaranız',
   'Your phone number at work' => 'İş yeri telefonu numaranız',
-  'Your skills, knowledge and experience (comma seperated)' => 'Becerileriniz, bilgi ve tecrübeleriniz (virgül ile ayrılmış)',
+  'Your skills, knowledge and experience' => '',
   'Your title or position' => 'Çalışma konumunuz',
-  '« Prev' => '« Geri',
-);
+  '{{current}} of {{total}}' => '',
+];

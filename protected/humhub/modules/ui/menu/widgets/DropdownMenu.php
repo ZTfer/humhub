@@ -17,9 +17,17 @@ namespace humhub\modules\ui\menu\widgets;
 abstract class DropdownMenu extends Menu
 {
     /**
-     * @var string the label of the dropdown button
+     * @var ?string the label of the dropdown button
      */
-    public $label;
+    public ?string $label = null;
+    /**
+     * @var bool whether the label should be HTML-encoded.
+     */
+    public bool $encodeLabel = true;
+    /**
+     * @var ?string the icon of the dropdown button
+     */
+    public ?string $icon = null;
 
     /**
      * @inheritdoc
@@ -33,7 +41,7 @@ abstract class DropdownMenu extends Menu
     public function getAttributes()
     {
         return [
-            'class' => 'btn-group dropdown-navigation'
+            'class' => 'btn-group dropdown',
         ];
     }
 

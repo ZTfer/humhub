@@ -1,12 +1,12 @@
 <?php
 
-
 namespace humhub\modules\stream\actions;
 
 use Yii;
 use yii\base\Exception;
 use yii\base\Model;
 use yii\db\IntegrityException;
+use yii\web\Controller;
 use yii\web\Response;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\widgets\stream\StreamEntryOptions;
@@ -38,12 +38,12 @@ class StreamEntryResponse extends Model
     public $output;
 
     /**
-     * @var boolean content pinned flag
+     * @var bool content pinned flag
      */
     public $pinned;
 
     /**
-     * @var boolean content archived flag
+     * @var bool content archived flag
      */
     public $archived;
 
@@ -55,7 +55,7 @@ class StreamEntryResponse extends Model
      * @throws Exception
      * @throws IntegrityException
      */
-    public static function getAsJson(Content $content, StreamEntryOptions $renderOptions = null, $widgetOptions = null)
+    public static function getAsJson(Content $content, ?StreamEntryOptions $renderOptions = null, $widgetOptions = null)
     {
         return Yii::$app->controller->asJson(static::getAsArray($content, $renderOptions, $widgetOptions));
     }
@@ -69,7 +69,7 @@ class StreamEntryResponse extends Model
      * @throws IntegrityException
      * @throws \Exception
      */
-    public static function getAsArray(Content $content, StreamEntryOptions $renderOptions = null, $widgetOptions = null)
+    public static function getAsArray(Content $content, ?StreamEntryOptions $renderOptions = null, $widgetOptions = null)
     {
         $model = $content->getModel();
 
@@ -82,9 +82,9 @@ class StreamEntryResponse extends Model
         return (new static([
             'id' => $content->id,
             'guid' => $content->guid,
-            'output' => Yii::$app->controller->renderAjaxContent($streamEntry),
-            'pinned' => (boolean) $content->pinned,
-            'archived' => (boolean) $content->archived,
+            'output' => Yii::$app->controller instanceof Controller ? Yii::$app->controller->renderAjaxPartial($streamEntry) : '',
+            'pinned' => (bool)$content->pinned,
+            'archived' => (bool)$content->archived,
         ]))->asArray();
     }
 
@@ -99,14 +99,14 @@ class StreamEntryResponse extends Model
             'id' => $this->id,
             'guid' => $this->guid,
             'output' => $this->output,
-            'pinned' => (boolean) $this->pinned,
-            'archived' => (boolean) $this->archived
+            'pinned' => (bool)$this->pinned,
+            'archived' => (bool)$this->archived,
         ];
     }
 
     /**
      * Returns the stream action result as json response.
-     * @return \yii\web\Response
+     * @return Response
      * @throws Exception
      */
     public function asJson()

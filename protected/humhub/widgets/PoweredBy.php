@@ -9,7 +9,7 @@
 namespace humhub\widgets;
 
 use humhub\components\Widget;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use Yii;
 
 /**
@@ -20,7 +20,6 @@ use Yii;
  */
 class PoweredBy extends Widget
 {
-
     /**
      * @var bool return text link only
      */
@@ -34,24 +33,35 @@ class PoweredBy extends Widget
     /**
      * @inheritdoc
      */
+    public function beforeRun()
+    {
+        return parent::beforeRun() && !self::isHidden();
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function run()
     {
+        return Yii::t('base', 'Powered by {name}', ['name' => $this->getHumHubName()]);
+    }
 
-        if (isset(Yii::$app->params['hidePoweredBy'])) {
-            return '';
-        }
+    public static function isHidden(): bool
+    {
+        return !empty(Yii::$app->params['hidePoweredBy']);
+    }
 
+    protected function getHumHubName(): string
+    {
         if ($this->textOnly) {
-            return Yii::t('base', 'Powered by {name}', ['name' => 'HumHub (https://humhub.org)']);
+            return 'HumHub (https://www.humhub.com)';
         }
 
         if (!isset($this->linkOptions['target'])) {
             $this->linkOptions['target'] = '_blank';
         }
 
-        return Yii::t('base', 'Powered by {name}', [
-            'name' => Html::a('HumHub', 'https://humhub.org', $this->linkOptions)
-        ]);
+        return Html::a('HumHub', 'https://www.humhub.com', $this->linkOptions);
     }
 
 }

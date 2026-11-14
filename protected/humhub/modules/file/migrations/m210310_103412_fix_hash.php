@@ -1,6 +1,6 @@
 <?php
 
-use yii\db\Migration;
+use humhub\components\Migration;
 
 /**
  * Class m210310_103412_fix_hash
@@ -12,8 +12,8 @@ class m210310_103412_fix_hash extends Migration
      */
     public function safeUp()
     {
-        $this->update('file', ['hash_sha1' => NULL]);
-        $this->alterColumn('file', 'hash_sha1', $this->string(40)->null());
+        $this->update('file', ['hash_sha1' => null]);
+        $this->safeAlterColumn('file', 'hash_sha1', $this->string(40)->null());
     }
 
     /**

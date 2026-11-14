@@ -1,26 +1,27 @@
 <?php
 
-use yii\bootstrap\ActiveForm;
-use yii\bootstrap\Html;
+use humhub\modules\user\models\Password;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+
+/* @var Password $model */
 ?>
-<?php $this->beginContent('@user/views/account/_userProfileLayout.php'); ?>
-    <div class="help-block">
-         <?php echo Yii::t('UserModule.account', 'Your current password can be changed here.') ?>
-    </div>
-    <?php $form = ActiveForm::begin(); ?>
+<?php $this->beginContent('@user/views/account/_userProfileLayout.php') ?>
+<div class="text-body-secondary">
+    <?= Yii::t('UserModule.account', 'Your current password can be changed here.') ?>
+</div>
+<?php $form = ActiveForm::begin(['acknowledge' => true]); ?>
 
-    <?php if ($model->isAttributeSafe('currentPassword')): ?>
-        <?php echo $form->field($model, 'currentPassword')->passwordInput(['maxlength' => 45]); ?>
-        <hr>
-    <?php endif; ?>
-
-    <?php echo $form->field($model, 'newPassword')->passwordInput(['maxlength' => 45]); ?>
-
-    <?php echo $form->field($model, 'newPasswordConfirm')->passwordInput(['maxlength' => 45]); ?>
-
+<?php if ($model->isAttributeSafe('currentPassword')): ?>
+    <?= $form->field($model, 'currentPassword')->passwordInput(['maxlength' => 45, 'autocomplete' => 'current-password']) ?>
     <hr>
-    <?php echo Html::submitButton(Yii::t('UserModule.account', 'Save'), ['class' => 'btn btn-primary', 'data-ui-loader' => '']); ?>
+<?php endif ?>
 
-    <?php echo \humhub\widgets\DataSaved::widget(); ?>
-    <?php ActiveForm::end(); ?>
-<?php $this->endContent(); ?>
+<?= $form->field($model, 'newPassword')->passwordInput(['maxlength' => 45, 'autocomplete' => 'new-password']) ?>
+
+<?= $form->field($model, 'newPasswordConfirm')->passwordInput(['maxlength' => 45, 'autocomplete' => 'new-password']); ?>
+
+<?= Button::save()->submit() ?>
+
+<?php ActiveForm::end() ?>
+<?php $this->endContent() ?>

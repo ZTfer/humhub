@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2019 HumHub GmbH & Co. KG
@@ -8,9 +9,12 @@
 namespace humhub\modules\marketplace\controllers;
 
 use humhub\modules\admin\components\Controller;
+use humhub\modules\admin\permissions\ManageModules;
+use humhub\modules\marketplace\models\forms\GeneralModuleSettingsForm;
 use humhub\modules\marketplace\Module;
+use humhub\modules\marketplace\services\ModuleService;
 use Yii;
-use yii\web\HttpException;
+use yii\web\NotFoundHttpException;
 
 /**
  * Class BrowseController
@@ -21,84 +25,40 @@ use yii\web\HttpException;
 class BrowseController extends Controller
 {
     /**
-     * @var string
-     */
-    public $defaultAction = 'list';
-
-    /**
-     * @var string
-     */
-    public $subLayout = '@admin/views/layouts/module';
-
-    /**
      * @inheritdoc
      */
-    public function getAccessRules()
+    protected function getAccessRules()
     {
         return [
-            ['permissions' => \humhub\modules\admin\permissions\ManageModules::class]
+            ['permissions' => ManageModules::class],
         ];
     }
 
     /**
-     * Complete list of all modules
+     * @inheritdoc
      */
-    public function actionList()
+    public function beforeAction($action)
     {
-        $keyword = Yii::$app->request->post('keyword', "");
-        $categoryId = (int)Yii::$app->request->post('categoryId', 0);
-        $hideInstalled = (boolean)Yii::$app->request->post('hideInstalled');
-
-        // Include Community Modules Form Submit
-        if (!empty(Yii::$app->request->get('communitySwitch'))) {
-            $this->module->settings->set('includeCommunityModules', (empty(Yii::$app->request->post('includeCommunityModules'))) ? 0 : 1);
-        }
-        $includeCommunityModules = (boolean)$this->module->settings->get('includeCommunityModules');
-
-        $onlineModules = $this->module->onlineModuleManager;
-        $modules = $onlineModules->getModules();
-        $categories = $onlineModules->getCategories();
-
-        foreach ($modules as $i => $module) {
-            if (!empty($categoryId) && !in_array($categoryId, $module['categories'])) {
-                unset($modules[$i]);
-            }
-            if (!empty($keyword) && stripos($module['name'], $keyword) === false && stripos($module['description'], $keyword) === false) {
-                unset($modules[$i]);
-            }
-            if ($hideInstalled && Yii::$app->moduleManager->hasModule($module['id'])) {
-                unset($modules[$i]);
-            }
-            if ($this->module->hideLegacyModules && !empty($module['isDeprecated'])) {
-                unset($modules[$i]);
-            }
-            if (!$includeCommunityModules && !empty($module['isCommunity'])) {
-                unset($modules[$i]);
-            }
+        if (!Module::isMarketplaceEnabled()) {
+            throw new NotFoundHttpException(Yii::t('MarketplaceModule.base', 'Marketplace is disabled.'));
         }
 
-        return $this->render('list', [
-            'modules' => $modules,
-            'keyword' => $keyword,
-            'categories' => $categories,
-            'categoryId' => $categoryId,
-            'hideInstalled' => $hideInstalled,
-            'includeCommunityModules' => $includeCommunityModules,
-            'licence' => $this->module->getLicence()
-        ]);
+        return parent::beforeAction($action);
     }
 
+    public function actionIndex()
+    {
+        $this->subLayout = '@admin/views/layouts/module';
+        return $this->render('index');
+    }
 
     /**
      * Returns the thirdparty disclaimer
-     *
-     * @throws HttpException
      */
     public function actionThirdpartyDisclaimer()
     {
-        return $this->renderAjax('thirdpartyDisclaimer', []);
+        return $this->renderAjax('thirdpartyDisclaimer');
     }
-
 
     /**
      * Installs a given moduleId from marketplace
@@ -107,13 +67,71 @@ class BrowseController extends Controller
     {
         $this->forcePostRequest();
 
-        $moduleId = Yii::$app->request->get('moduleId');
+        $this->getModuleService()->install();
 
-        if (!Yii::$app->moduleManager->hasModule($moduleId)) {
-            $this->module->onlineModuleManager->install($moduleId);
+        return $this->renderAjax('installed', [
+            'moduleId' => Yii::$app->request->post('moduleId'),
+        ]);
+    }
+
+    /**
+     * Enables a module after installation
+     *
+     * @throws HttpException
+     */
+    public function actionEnable(): string
+    {
+        $this->forcePostRequest();
+
+        $moduleService = $this->getModuleService();
+
+        if (!$moduleService->enable()) {
+            throw new NotFoundHttpException(Yii::t('MarketplaceModule.base', 'Could not find the requested module!'));
         }
 
-        return $this->redirect(['/admin/module/list']);
+        return $this->renderAjax('enabled', [
+            'moduleConfigUrl' => $moduleService->module->getConfigUrl(),
+        ]);
+    }
+
+    /**
+     * Module settings
+     * @return string
+     */
+    public function actionModuleSettings()
+    {
+        $moduleSettingsForm = new GeneralModuleSettingsForm();
+
+        if ($moduleSettingsForm->load(Yii::$app->request->post()) && $moduleSettingsForm->save()) {
+            $this->view->saved();
+            return $this->redirect(['/marketplace/browse']);
+        }
+
+        return $this->renderAjax('moduleSettings', [
+            'settings' => $moduleSettingsForm,
+        ]);
+    }
+
+    /**
+     * Toggles the marketplace setting that controls whether unverified community
+     * modules are included in the marketplace listing.
+     *
+     * @since 1.19
+     */
+    public function actionToggleCommunity()
+    {
+        $this->forcePostRequest();
+
+        $value = (bool) Yii::$app->request->post('value');
+        $this->module->settings->set('includeCommunityModules', $value);
+        Yii::$app->cache->delete('marketplace-categories');
+
+        return $this->asJson(['success' => true, 'enabled' => $value]);
+    }
+
+    private function getModuleService(): ModuleService
+    {
+        return new ModuleService(Yii::$app->request->post('moduleId'));
     }
 
 }

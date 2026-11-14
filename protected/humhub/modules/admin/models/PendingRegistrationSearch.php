@@ -30,7 +30,7 @@ class PendingRegistrationSearch extends Invite
     {
         return [
             [['id'], 'integer'],
-            [['email', 'created_at', 'originator.username',  'source', 'language'], 'safe'],
+            [['email', 'created_at', 'originator.username', 'source', 'language'], 'safe'],
         ];
     }
 
@@ -50,7 +50,9 @@ class PendingRegistrationSearch extends Invite
      */
     public function search($params = [])
     {
-        $query = self::find()->joinWith(['originator']);
+        $query = self::find()
+            ->joinWith(['originator'])
+            ->andWhere(self::filterSource());
 
         $dataProvider = new ActiveDataProvider([
             'query' => $query,
@@ -61,7 +63,7 @@ class PendingRegistrationSearch extends Invite
             'attributes' => [
                 'email',
                 'created_at',
-            ]
+            ],
         ]);
 
         $this->load($params);
@@ -76,7 +78,7 @@ class PendingRegistrationSearch extends Invite
         $query->andFilterWhere(['like', 'username', $this->getAttribute('originator.username')]);
         $query->andFilterWhere(['like', 'user_invite.email', $this->email]);
         $query->andFilterWhere(['like', 'user_invite.language', $this->language]);
-        $query->andFilterWhere(['like', 'source', $this->source]);
+        $query->andFilterWhere(['source' => $this->source]);
 
         return $dataProvider;
     }

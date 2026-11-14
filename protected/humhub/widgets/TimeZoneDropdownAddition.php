@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -20,7 +21,7 @@ use Yii;
  */
 class TimeZoneDropdownAddition extends JsInputWidget
 {
-    public $toggleClass = 'input-field-addon-sm colorInfo pull-right';
+    public $toggleClass = 'input-field-addon-sm text-info float-end';
 
     /**
      * @var bool whether or not to add offset information
@@ -51,7 +52,7 @@ class TimeZoneDropdownAddition extends JsInputWidget
             'name' => $this->name,
             'currentTimeZoneLabel' => $this->getCurrentLabel(),
             'value' => $this->value,
-            'timeZoneItems' => $this->getTimeZoneItems()
+            'timeZoneItems' => $this->getTimeZoneItems(),
         ]);
     }
 
@@ -65,11 +66,7 @@ class TimeZoneDropdownAddition extends JsInputWidget
         $value = $this->getTimeZoneValue();
         $timeZones = $this->getTimeZoneItems();
 
-        if (isset($timeZones[$value])) {
-            return $timeZones[$value];
-        }
-
-        return array_values($timeZones)[0];
+        return $timeZones[$value] ?? array_values($timeZones)[0];
     }
 
     /**

@@ -21,7 +21,6 @@ use yii\di\NotInstantiableException;
  */
 class MobileTarget extends BaseTarget
 {
-
     /**
      * @inheritdoc
      */
@@ -38,7 +37,7 @@ class MobileTarget extends BaseTarget
 
         try {
             $this->provider = Yii::$container->get(MobileTargetProvider::class);
-        } catch (NotInstantiableException $e) {
+        } catch (NotInstantiableException) {
             // No provider given
         }
     }
@@ -52,7 +51,7 @@ class MobileTarget extends BaseTarget
      */
     public function handle(BaseNotification $notification, User $user)
     {
-        if($this->provider) {
+        if ($this->provider) {
             $this->provider->handle($notification, $user);
         }
     }
@@ -65,13 +64,12 @@ class MobileTarget extends BaseTarget
         return Yii::t('NotificationModule.targets', 'Mobile');
     }
 
-    public function isActive(User $user = null)
+    public function isActive(?User $user = null)
     {
-        if(!parent::isActive() || !$this->provider) {
+        if (!parent::isActive() || !$this->provider) {
             return false;
         }
 
         return $this->provider->isActive($user);
     }
-
 }

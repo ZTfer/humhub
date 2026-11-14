@@ -9,10 +9,14 @@
 
 namespace humhub\assets;
 
-use humhub\components\assets\WebStaticAssetBundle;
+use humhub\components\assets\AssetBundle;
 
-class HighlightJsAsset extends WebStaticAssetBundle
+class HighlightJsAsset extends AssetBundle
 {
+    /**
+     * @inheritdoc
+     */
+    public $sourcePath = '@humhub/resources';
 
     /**
      * @inheritdoc
@@ -23,6 +27,6 @@ class HighlightJsAsset extends WebStaticAssetBundle
      * @inheritdoc
      */
     public $depends = [
-        HighlightJsStyleAsset::class
+        HighlightJsStyleAsset::class,
     ];
 }

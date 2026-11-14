@@ -14,7 +14,6 @@ use kartik\select2\Select2;
 use Yii;
 use yii\web\JsExpression;
 
-
 /**
  * IconPicker form field widget
  *
@@ -28,6 +27,8 @@ use yii\web\JsExpression;
  */
 class IconPicker extends Select2
 {
+    public $bsVersion = 5;
+
     /**
      * @var string optional icon provider id
      */
@@ -41,7 +42,7 @@ class IconPicker extends Select2
         $this->options['placeholder'] = Yii::t('UiModule.form', 'Select icon');
         $this->theme = Select2::THEME_BOOTSTRAP;
         $this->pluginOptions = [
-            'escapeMarkup' => new JsExpression("function(m) { return m; }")
+            'escapeMarkup' => new JsExpression("function(m) { return m; }"),
         ];
         parent::init();
     }
@@ -51,7 +52,7 @@ class IconPicker extends Select2
      */
     public function run()
     {
-        $this->value = (strpos($this->value, 'fa-') === 0)
+        $this->value = (str_starts_with((string)$this->value, 'fa-'))
             ? substr($this->value, 3, strlen($this->value))
             : $this->value;
 
@@ -74,8 +75,8 @@ class IconPicker extends Select2
     {
         foreach ($this->getIconNames() as $icon) {
             $title = $icon;
-            if (substr($title, 0, 3) === 'fa-') {
-                $title = substr($title, 3);
+            if (str_starts_with((string) $title, 'fa-')) {
+                $title = substr((string) $title, 3);
             }
 
             $this->data[$icon] = Icon::get(['name' => $icon, 'lib' => $this->lib]) . '&nbsp;&nbsp;' . $title;

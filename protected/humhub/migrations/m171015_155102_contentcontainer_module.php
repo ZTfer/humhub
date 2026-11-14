@@ -4,7 +4,6 @@ use yii\db\Migration;
 
 class m171015_155102_contentcontainer_module extends Migration
 {
-
     public function safeUp()
     {
         $this->createTable('contentcontainer_module', [
@@ -16,7 +15,7 @@ class m171015_155102_contentcontainer_module extends Migration
 
         try {
             $this->addForeignKey('fk_contentcontainer', 'contentcontainer_module', 'contentcontainer_id', 'contentcontainer', 'id', 'CASCADE', 'CASCADE');
-        } catch (\Exception $ex) {
+        } catch (\Exception) {
             Yii::error('Could not create foreign key for content container module table!');
         }
 

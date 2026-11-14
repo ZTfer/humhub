@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2019 HumHub GmbH & Co. KG
@@ -6,15 +7,18 @@
  */
 
 /**
- * @var $this \yii\web\View
- * @var $enabled boolean
+ * @var $this View
+ * @var $enabled bool
  * @var $errorMessage string
- * @var $model \humhub\modules\ldap\models\LdapSettings
+ * @var $model LdapSettings
  * @var $userCount string
+ * @var $authClientOptions array
  */
 
-use yii\helpers\Html;
-use yii\widgets\ActiveForm;
+use humhub\helpers\Html;
+use humhub\modules\ldap\models\LdapSettings;
+use humhub\widgets\form\ActiveForm;
+use yii\web\View;
 
 ?>
 
@@ -22,7 +26,7 @@ use yii\widgets\ActiveForm;
 
 <div class="panel-body">
 
-    <div class="help-block">
+    <div class="text-body-secondary">
         <?= Yii::t('LdapModule.base', 'Specify your LDAP-backend used to fetch user accounts.') ?>
     </div>
     <br>
@@ -44,15 +48,15 @@ use yii\widgets\ActiveForm;
 
     <?php $form = ActiveForm::begin([
         'id' => 'authentication-settings-form',
-        'fieldConfig' => function ($model, $attribute) {
-            return [
-                'inputOptions' => [
-                    'class' => 'form-control',
-                    'readonly' => Yii::$app->getModule('user')->settings->isFixed('auth.ldap.' . $attribute)
-                ],
-            ];
-        }
+        'fieldConfig' => fn($model, $attribute) => [
+            'inputOptions' => [
+                'class' => 'form-control',
+                'readonly' => Yii::$app->getModule('user')->settings->isFixed('auth.ldap.' . $attribute)
+            ],
+        ]
     ]) ?>
+
+    <?= $form->errorSummary($model) ?>
 
     <?= $form->field($model, 'enabled')->checkbox() ?>
     <hr>
@@ -60,15 +64,28 @@ use yii\widgets\ActiveForm;
     <?= $form->field($model, 'hostname')->textInput() ?>
     <?= $form->field($model, 'port')->textInput() ?>
     <?= $form->field($model, 'encryption')->dropDownList($model->encryptionTypes) ?>
+    <?= $form->field($model, 'disableCertificateChecking')->checkbox() ?>
     <?= $form->field($model, 'username')->textInput() ?>
     <?= $form->field($model, 'passwordField')->passwordInput() ?>
+
     <?= $form->field($model, 'baseDn')->textInput() ?>
-    <?= $form->field($model, 'loginFilter')->textArea() ?>
     <?= $form->field($model, 'userFilter')->textArea() ?>
+
     <?= $form->field($model, 'usernameAttribute')->textInput() ?>
     <?= $form->field($model, 'emailAttribute')->textInput() ?>
     <?= $form->field($model, 'idAttribute')->textInput() ?>
+
     <?= $form->field($model, 'refreshUsers')->checkbox() ?>
+
+    <?php if (!empty($authClientOptions)): ?>
+    <?= $form->field($model, 'allowedAuthClientIds')->checkboxList(
+        $authClientOptions,
+        ['hint' => Yii::t('LdapModule.base', 'Select the authentication methods LDAP users may use. Unchecking "LDAP" disables direct LDAP password login and forces users through the other selected methods (e.g. SAML, OpenID Connect).')]
+    ) ?>
+    <?php endif; ?>
+
+    <?= $form->field($model, 'ignoredDNs')->textarea(['style' => 'white-space:nowrap;']) ?>
+
     <hr>
 
     <?= Html::submitButton(Yii::t('base', 'Save'), ['class' => 'btn btn-primary', 'data-ui-loader' => '']) ?>

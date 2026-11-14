@@ -16,7 +16,6 @@ namespace humhub\modules\ui\form\widgets;
  */
 class MultiSelect extends BasePicker
 {
-
     /**
      * @inerhitdoc
      */
@@ -51,7 +50,7 @@ class MultiSelect extends BasePicker
 
     protected function getSelectedOptions()
     {
-        if (empty($this->selection)) {
+        if ($this->selection === null) {
             $attribute = $this->attribute;
             $this->selection = ($this->model) ? $this->model->$attribute : [];
         }

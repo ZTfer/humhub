@@ -14,7 +14,7 @@ $consoleConfig = [
     ]
 ];
 
-$config = yii\helpers\ArrayHelper::merge(       
+$config = yii\helpers\ArrayHelper::merge(
                 // Common HumHub Config
                 require(YII_APP_BASE_PATH . '/humhub/config/common.php'),
                 // Console HumHub Config
@@ -26,7 +26,6 @@ $config = yii\helpers\ArrayHelper::merge(
 );
 
 $application = new humhub\components\console\Application($config);
-$application->params['installed'] = false;
 
 $exitCode = $application->run();
 exit($exitCode);

@@ -9,7 +9,6 @@ use humhub\components\rendering\MailLayoutRenderer;
 
 class MailLayoutRendererTest extends HumHubDbTestCase
 {
-
     use Specify;
 
     public function testExistingTextView()
@@ -26,7 +25,7 @@ class MailLayoutRendererTest extends HumHubDbTestCase
         $renderer = new MailLayoutRenderer(['parent' => true]);
         $this->assertEquals('TestViewText', $renderer->renderText($viewable));
     }
-    
+
     public function testNonExistingTextLayout()
     {
         try {
@@ -34,7 +33,7 @@ class MailLayoutRendererTest extends HumHubDbTestCase
             $renderer = new MailLayoutRenderer(['textLayout' => '@tests/codeception/unit/components/rendering/views/layouts/nonExsting.php']);
             $renderer->renderText($viewable);
             $this->assertTrue(false);
-        } catch (\yii\base\ViewNotFoundException $ex) {
+        } catch (\yii\base\ViewNotFoundException) {
             $this->assertTrue(true);
         }
     }

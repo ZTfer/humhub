@@ -10,7 +10,6 @@ use humhub\modules\user\models\User;
 
 class DashboardMemberStreamQueryTest extends DashboardStreamTest
 {
-
     /**
      * SPACE MEMBER TESTS
      */
@@ -52,22 +51,22 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
 
     public function testSpaceMemberDoesNotSeePublicContentOfArchivedSpace()
     {
-        $this->assertSpaceMemberDoesNotSee(Space::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, 1 , Space::STATUS_ARCHIVED);
+        $this->assertSpaceMemberDoesNotSee(Space::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, 1, Space::STATUS_ARCHIVED);
     }
 
     public function testSpaceMemberDoesNotSeePublicContentOfDisabledSpace()
     {
-        $this->assertSpaceMemberDoesNotSee(Space::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, 1 , Space::STATUS_DISABLED);
+        $this->assertSpaceMemberDoesNotSee(Space::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, 1, Space::STATUS_DISABLED);
     }
 
-    private function assertSpaceMemberDoesSee($spaceVisibility, $contentVisibility, $show_at_dahsboard = 1,  $state = Space::STATUS_ENABLED)
+    private function assertSpaceMemberDoesSee($spaceVisibility, $contentVisibility, $showAtDashboard = 1, $state = Space::STATUS_ENABLED)
     {
         $user = User::findOne(['id' => 3]);
         $space = Space::findOne(['id' => 1]);
         $space->updateAttributes(['status' => $state, 'visibility' => $spaceVisibility]);
 
         $membership = $space->getMembership($user->id);
-        $membership->updateAttributes(['show_at_dashboard' => $show_at_dahsboard]);
+        $membership->updateAttributes(['show_at_dashboard' => $showAtDashboard]);
 
         static::assertTrue($space->isMember($user->id));
 
@@ -164,7 +163,7 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
 
     public function testSpaceFollowerDoesNotSeePublicContentOnPrivateSpace()
     {
-        $this->assertSpaceFollowerDoesSee(Space::VISIBILITY_NONE, Content::VISIBILITY_PUBLIC);
+        $this->assertSpaceFollowerDoesNotSee(Space::VISIBILITY_NONE, Content::VISIBILITY_PUBLIC);
     }
 
     public function testSpaceFollowerDoesNotSeePrivateContentOnPrivateSpace()
@@ -261,7 +260,7 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
     public function testUserDoesNotSeeContentOfDisabledProfileWithIncludeAll()
     {
         $this->enableAutoIncludeProfilePostsAll();
-        $this->assertUserDoesNotSeeProfileContent(User::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, null,User::STATUS_DISABLED);
+        $this->assertUserDoesNotSeeProfileContent(User::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, null, User::STATUS_DEACTIVATED);
     }
 
 
@@ -319,10 +318,10 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
     public function testAdminDoesNotSeeContentOnDisabledProfileWithIncludeAdminOnly()
     {
         $this->enableAutoIncludeProfilePostsAdmin();
-        $this->assertUserDoesNotSeeProfileContent(User::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, User::findOne(['id' => 1]), User::STATUS_DISABLED);
+        $this->assertUserDoesNotSeeProfileContent(User::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, User::findOne(['id' => 1]), User::STATUS_DEACTIVATED);
     }
 
-    private function assertUserDoesSeeProfileContent($userVisibility, $contentVisibility, $user = null , $status = User::STATUS_ENABLED)
+    private function assertUserDoesSeeProfileContent($userVisibility, $contentVisibility, $user = null, $status = User::STATUS_ENABLED)
     {
         $user1 = User::findOne(['id' => 2]);
         $user2 = $user ?? User::findOne(['id' => 3]);
@@ -335,14 +334,14 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
         static::assertEquals($content->id, $stream[0]->id);
     }
 
-    private function assertUserDoesNotSeeProfileContent($userVisibility, $contentVisibility,  $user = null, $status = User::STATUS_ENABLED)
+    private function assertUserDoesNotSeeProfileContent($userVisibility, $contentVisibility, $user = null, $status = User::STATUS_ENABLED)
     {
         $user1 = User::findOne(['id' => 2]);
         $user2 = $user ?? User::findOne(['id' => 3]);
 
         $user1->updateAttributes(['visibility' => $userVisibility, 'status' => $status]);
 
-        $this->createContent($contentVisibility, $user1,  $user1->username);
+        $this->createContent($contentVisibility, $user1, $user1->username);
         $stream = $this->fetchDashboardContent($user2);
         static::assertCount(0, $stream);
     }
@@ -372,7 +371,7 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
 
     public function testFollowingUserDoesNotSeeContentOfDisabledProfile()
     {
-        $this->assertFollowingUserDoesNotSeeProfileContent(User::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, User::STATUS_DISABLED);
+        $this->assertFollowingUserDoesNotSeeProfileContent(User::VISIBILITY_ALL, Content::VISIBILITY_PUBLIC, User::STATUS_DEACTIVATED);
     }
 
     private function assertFollowingUserDoesSeeProfileContent($userVisibility, $contentVisibility, $status = User::STATUS_ENABLED)
@@ -423,12 +422,12 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
 
     public function testFriendUserDoesNotSeeContentOfDisabledProfile()
     {
-        $this->assertFriendUserDoesNotSeeProfileContent(Content::VISIBILITY_PUBLIC, false, User::STATUS_DISABLED);
+        $this->assertFriendUserDoesNotSeeProfileContent(Content::VISIBILITY_PUBLIC, false, User::STATUS_DEACTIVATED);
     }
 
-    public function testFriendRequestedUserDoesNotSeePublicContent()
+    public function testFriendRequestedUserDoesSeePublicContent()
     {
-        $this->assertFriendUserDoesNotSeeProfileContent(Content::VISIBILITY_PUBLIC, true);
+        $this->assertFriendUserDoesSeeProfileContent(Content::VISIBILITY_PUBLIC, true);
     }
 
     public function testFriendRequestedUserDoesNotSeePrivateContent()
@@ -448,7 +447,7 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
 
         static::assertTrue(Friendship::add($user2, $user1));
 
-        if(!$requested) {
+        if (!$requested) {
             static::assertTrue(Friendship::add($user1, $user2));
         }
 
@@ -472,7 +471,7 @@ class DashboardMemberStreamQueryTest extends DashboardStreamTest
 
         static::assertTrue(Friendship::add($user2, $user1));
 
-        if(!$requested) {
+        if (!$requested) {
             static::assertTrue(Friendship::add($user1, $user2));
         }
 

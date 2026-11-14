@@ -10,12 +10,12 @@ use humhub\modules\space\models\Space;
 use humhub\modules\user\models\Mentioning;
 use humhub\modules\user\notifications\Mentioned;
 use tests\codeception\_support\HumHubDbTestCase;
+use yii\base\Exception;
 
 class MentionTest extends HumHubDbTestCase
 {
-
     /**
-     * @throws \yii\base\Exception
+     * @throws Exception
      */
     public function testPostMention()
     {
@@ -29,7 +29,7 @@ class MentionTest extends HumHubDbTestCase
         RichText::postProcess($post->message, $post);
 
         $this->assertHasNotification(Mentioned::class, $post);
-        $this->assertMailSent(1, 'Mentioned Notification');
+        $this->assertMailSent(1);
     }
 
     public function testMentionAuthor()
@@ -39,8 +39,7 @@ class MentionTest extends HumHubDbTestCase
         // Mention Admin in Space 1 (Admin is author of post)
         $comment = new Comment([
             'message' => 'Hi [url](mention:01e50e0d-82cd-41fc-8b0c-552392f5839c "url")',
-            'object_model' => Post::class,
-            'object_id' => 7
+            'content_id' => 7,
         ]);
 
         $comment->save();
@@ -48,7 +47,7 @@ class MentionTest extends HumHubDbTestCase
         $this->assertHasNotification(Mentioned::class, $comment);
 
         // We expect only the Mentioned mail
-        $this->assertMailSent(1, 'Comment Notification Mail sent');
+        $this->assertMailSent(1);
     }
 
     public function testMentionNonAuthor()
@@ -58,8 +57,7 @@ class MentionTest extends HumHubDbTestCase
         // Mention User1 in post
         $comment = new Comment([
             'message' => 'Hi [url](mention:01e50e0d-82cd-41fc-8b0c-552392f5839d "url")',
-            'object_model' => Post::class,
-            'object_id' => 7
+            'content_id' => 7,
         ]);
 
         $comment->save();
@@ -67,6 +65,6 @@ class MentionTest extends HumHubDbTestCase
         $this->assertHasNotification(Mentioned::class, $comment);
 
         // Commented mail for Admin and Mentioned mail for User1
-        $this->assertMailSent(2, 'Comment Notification Mail sent');
+        $this->assertMailSent(2);
     }
 }

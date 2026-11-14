@@ -8,248 +8,551 @@
 
 namespace humhub\modules\marketplace\commands;
 
+use humhub\components\console\WithoutModuleAutoload;
 use humhub\components\Module;
 use humhub\models\ModuleEnabled;
+use humhub\modules\admin\libs\HumHubAPI;
+use humhub\services\ModuleDependencyService;
+use humhub\services\ModuleDiscoveryService;
+use humhub\services\ModuleService;
 use Yii;
-use yii\base\InvalidArgumentException;
+use yii\base\ErrorException;
+use yii\base\Exception;
+use yii\base\InvalidConfigException;
 use yii\console\Controller;
+use yii\console\ExitCode;
 use yii\helpers\Console;
+use yii\helpers\Json;
+use yii\web\HttpException;
 
 /**
- * HumHub Module Managament
+ * HumHub Module Management
+ *
+ * Third-party module configs are not loaded at bootstrap ({@see WithoutModuleAutoload}).
+ * Each action that needs a specific module calls {@see loadModule()} to register it on demand.
  *
  * @property \humhub\modules\marketplace\Module $module
  * @since 0.5
  */
+#[WithoutModuleAutoload]
 class MarketplaceController extends Controller
 {
-
     /**
-     * @inerhitdoc
+     * @inheritdoc
      */
     public function beforeAction($action)
     {
-        /** @var \humhub\modules\marketplace\Module $module */
         $module = Yii::$app->getModule('marketplace');
 
         if ($module === null || !$module->enabled) {
-            print "Fatal: The module marketplace is disabled by configuration!\n\n";
+            $this->error('The marketplace module is disabled by configuration.');
             return false;
         }
 
         return parent::beforeAction($action);
     }
 
-
     /**
-     * Lists all installed and enabled modules.
+     * Lists all installed modules.
      *
-     * @throws \yii\base\Exception
+     * Reads metadata from module.json — no config.php is loaded.
      */
     public function actionList()
     {
-        Yii::$app->moduleManager->flushCache();
-        $installedModules = Yii::$app->moduleManager->getModules();
+        $installed = ModuleDiscoveryService::findInstalledModules();
+        $enabledIds = ModuleEnabled::getEnabledIds();
 
-        print "Installed modules: \n\n";
+        $this->heading('Installed Modules (' . count($installed) . ')');
 
-        $mask = "| %-20s | %10s |%20s | %-30s \n";
-        printf($mask, 'ID', 'ENABLED', 'INSTALLED VERSION', 'TITLE');
-        foreach ($installedModules as $module) {
-            printf($mask, $module->id, (Yii::$app->hasModule($module->id) ? 'Yes' : 'No'), $module->getVersion(), $module->getName());
+        if (empty($installed)) {
+            $this->warn('No modules installed.');
+            return 0;
         }
+
+        $this->stdout(sprintf('  %-26s  %-10s  %-12s  %s' . PHP_EOL, 'ID', 'STATUS', 'VERSION', 'NAME'), Console::BOLD);
+        $this->stdout('  ' . str_repeat('─', 70) . PHP_EOL);
+
+        foreach ($installed as $moduleId => $info) {
+            $isEnabled = in_array($moduleId, $enabledIds);
+            $name = $this->readModuleName($info['basePath'], $moduleId);
+            $this->stdout(sprintf('  %-26s  ', $moduleId));
+            $this->stdout(sprintf('%-10s', $isEnabled ? 'enabled' : 'disabled'), $isEnabled ? Console::FG_GREEN : Console::FG_YELLOW);
+            $this->stdout(sprintf('  %-12s  %s' . PHP_EOL, $info['version'] ?? '-', $name));
+        }
+
+        $enabledCount = count(array_intersect($enabledIds, array_keys($installed)));
+        $this->stdout(PHP_EOL . '  ' . $enabledCount . ' of ' . count($installed) . ' module(s) enabled.' . PHP_EOL);
+
+        return 0;
     }
 
     /**
      * Lists all online available modules.
+     *
+     * Uses filesystem metadata to determine installed status — no config.php is loaded.
      */
     public function actionListOnline()
     {
+        $this->stdout(PHP_EOL . 'Fetching online module list...' . PHP_EOL);
+
         $modules = $this->getMarketplaceModule()->onlineModuleManager->getModules();
+        $installed = ModuleDiscoveryService::findInstalledModules();
 
-        print "Online available modules: \n\n";
+        $this->heading('Online Modules (' . count($modules) . ')');
 
-        $mask = "| %-20s | %9s | %14s | %21s | %-30s \n";
-        printf($mask, 'ID', 'INSTALLED', 'LATEST VERSION', 'LATEST COMPAT VERSION', 'TITLE');
+        if (empty($modules)) {
+            $this->warn('No modules found.');
+            return 0;
+        }
+
+        $this->stdout(
+            sprintf('  %-26s  %-12s  %-12s  %-14s  %s' . PHP_EOL, 'ID', 'INSTALLED', 'LATEST', 'COMPATIBLE', 'NAME'),
+            Console::BOLD,
+        );
+        $this->stdout('  ' . str_repeat('─', 82) . PHP_EOL);
 
         foreach ($modules as $module) {
+            $isInstalled = array_key_exists($module['id'], $installed);
+            $installedVersion = $installed[$module['id']]['version'] ?? null;
+            $compat = $module['latestCompatibleVersion'] ?? '-';
 
-            printf($mask, $module['id'], (Yii::$app->moduleManager->hasModule($module['id']) ? 'Yes' : 'No'), $module['latestVersion'], (isset($module['latestCompatibleVersion']) && $module['latestCompatibleVersion']) ? $module['latestCompatibleVersion'] : "-", $module['name']);
+            $this->stdout(sprintf('  %-26s  ', $module['id']));
+            if ($isInstalled) {
+                $this->stdout(sprintf('%-12s', $installedVersion), Console::FG_GREEN);
+            } else {
+                $this->stdout(sprintf('%-12s', '-'), Console::FG_YELLOW);
+            }
+            $this->stdout(sprintf('  %-12s  %-14s  %s' . PHP_EOL, $module['latestVersion'] ?? '-', $compat, $module['name']));
         }
+
+        return 0;
     }
 
     /**
      * Installs a given module.
      *
-     * @param string $moduleId
-     * @throws \yii\base\ErrorException
-     * @throws \yii\base\Exception
-     * @throws \yii\base\InvalidConfigException
-     * @throws \yii\web\HttpException
+     * @throws ErrorException
+     * @throws Exception
+     * @throws InvalidConfigException
+     * @throws HttpException
      */
-    public function actionInstall($moduleId)
+    public function actionInstall(string $moduleId)
     {
+        $installed = ModuleDiscoveryService::findInstalledModules();
+
+        if (array_key_exists($moduleId, $installed)) {
+            $this->warn('Module ' . $moduleId . ' is already installed (v' . ($installed[$moduleId]['version'] ?? '?') . ').');
+            return 0;
+        }
+
+        $this->stdout(PHP_EOL . 'Installing ' . $moduleId . '...' . PHP_EOL);
+
         $this->getMarketplaceModule()->onlineModuleManager->install($moduleId);
 
-        print "\nModule " . $moduleId . " successfully installed!\n";
+        $version = ModuleDiscoveryService::findInstalledVersion($moduleId);
+        $this->success('Module ' . $moduleId . ($version ? ' (v' . $version . ')' : '') . ' installed successfully.');
+
+        return 0;
     }
 
     /**
      * Uninstalls a given module.
      *
-     * @param string $moduleId
-     * @throws \yii\base\ErrorException
-     * @throws \yii\base\Exception
+     * @throws ErrorException
+     * @throws Exception
      */
-    public function actionRemove($moduleId)
+    public function actionRemove(string $moduleId)
     {
+        $module = $this->loadModule($moduleId);
 
-        $module = Yii::$app->moduleManager->getModule($moduleId);
+        if ($module === null) {
+            // Module files are missing, but the module may still be marked as enabled
+            // (e.g. it can't be reinstalled because no compatible version exists anymore).
+            $moduleEnabled = ModuleEnabled::findOne(['module_id' => $moduleId]);
+            if ($moduleEnabled !== null) {
+                $moduleEnabled->delete();
+                $this->warn('Module ' . $moduleId . ' is not installed, removed its enabled flag from the database.');
+                return 0;
+            }
 
-        if ($module == null) {
-            print "\nModule " . $moduleId . " is not installed!\n";
-            return;
+            $this->error('Module ' . $moduleId . ' is not installed.');
+            return 1;
         }
 
-        Yii::$app->moduleManager->removeModule($module->id);
+        $this->stdout(PHP_EOL . 'Removing ' . $moduleId . '...' . PHP_EOL);
 
-        print "\nModule " . $moduleId . " successfully uninstalled!\n";
+        (new ModuleService($module))->remove();
+
+        $this->success('Module ' . $moduleId . ' removed successfully.');
+
+        return 0;
     }
 
     /**
-     * Updates a module
+     * Updates a module to the latest compatible version.
      *
-     * @param string $moduleId
-     * @throws \yii\base\Exception
-     * @todo Handle no marketplace modules
-     *
+     * @throws Exception
      */
-    public function actionUpdate($moduleId)
+    public function actionUpdate(string $moduleId)
     {
+        $installed = ModuleDiscoveryService::findInstalledModules();
 
-        if (!Yii::$app->moduleManager->hasModule($moduleId)) {
-            print "\nModule " . $moduleId . " is not installed!\n";
-            exit;
+        if (!array_key_exists($moduleId, $installed)) {
+            $this->error('Module ' . $moduleId . ' is not installed.');
+            return 1;
         }
 
-        // Look online for module
         $moduleInfo = $this->getMarketplaceModule()->onlineModuleManager->getModuleInfo($moduleId);
 
         if (!isset($moduleInfo['latestCompatibleVersion'])) {
-            print "No compatible version for " . $moduleId . " found online!\n";
-            return;
+            $this->warn('No compatible version for ' . $moduleId . ' found online.');
+            return 0;
         }
 
-        $module = Yii::$app->moduleManager->getModule($moduleId);
+        $currentVersion = $installed[$moduleId]['version'] ?? '?';
+        $newVersion = $moduleInfo['latestCompatibleVersion']['version'];
 
-        if ($moduleInfo['latestCompatibleVersion']['version'] == $module->getVersion()) {
-            print "Module " . $moduleId . " already up to date!\n";
-            return;
+        if ($newVersion === $currentVersion) {
+            $this->warn('Module ' . $moduleId . ' is already up to date (v' . $currentVersion . ').');
+            return 0;
         }
 
+        $this->stdout(PHP_EOL . 'Updating ' . $moduleId . ' (v' . $currentVersion . ' → v' . $newVersion . ')...' . PHP_EOL);
+
+        // No pre-loading: OnlineModuleManager::update() removes old files first, then
+        // calls install() which registers the fresh config.php. Loading the old module
+        // here would put stale class definitions into the process before the files change.
         $this->getMarketplaceModule()->onlineModuleManager->update($moduleId);
 
-        print "Module " . $moduleId . " successfully updated!\n";
+        $this->success('Module ' . $moduleId . ' updated to v' . $newVersion . '.');
+
+        return 0;
     }
 
     /**
      * Updates all modules to the latest available version.
+     *
+     * All packages are downloaded first and their module dependencies are checked against the
+     * versions installed once all updates are applied (see {@see planUpdates()}). Modules are then
+     * updated so that each one comes after the modules it depends on.
      */
     public function actionUpdateAll()
     {
         $onlineModuleManager = $this->getMarketplaceModule()->onlineModuleManager;
 
-        $i = 0;
-        foreach ($onlineModuleManager->getModuleUpdates() as $moduleId => $info) {
-            try {
-                $this->actionUpdate($moduleId);
-            } catch (InvalidArgumentException $ex) {
-                print "Module " . $moduleId . " - Error: " . $ex->getMessage() . "\n";
-            } catch (\Exception $ex) {
-                print "Module " . $moduleId . " - Error: " . $ex->getMessage() . "\n";
+        $this->stdout(PHP_EOL . 'Checking for module updates...' . PHP_EOL);
+
+        // An empty module list means the marketplace API is disabled or could not be reached,
+        // e.g. due to network issues. Reporting the modules as up to date would hide that.
+        if (empty($onlineModuleManager->getModules())) {
+            if (empty(Yii::$app->params['humhub']['apiEnabled'])) {
+                $this->error('Could not check for module updates, the HumHub API is disabled.');
+            } else {
+                $this->error('Could not check for module updates, no module list received from the HumHub API ('
+                    . Yii::$app->params['humhub']['apiUrl'] . '). Check the connection to the API, see the log for details.');
             }
-            $i++;
+            return ExitCode::UNSPECIFIED_ERROR;
         }
 
-        print "\nUpdated " . $i . " outdated modules. \n";
+        $updates = $onlineModuleManager->getModuleUpdates();
 
-        /**
-         * Looking up modules which are marked as installed but not loaded.
-         * Try to get recent version online.
-         */
-        // Also install modules which are seems to be installed
-        $installedModules = Yii::$app->moduleManager->getModules(['returnClass' => true]);
+        if (empty($updates)) {
+            $this->success('All modules are up to date.');
+        } else {
+            $this->stdout('Found ' . count($updates) . ' module(s) with available updates.' . PHP_EOL);
 
-        foreach (ModuleEnabled::getEnabledIds() as $moduleId) {
-            if (!in_array($moduleId, array_keys($installedModules))) {
-                // Module seems to be installed - but cannot be loaded
-                // Try force re-install
+            $succeeded = 0;
+            foreach ($this->planUpdates(array_keys($updates)) as $moduleId) {
+                $this->stdout(PHP_EOL . '── ' . $moduleId . ' ──' . PHP_EOL, Console::BOLD);
+                try {
+                    $this->actionUpdate($moduleId);
+                    $succeeded++;
+                } catch (\Throwable $e) {
+                    $this->error('Update of ' . $moduleId . ' failed: ' . $e->getMessage());
+                }
+            }
+
+            $this->stdout(PHP_EOL);
+            if ($succeeded === count($updates)) {
+                $this->success('Updated ' . $succeeded . ' of ' . count($updates) . ' module(s).');
+            } else {
+                $this->warn('Updated ' . $succeeded . ' of ' . count($updates) . ' module(s). ' . (count($updates) - $succeeded) . ' failed.');
+            }
+        }
+
+        // Reinstall modules that are marked as enabled in the DB but missing on disk.
+        $installed = ModuleDiscoveryService::findInstalledModules();
+        $missing = array_diff(ModuleEnabled::getEnabledIds(), array_keys($installed));
+
+        if (!empty($missing)) {
+            $this->stdout(PHP_EOL . 'Reinstalling ' . count($missing) . ' missing module(s)...' . PHP_EOL);
+
+            foreach ($missing as $moduleId) {
                 try {
                     $onlineModuleManager->install($moduleId);
-                    print "Reinstalled: " . $moduleId . "\n";
-                } catch (\Exception $ex) {
-
+                    $reinstalledModule = Yii::$app->moduleManager->getModule($moduleId);
+                    if ($reinstalledModule !== null) {
+                        $reinstalledModule->update();
+                    }
+                    $this->success('Reinstalled ' . $moduleId . '.');
+                } catch (\Exception $e) {
+                    $this->error('Could not reinstall ' . $moduleId . ': ' . $e->getMessage());
                 }
             }
         }
+
+        return 0;
     }
 
     /**
-     * Enables an installed module
+     * Downloads the given module updates and returns the ones to apply, in dependency order.
+     *
+     * An update is skipped when the module dependencies of its new version are not met, even
+     * after all other updates are applied. Skipping an update may in turn leave the dependencies
+     * of another one unmet, so the check repeats until no more updates are skipped.
+     *
+     * @param string[] $moduleIds
+     * @return string[]
+     */
+    private function planUpdates(array $moduleIds): array
+    {
+        $onlineModuleManager = $this->getMarketplaceModule()->onlineModuleManager;
+
+        $packages = [];
+        foreach ($moduleIds as $moduleId) {
+            try {
+                $packages[$moduleId] = $onlineModuleManager->getPackageModuleInfo($moduleId);
+            } catch (\Throwable $e) {
+                $this->error('Update of ' . $moduleId . ' failed: ' . $e->getMessage());
+            }
+        }
+
+        do {
+            $plannedVersions = array_filter(array_map(
+                static fn(array $moduleInfo) => $moduleInfo['version'] ?? null,
+                $packages,
+            ));
+
+            $skipped = false;
+            foreach ($packages as $moduleId => $moduleInfo) {
+                $unmetDependencies = (new ModuleDependencyService($moduleInfo, $plannedVersions))->getUnmetDependencies();
+                if ($unmetDependencies !== []) {
+                    $this->error('Update of ' . $moduleId . ' skipped: ' . implode(' ', $unmetDependencies));
+                    unset($packages[$moduleId]);
+                    $skipped = true;
+                }
+            }
+        } while ($skipped);
+
+        return ModuleDependencyService::sortByDependencies($packages);
+    }
+
+    /**
+     * Enables an installed module.
      *
      * @param string $moduleId the module id
      * @return int the exit code
      */
-    public function actionEnable($moduleId)
+    public function actionEnable(string $moduleId)
     {
-        $this->stdout(Yii::t('MarketplaceModule.base', "--- Enable module: {moduleId} ---\n\n", ['moduleId' => $moduleId]), Console::BOLD);
+        $this->stdout(PHP_EOL . 'Enabling ' . $moduleId . '...' . PHP_EOL);
 
-        /** @var Module $module */
-        $module = Yii::$app->moduleManager->getModule($moduleId);
+        $module = $this->loadModule($moduleId);
         if ($module === null) {
-            $this->stdout(Yii::t('MarketplaceModule.base', "Module not found!\n"), Console::FG_RED, Console::BOLD);
+            $this->error('Module ' . $moduleId . ' is not installed.');
             return 1;
+        }
+
+        if (ModuleEnabled::findOne(['module_id' => $moduleId])) {
+            $this->warn('Module ' . $moduleId . ' is already enabled.');
+            return 0;
         }
 
         $module->enable();
 
-        $this->stdout(Yii::t('MarketplaceModule.base', "\nModule successfully enabled!\n"), Console::FG_GREEN, Console::BOLD);
+        $this->success('Module ' . $moduleId . ' enabled.');
         return 0;
     }
 
     /**
-     * Disables an enabled module
+     * Disables an enabled module.
      *
      * @param string $moduleId the module id
      * @return int the exit code
      */
-    public function actionDisable($moduleId)
+    public function actionDisable(string $moduleId)
     {
-        if (!$this->confirm(Yii::t('MarketplaceModule.base', 'All {moduleId} module content will be deleted. Continue?', ['moduleId' => $moduleId]), false)) {
+        $module = $this->loadModule($moduleId);
+        if ($module === null) {
+            $this->error('Module ' . $moduleId . ' is not installed.');
             return 1;
         }
 
-        $this->stdout(Yii::t('MarketplaceModule.base', "--- Disable module: {moduleId} ---\n\n", ['moduleId' => $moduleId]), Console::BOLD);
+        if (!ModuleEnabled::findOne(['module_id' => $moduleId])) {
+            $this->warn('Module ' . $moduleId . ' is not enabled.');
+            return 0;
+        }
 
-        /** @var Module $module */
-        $module = Yii::$app->moduleManager->getModule($moduleId);
-        if ($module === null || !Yii::$app->hasModule($moduleId)) {
-            $this->stdout(Yii::t('MarketplaceModule.base', "Module not found or activated!\n"), Console::FG_RED, Console::BOLD);
+        if (!$this->confirm(
+            Yii::t('MarketplaceModule.base', 'All {moduleId} module content will be deleted. Continue?', ['moduleId' => $moduleId]),
+            false,
+        )) {
             return 1;
         }
+
+        $this->stdout(PHP_EOL . 'Disabling ' . $moduleId . '...' . PHP_EOL);
 
         $module->disable();
 
-        $this->stdout(Yii::t('MarketplaceModule.base', "\nModule successfully disabled!\n"), Console::FG_GREEN, Console::BOLD);
+        $this->success('Module ' . $moduleId . ' disabled.');
         return 0;
     }
 
     /**
-     * @return \humhub\modules\marketplace\Module
+     * Registers a license key for a paid module.
+     *
+     * @param string $licenceKey
+     * @throws ErrorException
+     * @throws Exception
+     * @throws InvalidConfigException
+     * @throws HttpException
      */
-    private function getMarketplaceModule()
+    public function actionRegister(string $licenceKey)
+    {
+        if (empty($licenceKey)) {
+            $this->error('License key cannot be empty.');
+            return 1;
+        }
+
+        $result = HumHubAPI::request('v1/modules/registerPaid', ['licenceKey' => $licenceKey]);
+
+        if (!isset($result['status'])) {
+            $this->error('Could not connect to the HumHub API.');
+            return 1;
+        }
+
+        if ($result['status'] !== 'ok' && $result['status'] !== 'created') {
+            $this->error('Invalid license key.');
+            return 1;
+        }
+
+        $this->success('License key registered successfully.');
+        return 0;
+    }
+
+    /**
+     * Displays detailed information about a module.
+     *
+     * @param string $moduleId Module ID
+     */
+    public function actionInfo(string $moduleId)
+    {
+        $installed = ModuleDiscoveryService::findInstalledModules();
+        $isInstalled = array_key_exists($moduleId, $installed);
+        $isEnabled = $isInstalled && ModuleEnabled::findOne(['module_id' => $moduleId]) !== null;
+
+        $module = $isInstalled ? $this->loadModule($moduleId) : null;
+
+        $this->heading('Module: ' . $moduleId);
+
+        $this->printInfoRow('Installed', $isInstalled ? 'Yes' : 'No', $isInstalled ? Console::FG_GREEN : Console::FG_RED);
+
+        if (!$isInstalled) {
+            $this->stdout(PHP_EOL);
+            return 1;
+        }
+
+        $this->printInfoRow('Enabled', $isEnabled ? 'Yes' : 'No', $isEnabled ? Console::FG_GREEN : Console::FG_YELLOW);
+
+        if ($module !== null) {
+            $this->printInfoRow('Name', $module->name);
+            $this->printInfoRow('Version', $module->version);
+            $this->printInfoRow('Description', $module->description);
+            $this->printInfoRow('Path', $module->basePath);
+        } else {
+            $this->printInfoRow('Version', $installed[$moduleId]['version'] ?? '-');
+            $this->printInfoRow('Path', $installed[$moduleId]['basePath']);
+            $this->stdout(PHP_EOL);
+            $this->warn('Module config could not be loaded (broken config.php).');
+        }
+
+        $this->stdout(PHP_EOL);
+        return 0;
+    }
+
+    /**
+     * Explicitly loads a single module's config.php and registers it with the module manager.
+     *
+     * Returns the Module instance on success, or null if the module is not found on disk
+     * or its config.php throws an error.
+     */
+    private function loadModule(string $moduleId): ?Module
+    {
+        $basePath = ModuleDiscoveryService::findModuleBasePath($moduleId);
+        if ($basePath === null) {
+            return null;
+        }
+
+        try {
+            Yii::$app->moduleManager->register($basePath);
+        } catch (\Throwable $e) {
+            Yii::error('Could not load config for module "' . $moduleId . '": ' . $e->getMessage());
+            return null;
+        }
+
+        return Yii::$app->moduleManager->getModule($moduleId, false);
+    }
+
+    private function heading(string $title): void
+    {
+        $this->stdout(PHP_EOL . $title . PHP_EOL, Console::BOLD);
+        $this->stdout(str_repeat('─', max(mb_strlen($title) + 4, 44)) . PHP_EOL);
+    }
+
+    private function success(string $message): void
+    {
+        $this->stdout('✓ ', Console::FG_GREEN, Console::BOLD);
+        $this->stdout($message . PHP_EOL);
+    }
+
+    private function error(string $message): void
+    {
+        $this->stdout('✗ ', Console::FG_RED, Console::BOLD);
+        $this->stdout($message . PHP_EOL);
+    }
+
+    private function warn(string $message): void
+    {
+        $this->stdout('! ', Console::FG_YELLOW, Console::BOLD);
+        $this->stdout($message . PHP_EOL);
+    }
+
+    private function printInfoRow(string $label, string $value, ?int $valueColor = null): void
+    {
+        $this->stdout(sprintf('  %-14s', $label . ':'));
+        if ($valueColor !== null) {
+            $this->stdout($value . PHP_EOL, $valueColor, Console::BOLD);
+        } else {
+            $this->stdout($value . PHP_EOL);
+        }
+    }
+
+    private function readModuleName(string $basePath, string $fallback): string
+    {
+        $path = $basePath . DIRECTORY_SEPARATOR . 'module.json';
+        if (!is_file($path)) {
+            return $fallback;
+        }
+
+        try {
+            return Json::decode(file_get_contents($path))['name'] ?? $fallback;
+        } catch (\Throwable) {
+            return $fallback;
+        }
+    }
+
+    private function getMarketplaceModule(): \humhub\modules\marketplace\Module
     {
         return Yii::$app->getModule('marketplace');
     }
-
 }

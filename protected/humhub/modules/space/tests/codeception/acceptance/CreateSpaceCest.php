@@ -2,16 +2,16 @@
 
 namespace space\acceptance;
 
+use Exception;
 use space\AcceptanceTester;
 
 class CreateSpaceCest
 {
-
     /**
-     * Create private space
+     * Create Private Spaces
      *
      * @param AcceptanceTester $I
-     * @throws \Exception
+     * @throws Exception
      */
     public function testCreateSpace(AcceptanceTester $I)
     {
@@ -20,13 +20,14 @@ class CreateSpaceCest
         $I->amGoingTo('create a new space and invite another user');
 
         $I->click('#space-menu');
-        $I->waitForText('Create new space');
-        $I->click('Create new space');
+        $I->waitForText('Create Space');
+        $I->click('Create Space');
 
-        $I->waitForText('Create new space', 30, '#globalModal');
+        $I->waitForText('Create Space', 30, '#globalModal');
         $I->fillField('Space[name]', 'Space 1');
         $I->fillField('Space[description]', 'SpaceDescription');
 
+        $I->wait(1); // let modal fade-in settle so the collapse toggle click registers
         $I->click('#access-settings-link');
         $I->waitForElementVisible('.field-space-join_policy');
 
@@ -47,7 +48,7 @@ class CreateSpaceCest
         try {
             $I->waitForText('Add Modules', 5, '#globalModal');
             $I->click('Next', '#globalModal');
-        } catch (\Exception $e) {
+        } catch (Exception) {
             // Do this if it's not present.
         }
 

@@ -6,24 +6,22 @@
  *
  */
 
-use humhub\modules\ui\form\widgets\SortOrderField;
-use humhub\widgets\ModalButton;
-use humhub\widgets\ModalDialog;
-use yii\bootstrap\ActiveForm;
+use humhub\components\View;
+use humhub\modules\topic\models\Topic;
+use humhub\widgets\form\SortOrderField;
+use humhub\widgets\modal\Modal;
+use humhub\widgets\modal\ModalButton;
 
-/* @var $this \humhub\modules\ui\view\components\View */
-/* @var $model \humhub\modules\topic\models\Topic */
+/* @var $this View */
+/* @var $model Topic */
 ?>
 
-<?php ModalDialog::begin(['header' => Yii::t('TopicModule.base', '<strong>Edit</strong> Topic')])?>
-    <?php $form = ActiveForm::begin() ?>
-        <div class="modal-body">
-            <?= $form->field($model, 'name')?>
-            <?= $form->field($model, 'sort_order')->widget(SortOrderField::class) ?>
-        </div>
-        <div class="modal-footer">
-            <?= ModalButton::submitModal()?>
-            <?= ModalButton::cancel() ?>
-        </div>
-    <?php ActiveForm::end() ?>
-<?php ModalDialog::end()?>
+<?php $form = Modal::beginFormDialog([
+    'title' => Yii::t('TopicModule.base', '<strong>Edit</strong> Topic'),
+    'footer' => ModalButton::cancel() . ' ' . ModalButton::save()->submit(),
+]) ?>
+
+    <?= $form->field($model, 'name') ?>
+    <?= $form->field($model, 'sort_order')->widget(SortOrderField::class) ?>
+
+<?php Modal::endFormDialog(); ?>

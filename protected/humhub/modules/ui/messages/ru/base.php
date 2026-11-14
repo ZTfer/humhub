@@ -1,6 +1,10 @@
 <?php
-return array (
-  'Collapse' => 'Свернуть',
-  'Read more' => '',
-  'User Interface' => 'Интерфейс Пользователя',
-);
+
+return [
+    'Collapse' => 'Свернуть',
+    'Read more' => 'Развернуть',
+    'Reset filters' => 'Сбросить фильтры',
+    'Select' => 'Выбрать',
+    'User Interface' => 'Интерфейс Пользователя',
+    'Toggle filters' => '',
+];

@@ -8,11 +8,14 @@
 
 namespace humhub\modules\admin\models;
 
+use humhub\libs\DateHelper;
+use humhub\modules\user\components\ActiveQueryUser;
 use yii\base\InvalidArgumentException;
 use Yii;
 use yii\base\Model;
 use yii\data\ActiveDataProvider;
 use humhub\modules\user\models\User;
+use yii\db\Expression;
 
 /**
  * Description of UserSearch
@@ -21,9 +24,8 @@ use humhub\modules\user\models\User;
  */
 class UserSearch extends User
 {
-
     /**
-     * @var \humhub\modules\user\components\ActiveQueryUser
+     * @var ActiveQueryUser
      */
     public $query;
 
@@ -71,7 +73,7 @@ class UserSearch extends User
     public function search($params)
     {
         $query = ($this->query == null) ? User::find() : $this->query;
-        /* @var $query \humhub\modules\user\components\ActiveQueryUser */
+        /* @var $query ActiveQueryUser */
         $query->joinWith('profile');
 
         $dataProvider = new ActiveDataProvider([
@@ -87,7 +89,7 @@ class UserSearch extends User
                 'profile.firstname',
                 'profile.lastname',
                 'created_at',
-            ]
+            ],
         ]);
         $dataProvider->sort->defaultOrder = ['id' => SORT_DESC];
 
@@ -98,15 +100,11 @@ class UserSearch extends User
             return $dataProvider;
         }
 
-
-        $query->joinWith(['profile']);
-
-
         // Freetext filters
         if (!empty($this->freeText)) {
             $query->andWhere([
                 'OR',
-                ['like', 'user.id', $this->freeText],
+                ['=', 'user.id', $this->freeText],
                 ['like', 'user.username', $this->freeText],
                 ['like', 'user.email', $this->freeText],
                 ['like', 'profile.firstname', $this->freeText],
@@ -115,7 +113,7 @@ class UserSearch extends User
                 ['like', 'concat(profile.lastname, " ", profile.firstname)', $this->freeText],
             ]);
 
-            if (!empty($this->status)) {
+            if (isset($this->status) && in_array($this->status, [User::STATUS_ENABLED, User::STATUS_DEACTIVATED, User::STATUS_SOFT_DELETED])) {
                 $query->andFilterWhere(['user.status' => $this->status]);
             }
             return $dataProvider;
@@ -130,17 +128,16 @@ class UserSearch extends User
         $query->andFilterWhere(['like', 'profile.lastname', $this->getAttribute('profile.lastname')]);
 
 
-
         if ($this->getAttribute('last_login') != "") {
             try {
-                $last_login = \humhub\libs\DateHelper::parseDateTime($this->getAttribute('last_login'));
+                $last_login = DateHelper::parseDateTime($this->getAttribute('last_login'));
 
                 $query->andWhere([
                     '=',
-                    new \yii\db\Expression("DATE(last_login)"),
-                    new \yii\db\Expression("DATE(:last_login)", [':last_login' => $last_login])
+                    new Expression("DATE(last_login)"),
+                    new Expression("DATE(:last_login)", [':last_login' => $last_login]),
                 ]);
-            } catch (InvalidArgumentException $e) {
+            } catch (InvalidArgumentException) {
                 // do not change the query if the date is wrong formatted
             }
         }
@@ -148,15 +145,15 @@ class UserSearch extends User
         return $dataProvider;
     }
 
-    public static function getStatusAttributes()
+    public function getStatusAttributes(): array
     {
         $countActive = User::find()->where(['user.status' => User::STATUS_ENABLED])->count();
-        $countDisabled = User::find()->where(['user.status' => User::STATUS_DISABLED])->count();
+        $countDeactivated = User::find()->where(['user.status' => User::STATUS_DEACTIVATED])->count();
         $countSoftDeleted = User::find()->where(['user.status' => User::STATUS_SOFT_DELETED])->count();
 
         return [
             User::STATUS_ENABLED => Yii::t('AdminModule.user', 'Active users') . ' (' . $countActive . ')',
-            User::STATUS_DISABLED => Yii::t('AdminModule.user', 'Disabled users') . ' (' . $countDisabled . ')',
+            User::STATUS_DEACTIVATED => Yii::t('AdminModule.user', 'Deactivated users') . ' (' . $countDeactivated . ')',
             User::STATUS_SOFT_DELETED => Yii::t('AdminModule.user', 'Deleted users') . ' (' . $countSoftDeleted . ')',
         ];
     }

@@ -1,21 +1,24 @@
 <?php
 
-use humhub\libs\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\ui\menu\MenuEntry;
+use humhub\modules\ui\menu\widgets\LeftNavigation;
 
-/* @var $this \humhub\modules\ui\view\components\View */
-/* @var $menu \humhub\modules\ui\menu\widgets\LeftNavigation */
-/* @var $entries \humhub\modules\ui\menu\MenuEntry[] */
+/* @var $this View */
+/* @var $menu LeftNavigation */
+/* @var $entries MenuEntry[] */
 /* @var $options [] */
 ?>
 
-<?= Html::beginTag('div', $options) ?>
-    <?php if (!empty($menu->panelTitle)) : ?>
-        <div class="panel-heading"><?= $menu->panelTitle; ?></div>
-    <?php endif; ?>
+<?= Html::beginTag('nav', $options) ?>
+<?php if (!empty($menu->panelTitle)) : ?>
+    <h2 class="panel-heading"><?= $menu->panelTitle ?></h2>
+<?php endif; ?>
 
-    <div class="list-group">
-        <?php foreach ($entries as $entry): ?>
-            <?= $entry->render(['class' => 'list-group-item']) ?>
-        <?php endforeach; ?>
-    </div>
-<?= Html::endTag('div') ?>
+<div class="list-group list-group-horizontal list-group-vertical-lg">
+    <?php foreach ($entries as $entry): ?>
+        <?= $entry->render(['class' => 'list-group-item']) ?>
+    <?php endforeach; ?>
+</div>
+<?= Html::endTag('nav') ?>

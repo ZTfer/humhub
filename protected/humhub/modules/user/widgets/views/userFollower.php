@@ -1,56 +1,60 @@
 <?php
 
-use yii\helpers\Html;
 use humhub\modules\user\models\User;
+use humhub\modules\user\widgets\Image;
+use humhub\widgets\PanelMenu;
 
-$followers = $user->getFollowers(User::find()->limit(16));
+/* @var User[] $followers */
+/* @var User[] $following */
 ?>
-<?php if (count($followers) > 0) { ?>
-    <div class="panel panel-default follower" id="profile-follower-panel">
+<?php if (count($followers) > 0) : ?>
+    <div class="panel panel-default profile-follower-panel" id="profile-follower-panel">
 
         <!-- Display panel menu widget -->
-        <?php echo \humhub\widgets\PanelMenu::widget(['id' => 'profile-follower-panel']); ?>
+        <?= PanelMenu::widget([
+            'collapseId' => 'humhubmodulesuserfollowerwidgetspanel', // Unique ID, as the widget class is the same for both panels
+        ]) ?>
 
-        <div class="panel-heading"><?php echo Yii::t('UserModule.base', '<strong>User</strong> followers'); ?></div>
+        <div class="panel-heading"><?= Yii::t('UserModule.base', '<strong>Followers</strong>') ?></div>
 
         <div class="panel-body">
-            <?php foreach ($followers as $follower): ?>
-                <a href="<?php echo $follower->getUrl(); ?>">
-                    <img src="<?php echo $follower->getProfileImage()->getUrl(); ?>" class="img-rounded tt img_margin"
-                         height="24" width="24" alt="24x24" data-src="holder.js/24x24"
-                         style="width: 24px; height: 24px;"
-                         data-toggle="tooltip" data-placement="top" title=""
-                         data-original-title="<?php echo Html::encode($follower->displayName); ?>">
-                </a>
-            <?php endforeach; ?>
+            <div class="d-flex gap-2 flex-wrap">
+                <?php foreach ($followers as $follower): ?>
+                    <?= Image::widget([
+                        'user' => $follower,
+                        'width' => 30,
+                        'link' => true,
+                        'showTooltip' => true,
+                    ]) ?>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
-<?php } ?>
+<?php endif; ?>
 
-<?php
-$following = $user->getFollowingObjects(User::find()->limit(16));
-?>
-<?php if (count($following) > 0) { ?>
-    <div class="panel panel-default follower" id="profile-following-panel">
+<?php if (count($following) > 0) : ?>
+    <div class="panel panel-default profile-following-panel" id="profile-following-panel">
 
         <!-- Display panel menu widget -->
-        <?php echo \humhub\widgets\PanelMenu::widget(['id' => 'profile-following-panel']); ?>
+        <?= PanelMenu::widget([
+            'collapseId' => 'humhubmodulesuserfollowingwidgetspanel', // Unique ID, as the widget class is the same for both panels
+        ]) ?>
 
         <div class="panel-heading">
-            <?php echo Yii::t('UserModule.base', '<strong>Following</strong> user'); ?>
+            <?= Yii::t('UserModule.base', '<strong>Following</strong>') ?>
         </div>
 
         <div class="panel-body">
-            <?php foreach ($following as $followingUser): ?>
-                <a href="<?php echo $followingUser->getUrl(); ?>">
-                    <img src="<?php echo $followingUser->getProfileImage()->getUrl(); ?>" class="img-rounded tt img_margin"
-                         height="24" width="24" alt="24x24" data-src="holder.js/24x24"
-                         style="width: 24px; height: 24px;"
-                         data-toggle="tooltip" data-placement="top" title=""
-                         data-original-title="<?php echo Html::encode($followingUser->displayName); ?>">
-                </a>
-            <?php endforeach; ?>
+            <div class="d-flex gap-2 flex-wrap">
+                <?php foreach ($following as $followingUser): ?>
+                    <?= Image::widget([
+                        'user' => $followingUser,
+                        'width' => 30,
+                        'link' => true,
+                        'showTooltip' => true,
+                    ]) ?>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
-
-<?php } ?>
+<?php endif; ?>

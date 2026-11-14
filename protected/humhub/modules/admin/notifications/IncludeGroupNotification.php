@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2018 HumHub GmbH & Co. KG
@@ -7,9 +8,10 @@
 
 namespace humhub\modules\admin\notifications;
 
+use humhub\helpers\Html;
 use humhub\modules\notification\components\BaseNotification;
 use humhub\modules\user\models\Group;
-use yii\helpers\Html;
+use Yii;
 use yii\helpers\Url;
 
 /**
@@ -29,7 +31,7 @@ class IncludeGroupNotification extends BaseNotification
      */
     public function getUrl()
     {
-        return Url::to(['/directory/directory/groups']);
+        return Url::to(['/user/people']);
     }
 
     /**
@@ -37,7 +39,7 @@ class IncludeGroupNotification extends BaseNotification
      */
     public function category()
     {
-        return new AdminNotificationCategory;
+        return new AdminNotificationCategory();
     }
 
     /**
@@ -45,10 +47,10 @@ class IncludeGroupNotification extends BaseNotification
      */
     public function getMailSubject()
     {
-        return \Yii::t(
+        return Yii::t(
             'AdminModule.notification',
             'Notify from {appName}. You were added to the group.',
-            ['appName' => \Yii::$app->name]
+            ['appName' => Yii::$app->name],
         );
     }
 
@@ -57,13 +59,13 @@ class IncludeGroupNotification extends BaseNotification
      */
     public function html()
     {
-        return \Yii::t(
+        return Yii::t(
             'AdminModule.notification',
             '{displayName} added you to group {groupName}',
             [
                 '{displayName}' => Html::tag('strong', Html::encode($this->originator->getDisplayName())),
                 '{groupName}' => Html::tag('strong', Html::encode($this->source->name)),
-            ]
+            ],
         );
     }
 }

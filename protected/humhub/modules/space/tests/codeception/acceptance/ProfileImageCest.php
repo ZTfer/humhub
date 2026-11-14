@@ -2,16 +2,16 @@
 
 namespace space\acceptance;
 
+use Exception;
 use space\AcceptanceTester;
 
 class ProfileImageCest
 {
-
     /**
-     * Create private space
+     * Create Private Spaces
      *
      * @param AcceptanceTester $I
-     * @throws \Exception
+     * @throws Exception
      */
     public function testBannerUploadAndDelete(AcceptanceTester $I)
     {
@@ -23,32 +23,34 @@ class ProfileImageCest
         // Just to make sure there is no banner
         $this->deleteImage($I, '.profile-banner-image-container');
 
-        $I->waitForElementVisible('.profile-banner-image-container .img-profile-header-background[src="/static/img/default_banner.jpg"]');
-        $I->jsShow('.profile-banner-image-container .image-upload-buttons');
-        $I->seeElement('.profile-banner-image-container .image-upload-buttons .profile-image-upload');
+        $I->waitForElementVisible('.profile-banner-image-container .img-profile-header-background[src*="default_banner"]');
+        $I->executeJS("$('.profile-banner-image-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-banner-image-container .image-upload-buttons .profile-image-upload');
         $I->dontSeeElement('.profile-banner-image-container .image-upload-buttons .profile-image-edit');
 
         $I->attachFile('.profile-banner-image-container .profile-upload-input', 'test.jpg');
-        $I->wait(2);
-        $I->dontSeeElement('.profile-banner-image-container .img-profile-header-background[src="/static/img/default_banner.jpg"]');
-        $I->jsShow('.profile-banner-image-container .image-upload-buttons');
+        $I->wait(1);
+        $I->dontSeeElement('.profile-banner-image-container .img-profile-header-background[src*="default_banner"]');
+        $I->wait(1);
+        $I->executeJS("$('.profile-banner-image-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-banner-image-container .image-upload-buttons .profile-image-delete');
         $I->seeElement('.profile-banner-image-container .image-upload-buttons .profile-image-upload');
         $I->seeElement('.profile-banner-image-container .image-upload-buttons .profile-image-edit');
 
         $I->wantToTest('the deletion of the space banner');
         $I->amGoingTo('press the delete button');
         $I->click('.profile-banner-image-container .image-upload-buttons .btn-danger');
-        $I->waitForText('Confirm image deletion', null,'#globalModalConfirm');
+        $I->waitForText('Confirm image deletion', 10, '#globalModalConfirm');
         $I->click('Delete', '#globalModalConfirm');
-        $I->waitForElementVisible('.profile-banner-image-container .img-profile-header-background[src="/static/img/default_banner.jpg"]');
-        $I->jsShow('.profile-banner-image-container .image-upload-buttons');
-        $I->seeElement('.profile-banner-image-container .image-upload-buttons .btn-info');
+        $I->waitForElementVisible('.profile-banner-image-container .img-profile-header-background[src*="default_banner"]');
+        $I->executeJS("$('.profile-banner-image-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-banner-image-container .image-upload-buttons .btn-accent');
         $I->dontSeeElement('.profile-banner-image-container .image-upload-buttons .profile-image-edit');
     }
 
     /**
      * @param AcceptanceTester $I
-     * @throws \Exception
+     * @throws Exception
      */
     public function testProfileImageUploadAndDelete(AcceptanceTester $I)
     {
@@ -57,35 +59,36 @@ class ProfileImageCest
         $I->wantToTest('the space profile image upload');
         $I->amGoingTo('upload a new space profile image');
 
-        // Just to make sure there is no banner
+        // Just to make sure there is no image
         $this->deleteImage($I, '.profile-user-photo-container');
 
         $I->waitForElementVisible('.profile-user-photo-container .space-acronym');
         $I->wait(2); // wait for animation
-        $I->see('S2','.profile-user-photo-container .space-acronym');
-        $I->jsShow('.profile-user-photo-container .image-upload-buttons');
-        $I->seeElement('.profile-user-photo-container .image-upload-buttons .btn-info');
+        $I->see('S2', '.profile-user-photo-container .space-acronym');
+        $I->executeJS("$('.profile-user-photo-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-user-photo-container .image-upload-buttons .btn-accent');
         $I->dontSeeElement('.profile-user-photo-container .image-upload-buttons .profile-image-edit');
 
         $I->attachFile('.profile-user-photo-container .profile-upload-input', 'test.jpg');
         $I->wait(2);
         $I->dontSeeElement('.profile-user-photo-container .space-profile-acronym-2 space-acronym');
-        $I->jsShow('.profile-user-photo-container .image-upload-buttons');
-        $I->seeElement('.profile-user-photo-container .image-upload-buttons .btn-info');
+        $I->executeJS("$('.profile-user-photo-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-user-photo-container .image-upload-buttons .profile-image-delete');
+        $I->seeElement('.profile-user-photo-container .image-upload-buttons .btn-accent');
         $I->seeElement('.profile-user-photo-container .image-upload-buttons .profile-image-edit');
 
         $I->wantToTest('the deletion of the space profile image');
         $I->amGoingTo('press the delete button');
 
         $I->click('.profile-user-photo-container .image-upload-buttons .btn-danger');
-        $I->waitForText('Confirm image deletion', null,'#globalModalConfirm');
+        $I->waitForText('Confirm image deletion', 10, '#globalModalConfirm');
         $I->click('Delete', '#globalModalConfirm');
 
         $I->waitForElementVisible('.profile-user-photo-container .space-acronym');
         $I->wait(2); // wait for animation
-        $I->see('S2','.profile-user-photo-container .space-acronym');
-        $I->jsShow('.profile-user-photo-container .image-upload-buttons');
-        $I->seeElement('.profile-user-photo-container .image-upload-buttons .btn-info');
+        $I->see('S2', '.profile-user-photo-container .space-acronym');
+        $I->executeJS("$('.profile-user-photo-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-user-photo-container .image-upload-buttons .btn-accent');
         $I->dontSeeElement('.profile-user-photo-container .image-upload-buttons .profile-image-edit');
     }
 
@@ -111,14 +114,14 @@ class ProfileImageCest
         // Just to make sure there is no banner
         $this->deleteImage($I, '.profile-banner-image-container');
 
-        $I->waitForElementVisible('.profile-banner-image-container .img-profile-header-background[src="/static/img/default_banner.jpg"]');
+        $I->waitForElementVisible('.profile-banner-image-container .img-profile-header-background[src*="default_banner"]');
         $I->attachFile('.profile-banner-image-container .profile-upload-input', 'test.jpg');
         $I->wait(2);
-        $I->jsShow('.profile-banner-image-container .image-upload-buttons');
-        $I->seeElement('.profile-banner-image-container .profile-image-crop');
+        $I->executeJS("$('.profile-banner-image-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-banner-image-container .profile-image-crop');
         $I->click('.profile-banner-image-container .profile-image-crop');
 
-        $I->waitForText('Modify image', null, '#globalModal');
+        $I->waitForText('Modify image', 10, '#globalModal');
         $I->click('Save', '#globalModal');
         $I->seeSuccess();
     }
@@ -136,19 +139,20 @@ class ProfileImageCest
         $I->waitForElementVisible('.profile-user-photo-container .space-acronym');
         $I->attachFile('.profile-user-photo-container .profile-upload-input', 'test.jpg');
         $I->wait(2);
-        $I->jsShow('.profile-user-photo-container .image-upload-buttons');
-        $I->seeElement('.profile-user-photo-container .profile-image-crop');
+        $I->executeJS("$('.profile-user-photo-container .image-upload-buttons').css('display', 'block');");
+        $I->waitForElementVisible('.profile-user-photo-container .profile-image-crop');
         $I->click('.profile-user-photo-container .profile-image-crop');
 
-        $I->waitForText('Modify image', null, '#globalModal');
+        $I->waitForText('Modify image', 10, '#globalModal');
         $I->click('Save', '#globalModal');
         $I->seeSuccess();
     }
 
     private function deleteImage(AcceptanceTester $I, $containerClass)
     {
-        $I->jsClick($containerClass.' .image-upload-buttons .btn-danger');
-        $I->waitForText('Confirm image deletion', null,'#globalModalConfirm');
+        $I->jsClick($containerClass . ' .image-upload-buttons .btn-danger');
+        $I->wait(1);
         $I->click('Delete', '#globalModalConfirm');
+        $I->wait(1);
     }
 }

@@ -8,9 +8,10 @@
 
 namespace humhub\modules\space\behaviors;
 
+use humhub\modules\activity\services\ActivityManager;
 use humhub\modules\admin\permissions\ManageSpaces;
-use humhub\modules\space\activities\MemberAdded;
-use humhub\modules\space\activities\MemberRemoved;
+use humhub\modules\space\activities\MemberAddedActivity;
+use humhub\modules\space\activities\MemberRemovedActivity;
 use humhub\modules\space\MemberEvent;
 use humhub\modules\space\models\Membership;
 use humhub\modules\space\models\Space;
@@ -24,9 +25,11 @@ use humhub\modules\space\notifications\InviteRevoked;
 use humhub\modules\user\components\ActiveQueryUser;
 use humhub\modules\user\models\Invite;
 use humhub\modules\user\models\User;
+use Throwable;
 use Yii;
 use yii\base\Behavior;
 use yii\base\Exception;
+use yii\base\InvalidConfigException;
 use yii\validators\EmailValidator;
 
 /**
@@ -37,14 +40,13 @@ use yii\validators\EmailValidator;
  */
 class SpaceModelMembership extends Behavior
 {
-
     private $_spaceOwner = null;
 
     /**
      * Checks if given userId is Member of this Space.
      *
-     * @param integer $userId
-     * @return boolean
+     * @param int $userId
+     * @return bool
      */
     public function isMember($userId = '')
     {
@@ -92,8 +94,8 @@ class SpaceModelMembership extends Behavior
      *
      * If no UserId is given, current UserId will be used
      *
-     * @param User|integer|null $user User instance or userId
-     * @return boolean
+     * @param User|int|null $user User instance or userId
+     * @return bool
      */
     public function isAdmin($user = null)
     {
@@ -119,8 +121,8 @@ class SpaceModelMembership extends Behavior
     /**
      * Sets Owner for this workspace
      *
-     * @param User|integer|null $userId
-     * @return boolean
+     * @param User|int|null $userId
+     * @return bool
      */
     public function setSpaceOwner($user = null)
     {
@@ -188,8 +190,8 @@ class SpaceModelMembership extends Behavior
     /**
      * Sets Owner for this workspace
      *
-     * @param integer $userId
-     * @return boolean
+     * @param int $userId
+     * @return bool
      */
     public function setAdmin($userId = null)
     {
@@ -214,29 +216,23 @@ class SpaceModelMembership extends Behavior
      *
      * If none Record is found, null is given
      *
-     * @return Membership the membership
+     * @return Membership|null the membership
      */
-    public function getMembership($userId = null)
+    public function getMembership($userId = null): ?Membership
     {
-        if ($userId instanceof User) {
-            $userId = $userId->id;
-        } elseif (!$userId || $userId == '') {
-            $userId = Yii::$app->user->id;
-        }
-
-        return Membership::findOne(['user_id' => $userId, 'space_id' => $this->owner->id]);
+        return Membership::findMembership($this->owner->id, $userId);
     }
 
     /**
      * Invites a not registered member to this space
      *
      * @param string $email
-     * @param integer $originatorUserId
+     * @param int $originatorUserId
      */
     public function inviteMemberByEMail($email, $originatorUserId)
     {
         // Invalid E-Mail
-        $validator = new EmailValidator;
+        $validator = new EmailValidator();
         if (!$validator->validate($email)) {
             return false;
         }
@@ -276,7 +272,7 @@ class SpaceModelMembership extends Behavior
     /**
      * Requests Membership
      *
-     * @param integer $userId
+     * @param int $userId
      * @param string $message
      */
     public function requestMembership($userId, $message = '')
@@ -289,12 +285,14 @@ class SpaceModelMembership extends Behavior
             'user_id' => $user->id,
             'status' => Membership::STATUS_APPLICANT,
             'group_id' => Space::USERGROUP_MEMBER,
-            'request_message' => $message
+            'request_message' => $message,
         ]);
 
         $membership->save();
 
-        ApprovalRequest::instance()->from($user)->about($this->owner)->withMessage($message)->sendBulk($this->getAdminsQuery());
+        ApprovalRequest::instance()->from($user)->about($this->owner)->withMessage($message)->sendBulk(
+            $this->getAdminsQuery(),
+        );
     }
 
     /**
@@ -310,15 +308,14 @@ class SpaceModelMembership extends Behavior
     /**
      * Returns user query for admins of the space
      *
-     * @since 1.3
      * @return ActiveQueryUser
+     * @since 1.3
      */
-    public function getAdminsQuery()
+    public function getAdminsQuery(): ActiveQueryUser
     {
-        $query = Membership::getSpaceMembersQuery($this->owner);
-        $query->andWhere(['space_membership.group_id' => Space::USERGROUP_ADMIN]);
-
-        return $query;
+        return $this->owner->getMemberListService()
+            ->getAdminQuery()
+            ->andWhere(['space_membership.group_id' => Space::USERGROUP_ADMIN]);
     }
 
     /**
@@ -327,8 +324,8 @@ class SpaceModelMembership extends Behavior
      * If user is already invited, retrigger invitation.
      * If user is applicant approve it.
      *
-     * @param integer $userId
-     * @param integer $originatorId
+     * @param int $userId
+     * @param int $originatorId
      * @param bool $sendInviteNotification
      */
     public function inviteMember($userId, $originatorId, $sendInviteNotification = true)
@@ -340,6 +337,7 @@ class SpaceModelMembership extends Behavior
                 case Membership::STATUS_APPLICANT:
                     // If user is an applicant of this space add user and return.
                     $this->addMember($userId);
+                    // no break
                 case Membership::STATUS_MEMBER:
                     // If user is already a member just ignore the invitation.
                     return;
@@ -354,7 +352,7 @@ class SpaceModelMembership extends Behavior
                 'space_id' => $this->owner->id,
                 'user_id' => $userId,
                 'status' => Membership::STATUS_INVITED,
-                'group_id' => Space::USERGROUP_MEMBER
+                'group_id' => Space::USERGROUP_MEMBER,
             ]);
         }
 
@@ -373,14 +371,14 @@ class SpaceModelMembership extends Behavior
     /**
      * Sends an Invite Notification to the given user.
      *
-     * @param integer $userId
-     * @param integer $originatorId
+     * @param int $userId
+     * @param int $originatorId
      */
     protected function sendInviteNotification($userId, $originatorId)
     {
         $notification = new InviteNotification([
             'source' => $this->owner,
-            'originator' => User::findOne(['id' => $originatorId])
+            'originator' => User::findOne(['id' => $originatorId]),
         ]);
 
         $notification->send(User::findOne(['id' => $userId]));
@@ -392,16 +390,27 @@ class SpaceModelMembership extends Behavior
      * This can happens after an clicking "Request Membership" Link
      * after Approval or accepting an invite.
      *
-     * @param integer $userId
-     * @param integer $canLeave 0: user cannot cancel membership | 1: can cancel membership | 2: depending on space flag members_can_leave
+     * @param int $userId
+     * @param int $canLeave 0: user cannot cancel membership | 1: can cancel membership | 2: depending on space flag members_can_leave
      * @param bool $silent add member without any notifications
+     * @param bool $showAtDashboard add member without any notifications
+     * @param string $groupId
      * @return bool
-     * @throws \Throwable
-     * @throws \yii\base\InvalidConfigException
+     * @throws Throwable
+     * @throws InvalidConfigException
      */
-    public function addMember($userId, $canLeave = 1, $silent = false)
-    {
+    public function addMember(
+        int $userId,
+        int $canLeave = 1,
+        bool $silent = false,
+        string $groupId = Space::USERGROUP_MEMBER,
+        bool $showAtDashboard = true,
+    ): bool {
         $user = User::findOne(['id' => $userId]);
+        if (!$user) {
+            return false;
+        }
+
         $membership = $this->getMembership($userId);
 
         if ($membership === null) {
@@ -410,15 +419,20 @@ class SpaceModelMembership extends Behavior
                 'space_id' => $this->owner->id,
                 'user_id' => $userId,
                 'status' => Membership::STATUS_MEMBER,
-                'group_id' => Space::USERGROUP_MEMBER,
-                'can_cancel_membership' => $canLeave
+                'group_id' => $groupId,
+                'show_at_dashboard' => $showAtDashboard,
+                'can_cancel_membership' => $canLeave,
             ]);
 
             $userInvite = Invite::findOne(['email' => $user->email]);
 
-            if ($userInvite !== null && $userInvite->source == Invite::SOURCE_INVITE && !$silent) {
-                InviteAccepted::instance()->from($user)->about($this->owner)
-                    ->send(User::findOne(['id' => $userInvite->user_originator_id]));
+            if ($userInvite !== null
+                && !empty($userInvite->user_originator_id)
+                && $userInvite->source == Invite::SOURCE_INVITE && !$silent) {
+                $originator = User::findOne(['id' => $userInvite->user_originator_id]);
+                if ($originator !== null) {
+                    InviteAccepted::instance()->from($user)->about($this->owner)->send($originator);
+                }
             }
         } else {
             // User is already member
@@ -440,17 +454,21 @@ class SpaceModelMembership extends Behavior
 
             // Update Membership
             $membership->status = Membership::STATUS_MEMBER;
+            $membership->group_id = $groupId;
         }
 
-        $membership->save();
+        if (!$membership->save()) {
+            return false;
+        }
 
         MemberEvent::trigger(Membership::class, Membership::EVENT_MEMBER_ADDED, new MemberEvent([
-            'space' => $this->owner, 'user' => $user
+            'space' => $this->owner,
+            'user' => $user,
         ]));
 
-        if (!$silent) {
+        if (!$this->owner->settings->get('hideMembers')) {
             // Create Activity
-            MemberAdded::instance()->from($user)->about($this->owner)->save();
+            ActivityManager::dispatch(MemberAddedActivity::class, $this->owner, $user);
         }
 
         // Members can't also follow the space
@@ -461,19 +479,21 @@ class SpaceModelMembership extends Behavior
 
         // Delete pending approval request notifications for this user
         ApprovalRequest::instance()->from($user)->about($this->owner)->delete();
+
+        return true;
     }
 
     /**
      * Remove Membership
      *
-     * @param integer $userId of User to Remove
+     * @param int|null $userId of User to Remove
      * @return bool
-     * @throws \yii\base\InvalidConfigException
-     * @throws \Throwable
+     * @throws InvalidConfigException
+     * @throws Throwable
      */
-    public function removeMember($userId = '')
+    public function removeMember($userId = null)
     {
-        if ($userId == '') {
+        if (!$userId) {
             $userId = Yii::$app->user->id;
         }
 
@@ -488,13 +508,17 @@ class SpaceModelMembership extends Behavior
             return false;
         }
 
-        Membership::getDb()->transaction(function($db) use ($membership, $user) {
-            foreach (Membership::findAll(['user_id' => $user->id, 'space_id' => $this->owner->id]) as $obsoleteMembership) {
+        Membership::getDb()->transaction(function ($db) use ($membership, $user): void {
+            foreach (
+                Membership::findAll(['user_id' => $user->id, 'space_id' => $this->owner->id]) as $obsoleteMembership
+            ) {
                 $obsoleteMembership->delete();
             }
 
             $this->handleRemoveMembershipEvent($membership, $user);
         });
+
+        return true;
     }
 
     /**
@@ -503,11 +527,13 @@ class SpaceModelMembership extends Behavior
      * @param Membership $membership
      * @param User $user
      * @throws Exception
-     * @throws \Throwable
-     * @throws \yii\base\InvalidConfigException
+     * @throws Throwable
+     * @throws InvalidConfigException
      */
     private function handleRemoveMembershipEvent(Membership $membership, User $user)
     {
+        Membership::unsetCache($this->owner->id, $user->id);
+
         // Get rid of old notifications
         ApprovalRequest::instance()->from($user)->about($this->owner)->delete();
         InviteNotification::instance()->about($this->owner)->delete($user);
@@ -528,9 +554,15 @@ class SpaceModelMembership extends Behavior
      */
     private function handleCancelMemberEvent(User $user)
     {
-        MemberRemoved::instance()->about($this->owner)->from($user)->create();
-        MemberEvent::trigger(Membership::class, Membership::EVENT_MEMBER_REMOVED,
-            new MemberEvent(['space' => $this->owner, 'user' => $user]));
+        if (!$this->owner->settings->get('hideMembers')) {
+            ActivityManager::dispatch(MemberRemovedActivity::class, $this->owner, $user);
+        }
+
+        MemberEvent::trigger(
+            Membership::class,
+            Membership::EVENT_MEMBER_REMOVED,
+            new MemberEvent(['space' => $this->owner, 'user' => $user]),
+        );
     }
 
     /**
@@ -539,13 +571,15 @@ class SpaceModelMembership extends Behavior
      *
      * @param Membership $membership
      * @param User $user
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     private function handleCancelInvitationEvent(Membership $membership, User $user)
     {
         if ($membership->originator && $membership->isCurrentUser()) {
-            InviteDeclined::instance()->from(Yii::$app->user->identity)->about($this->owner)->send($membership->originator);
-        } else if(Yii::$app->user->identity) {
+            InviteDeclined::instance()->from(Yii::$app->user->identity)->about($this->owner)->send(
+                $membership->originator,
+            );
+        } elseif (Yii::$app->user->identity) {
             InviteRevoked::instance()->from(Yii::$app->user->identity)->about($this->owner)->send($user);
         }
     }
@@ -556,14 +590,23 @@ class SpaceModelMembership extends Behavior
      *
      * @param Membership $membership
      * @param User $user
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     private function handleCancelApplicantEvent(Membership $membership, User $user)
     {
         // Only send a declined notification if the user did not cancel the request himself.
-        if(Yii::$app->user->identity && !$membership->isCurrentUser()) {
+        if (Yii::$app->user->identity && !$membership->isCurrentUser()) {
             ApprovalRequestDeclined::instance()->from(Yii::$app->user->identity)->about($this->owner)->send($user);
         }
+    }
+
+    public function canViewMembers($userId = null): bool
+    {
+        if ($this->owner->getAdvancedSettings()->hideMembers) {
+            return $this->getMembership($userId)?->isPrivileged() ?? false;
+        }
+
+        return true;
     }
 
 }

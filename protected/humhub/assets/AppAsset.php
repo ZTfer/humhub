@@ -8,11 +8,12 @@
 
 namespace humhub\assets;
 
-use humhub\components\assets\WebStaticAssetBundle;
+use humhub\components\assets\AssetBundle;
 use humhub\modules\content\assets\ContentAsset;
+use humhub\modules\content\assets\ContentHighlightAsset;
 use humhub\modules\file\assets\FileAsset;
-use yii\bootstrap\BootstrapAsset;
-use yii\bootstrap\BootstrapPluginAsset;
+use yii\bootstrap5\BootstrapAsset;
+use yii\bootstrap5\BootstrapPluginAsset;
 use yii\jui\JuiAsset;
 use yii\validators\ValidationAsset;
 use yii\web\JqueryAsset;
@@ -27,8 +28,13 @@ use yii\widgets\ActiveFormAsset;
  * Note: All CSS/JS files will be compressed and bundled. If you need dynamic
  * css/js loading e.g. based on users locale: see AppDynamicAsset
  */
-class AppAsset extends WebStaticAssetBundle
+class AppAsset extends AssetBundle
 {
+    /**
+     * @inheritdoc
+     */
+    public $sourcePath = '@humhub/resources';
+
     /**
      * @inheritdoc
      */
@@ -37,17 +43,13 @@ class AppAsset extends WebStaticAssetBundle
     /**
      * @inheritdoc
      */
-    public $defaultDepends = false;
-
-    /**
-     * @inheritdoc
-     */
     public $jsPosition = View::POS_HEAD;
 
-    const BUNDLE_NAME = 'app';
+    public const BUNDLE_NAME = 'app';
 
-    const STATIC_DEPENDS = [
+    public const STATIC_DEPENDS = [
         JqueryAsset::class,
+        JqueryBs5FixAsset::class,
         JuiBootstrapBridgeAsset::class,
         JuiAsset::class,
         YiiAsset::class,
@@ -61,6 +63,7 @@ class AppAsset extends WebStaticAssetBundle
         OpenSansAsset::class,
         PjaxAsset::class,
         JqueryTimeAgoAsset::class,
+        IntlMessageFormatAsset::class,
 
         /**
          * Style only assets
@@ -69,7 +72,6 @@ class AppAsset extends WebStaticAssetBundle
         NProgressStyleAsset::class,
         Select2StyleAsset::class,
         BlueimpGalleryStyleAsset::class,
-        FlatelementsStyleAsset::class,
 
 
         /**
@@ -84,6 +86,7 @@ class AppAsset extends WebStaticAssetBundle
          */
         CoreApiAsset::class,
         ContentAsset::class,
+        ContentHighlightAsset::class,
         FileAsset::class,
     ];
 
@@ -91,14 +94,6 @@ class AppAsset extends WebStaticAssetBundle
      * @inheritdoc
      */
     public $depends = self::STATIC_DEPENDS;
-
-    /**
-     * @inheritdoc
-     */
-    public $js = [
-        'js/desktop-notify-min.js',
-        'js/desktop-notify-config.js',
-    ];
 
     /**
      * @inheritdoc

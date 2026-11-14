@@ -8,20 +8,31 @@
 
 namespace humhub\modules\content\tests\codeception\unit\widgets;
 
+use humhub\modules\content\widgets\stream\WallStreamEntryWidget;
+
 /**
  * @inheritdoc
  */
-class WallEntryTest extends \humhub\modules\content\widgets\WallEntry
+class WallEntryTest extends WallStreamEntryWidget
 {
-    
-     public $wallEntryLayout = "@humhub/modules/content/tests/codeception/unit/widgets/views/wallEntry.php";
-     
+    /**
+     * @inheritdoc
+     */
+    public $widgetLayout = "@humhub/modules/content/tests/codeception/unit/widgets/views/wallEntry.php";
+
     /**
      * @inheritdoc
      */
     public function run()
     {
-        return '<div>Wallentry:'.$this->contentObject->message.'</div>';
+        return '<div>Wallentry:' . $this->contentObject->message . '</div>';
     }
 
+    /**
+     * @inheritdoc
+     */
+    protected function renderContent()
+    {
+        return 'test';
+    }
 }

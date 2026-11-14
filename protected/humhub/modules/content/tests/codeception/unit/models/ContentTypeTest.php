@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -18,14 +19,15 @@ use modules\content\tests\codeception\_support\ContentModelTest;
 
 class ContentTypeTest extends ContentModelTest
 {
-
     public function _before()
     {
         parent::_before();
         ContentType::flush();
+
         // Make sure there is no content
-        Content::deleteAll();
-        Post::deleteAll();
+        foreach (Content::find()->all() as $content) {
+            $content->polymorphicRelation->hardDelete();
+        };
     }
 
     public function testContainerContentTypes()

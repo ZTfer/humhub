@@ -1,10 +1,12 @@
 <?php
 return array (
-  'Author' => '',
+  'Author' => 'Autorius',
   'Content' => 'Turinys',
-  'Content Type' => '',
+  'Content Type' => 'Turinio pobūdis',
+  'Date from' => 'Data nuo',
+  'Date to' => 'Data iki',
   'Scope' => 'Apimtis',
   'Sorting' => 'Rūšiavimas',
-  'Topic' => '',
+  'Topic' => 'Tema',
   'Visibility' => 'Matomumas',
 );

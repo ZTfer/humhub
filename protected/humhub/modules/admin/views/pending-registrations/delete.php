@@ -1,15 +1,17 @@
 <?php
 
-use yii\helpers\Html;
+use humhub\helpers\Html;
+use humhub\modules\user\models\Invite;
 use yii\helpers\Url;
+use yii\widgets\DetailView;
 
-/** @var $model \humhub\modules\user\models\Invite */
+/** @var $model Invite */
 ?>
 <div class="panel-body">
     <h4><?= Yii::t('AdminModule.user', 'Delete invitation?'); ?></h4>
     <br>
 
-    <?= \yii\widgets\DetailView::widget([
+    <?= DetailView::widget([
         'model' => $model,
         'attributes' => [
             'email:email',
@@ -36,6 +38,6 @@ use yii\helpers\Url;
     <?= Html::a(
         Yii::t('AdminModule.user', 'Cancel'),
         Url::to(['/admin/pending-registrations']),
-        ['class' => 'btn btn-primary pull-right']
+        ['class' => 'btn btn-primary float-end']
     ); ?>
 </div>

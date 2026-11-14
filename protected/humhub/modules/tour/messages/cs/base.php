@@ -1,6 +1,7 @@
 <?php
-return array (
+return [
   ' Remove panel' => 'Odstranit panel',
+  '&larr; Previous' => '',
   '<strong>Account</strong> Menu' => '<strong>Možnosti</strong> účtu',
   '<strong>Getting</strong> Started' => '<strong>Začínáme</strong>',
   '<strong>Guide:</strong> Administration (Modules)' => '<strong>Průvodce:</strong> Administrace (Moduly)',
@@ -13,12 +14,12 @@ return array (
   '<strong>Start</strong> space guide' => '<strong>Zahájit</strong> průvodce prostory',
   'Cancel' => 'Zrušit',
   'Don\'t lose track of things!<br /><br />This icon will keep you informed of activities and posts that concern you directly.' => 'Neztratíte přehled.<br /><br />Tato ikona vás bude informovat o nových aktivitách a příspěvcích, které se vás týkají.',
+  'Done' => 'Hotovo',
   'Drag a photo here or click to browse your files' => 'Přetáhněte sem fotografii nebo procházejte soubory',
-  'End guide' => 'Ukončit průvodce',
   'Get to know your way around the site\'s most important features with the following guides:' => 'Následující průvodce vám může pomoci se lépe zorientovat v této síti a tak vám usnadní začátky práce s ní. Vyberte si, co vás zajímá:',
   'Hide my year of birth' => 'Skrýt můj rok narození',
-  'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => '',
-  'Next »' => 'Další »',
+  'Howdy <strong>%firstname%</strong>, thank you for using %community%.' => 'Ahoj <strong>%firstname%</strong>, děkujeme, že používáš %community%.',
+  'Next &rarr;' => '',
   'Ok' => 'Ok',
   'Save and close' => 'Uložit a zavřít',
   'The account menu gives you access to your private settings and allows you to manage your public profile.' => 'Skrze možnosti účtu se dostanete k vašemu soukromému nastavení a ke správě vašeho veřejného profilu.',
@@ -29,7 +30,7 @@ return array (
   'Your lastname' => 'Přijmení',
   'Your mobile phone number' => 'Mobilní telefon',
   'Your phone number at work' => 'Telefon do zaměstnání',
-  'Your skills, knowledge and experience (comma seperated)' => 'Vaše dovednosti, zkušenosti atd...',
+  'Your skills, knowledge and experience' => '',
   'Your title or position' => 'Název Vaší pozice',
-  '« Prev' => '« Předchozí',
-);
+  '{{current}} of {{total}}' => '',
+];

@@ -1,17 +1,17 @@
 <?php
 
 use humhub\compat\HForm;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\user\models\ProfileField;
-use yii\widgets\ActiveForm;
+use humhub\widgets\form\ActiveForm;
 
 /* @var $field ProfileField */
 /* @var $hForm HForm */
 ?>
 
 <div id="edit-profile-field-root" class="panel-body">
-    <div class="pull-right">
-        <?= Html::backButton(['index'], ['label' => Yii::t('AdminModule.base', 'Back to overview'), 'class' => 'pull-right']); ?>
+    <div class="float-end">
+        <?= Html::backButton(['index'], ['label' => Yii::t('AdminModule.base', 'Back to overview'), 'class' => 'float-end']); ?>
     </div>
 
     <?php if (!$field->isNewRecord): ?>
@@ -23,7 +23,7 @@ use yii\widgets\ActiveForm;
     <br>
 
     <?php $form = ActiveForm::begin(); ?>
-        <?= $hForm->render($form); ?>
+    <?= $hForm->render($form); ?>
     <?php ActiveForm::end(); ?>
 </div>
 
@@ -32,14 +32,13 @@ use yii\widgets\ActiveForm;
     /**
      * Switcher for Sub Forms (FormField Type)
      */
-    var checkFieldTypeFormState = function()
-    {
-        $("#edit-profile-field-root .form-group").show();
+    var checkFieldTypeFormState = function () {
+        $("#edit-profile-field-root .mb-3").show();
 
         // Hide all form type specific forms
         $(".fieldTypeSettings").hide();
 
-        var $fieldTypeSelect =  $("#profilefield-field_type_class");
+        var $fieldTypeSelect = $("#profilefield-field_type_class");
         var fieldTypeClass = $fieldTypeSelect.val();
         var showTypeSettings = fieldTypeClass.replace(/[\\]/g, '_');
 
@@ -49,8 +48,8 @@ use yii\widgets\ActiveForm;
         var $selectedOption = $fieldTypeSelect.find(':selected');
         var hideFields = $selectedOption.data('hiddenFields');
 
-        hideFields.forEach(function(value) {
-            $('.field-profilefield-'+value).hide();
+        hideFields.forEach(function (value) {
+            $('.field-profilefield-' + value).hide();
         })
     };
 

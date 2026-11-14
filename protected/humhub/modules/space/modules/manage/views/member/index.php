@@ -1,15 +1,17 @@
 <?php
 
-use humhub\widgets\Button;
-use humhub\widgets\GridView;
-use yii\bootstrap\ActiveForm;
+use humhub\helpers\Html;
 use humhub\modules\space\models\Space;
-use humhub\modules\space\modules\manage\widgets\MemberMenu;
-use humhub\modules\user\grid\ImageColumn;
-use humhub\modules\user\grid\DisplayNameColumn;
 use humhub\modules\space\modules\manage\models\MembershipSearch;
+use humhub\modules\space\modules\manage\widgets\MemberHeaderControlsMenu;
+use humhub\modules\space\modules\manage\widgets\MemberMenu;
+use humhub\modules\ui\icon\widgets\Icon;
+use humhub\modules\user\grid\DisplayNameColumn;
+use humhub\modules\user\grid\ImageColumn;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+use humhub\widgets\GridView;
 use humhub\widgets\TimeAgo;
-use yii\helpers\Html;
 
 /* @var $space Space */
 ?>
@@ -22,20 +24,27 @@ use yii\helpers\Html;
     <div class="panel-body">
 
         <?php $form = ActiveForm::begin(['method' => 'get']); ?>
-        <div class="row">
-            <div class="col-md-8">
+        <div class="d-flex justify-content-between column-gap-4 row-gap-2 flex-column flex-sm-row">
+            <div class="flex-fill">
                 <div class="input-group">
                     <?= Html::activeTextInput($searchModel, 'freeText', ['class' => 'form-control', 'placeholder' => Yii::t('AdminModule.user', 'Search by name, email or id.')]); ?>
-                    <span class="input-group-btn">
-                        <button class="btn btn-default" type="submit"><i class="fa fa-search"></i></button>
-                    </span>
+                    <button class="btn btn-light" type="submit"><i class="fa fa-search"></i></button>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="flex-fill">
                 <?= Html::activeDropDownList($searchModel, 'group_id', MembershipSearch::getRoles($space), ['class' => 'form-control', 'data-action-change' => 'ui.form.submit']); ?>
+            </div>
+            <div class="flex-fill float-end">
+                <div class="float-end">
+                    <?= MemberHeaderControlsMenu::widget([
+                        'space' => $space,
+                        'icon' => 'cog',
+                    ]) ?>
+                </div>
             </div>
         </div>
         <?php ActiveForm::end(); ?>
+
         <div class="table-responsive">
 
             <?php
@@ -53,25 +62,25 @@ use yii\helpers\Html;
                         'attribute' => 'created_at',
                         'format' => 'raw',
                         'value' =>
-                        function ($data) {
-                            if ($data->created_at == '') {
-                                return Yii::t('SpaceModule.manage', '-');
-                            }
+                            function ($data) {
+                                if ($data->created_at == '') {
+                                    return Yii::t('SpaceModule.manage', '-');
+                                }
 
-                            return TimeAgo::widget(['timestamp' => $data->created_at]);
-                        }
+                                return TimeAgo::widget(['timestamp' => $data->created_at]);
+                            }
                     ],
                     [
                         'attribute' => 'last_visit',
                         'format' => 'raw',
                         'value' =>
-                        function ($data) use (&$groups) {
-                            if (empty($data->last_visit)) {
-                                return Yii::t('SpaceModule.manage', 'never');
-                            }
+                            function ($data) use (&$groups) {
+                                if (empty($data->last_visit)) {
+                                    return Yii::t('SpaceModule.manage', 'never');
+                                }
 
-                            return TimeAgo::widget(['timestamp' => $data->last_visit]);
-                        }
+                                return TimeAgo::widget(['timestamp' => $data->last_visit]);
+                            }
                     ],
                     [
                         'label' => Yii::t('SpaceModule.manage', 'Role'),
@@ -87,26 +96,20 @@ use yii\helpers\Html;
                         'filter' => $groups,
                         'dropDownOptions' => $groups,
                         'value' =>
-                        function ($data) use (&$groups, $space) {
-                            return $groups[$data->group_id];
-                        }
+                            function ($data) use (&$groups, $space) {
+                                return $groups[$data->group_id];
+                            }
                     ],
                     [
                         'class' => 'yii\grid\ActionColumn',
                         'options' => ['style' => 'width:40px; min-width:40px;'],
                         'buttons' => [
-                            'view' => function ($url, $model) {
-                                return false;
-                            },
-                            'update' => function ($url, $model) {
-                                return false;
-                            },
-                            'delete' => function ($url, $model) use($space) {
-                                return Button::danger()->tooltip(Yii::t('SpaceModule.manage', 'Remove from space'))
-                                    ->link(['/space/manage/member/remove', 'userGuid' => $model->user->guid, 'container' => $space])
-                                    ->options(['data-method' => 'POST', 'data-confirm' => Yii::t('SpaceModule.manage', 'Are you sure you want to remove this member.') ])
-                                    ->icon('remove')->xs();
-                            }
+                            'view' => fn($url, $model) => false,
+                            'update' => fn($url, $model) => false,
+                            'delete' => fn($url, $model) => Button::danger()->tooltip(Yii::t('SpaceModule.manage', 'Remove from space'))
+                                ->link(['/space/manage/member/remove', 'userGuid' => $model->user->guid, 'container' => $space])
+                                ->options(['data-method' => 'POST', 'data-confirm' => Yii::t('SpaceModule.manage', 'Are you sure you want to remove this member.')])
+                                ->icon('remove')->sm()
                         ],
                     ],
                 ],

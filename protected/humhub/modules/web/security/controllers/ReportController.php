@@ -2,12 +2,21 @@
 
 namespace humhub\modules\web\security\controllers;
 
+use humhub\components\access\ControllerAccess;
 use humhub\components\Controller;
+use humhub\modules\web\security\helpers\CspReport;
 use humhub\modules\web\security\models\SecuritySettings;
 use Yii;
 
 class ReportController extends Controller
 {
+    /**
+     * Reports are sent by the browser without a session, independently of the guest mode setting.
+     *
+     * @inheritdoc
+     */
+    protected $access = ControllerAccess::class;
+
     public function init()
     {
         $this->enableCsrfValidation = false;
@@ -17,15 +26,12 @@ class ReportController extends Controller
     {
         Yii::$app->response->statusCode = 204;
 
-        if(!SecuritySettings::isReportingEnabled()) {
+        if (!SecuritySettings::isReportingEnabled()) {
             return;
         }
 
-        $json_data = file_get_contents('php://input');
-        if ($json_data = json_decode($json_data)) {
-            $json_data = json_encode($json_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            $json_data = preg_replace('/\'nonce-[^\']*\'/', "'nonce-xxxxxxxxxxxxxxxxxxxxxxxx'", $json_data);
-            Yii::error($json_data, 'web.security');
+        foreach (CspReport::parse(Yii::$app->request->getRawBody(), Yii::$app->request->get('disposition') === 'report') as $report) {
+            $report->log();
         }
     }
 

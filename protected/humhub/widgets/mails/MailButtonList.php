@@ -16,9 +16,8 @@ namespace humhub\widgets\mails;
  */
 class MailButtonList extends \yii\base\Widget
 {
-
     /**
-     * @var string hex color
+     * @var array hex color
      */
     public $buttons = [];
 
@@ -29,7 +28,7 @@ class MailButtonList extends \yii\base\Widget
     public function run()
     {
         return $this->render('mailButtonList', [
-                    'buttons' => $this->buttons
+            'buttons' => $this->buttons,
         ]);
     }
 }

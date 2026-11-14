@@ -8,8 +8,9 @@
 
 namespace humhub\modules\user\grid;
 
+use humhub\helpers\Html;
+use humhub\modules\user\source\UserSourceCollection;
 use Yii;
-use yii\bootstrap\Html;
 
 /**
  * DisplayNameColumn
@@ -18,7 +19,6 @@ use yii\bootstrap\Html;
  */
 class DisplayNameColumn extends BaseColumn
 {
-
     /**
      * @inheritdoc
      */
@@ -43,11 +43,16 @@ class DisplayNameColumn extends BaseColumn
         $user = $this->getUser($model);
 
         $badge = '';
-        if ($user->auth_mode !== 'local') {
-            $badge = '&nbsp;<span class="badge">'.$user->auth_mode.'</span>';
+        if ($user->user_source !== 'local' && Yii::$app->user->isAdmin()) {
+            /** @var UserSourceCollection $collection */
+            $collection = Yii::$app->userSourceCollection;
+            $title = $collection->hasUserSource($user->user_source)
+                ? $collection->getUserSource($user->user_source)->getTitle()
+                : $user->user_source;
+            $badge = '&nbsp;<span class="badge">' . Html::encode($title) . '</span>';
         }
-        return '<div>' . Html::encode($user->displayName) . $badge . '<br> ' .
-                '<small>' . Html::encode($user->username) . '</small></div>';
+        return '<div>' . Html::encode($user->displayName) . $badge . '<br> '
+            . '<small>' . Html::encode($user->displayNameSub) . '</small></div>';
     }
 
 }

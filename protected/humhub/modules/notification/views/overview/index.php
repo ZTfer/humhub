@@ -1,42 +1,54 @@
 <?php
+/**
+ * @link https://www.humhub.org/
+ * @copyright Copyright (c) HumHub GmbH & Co. KG
+ * @license https://www.humhub.com/licences
+ */
 
-use yii\bootstrap\ActiveForm;
-use yii\helpers\Url;
+use humhub\helpers\Html;
+use humhub\modules\notification\models\forms\FilterForm;
+use humhub\widgets\bootstrap\Button;
+use humhub\modules\notification\widgets\NotificationFilterForm;
 
-/* @var $overview string */
-/* @var $filterForm */
-
+/* @var string $overview */
+/* @var FilterForm $filterForm */
 ?>
 <div class="container">
     <div class="row">
-        <div class="col-md-9 layout-content-container">
+        <div class="col-lg-9 layout-content-container">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <?= Yii::t('NotificationModule.base', '<strong>Notification</strong> Overview'); ?>
-                    <a id="notification_overview_markseen" href="#" data-action-click="notification.markAsSeen" data-action-url="<?= Url::to(['/notification/list/mark-as-seen']); ?>" class="pull-right heading-link" >
-                        <b><?= Yii::t('NotificationModule.base', 'Mark all as seen'); ?></b>
-                    </a> 
+                    <?= Yii::t('NotificationModule.base', '<strong>Notification</strong> Overview') ?>
+                    <div class="float-end">
+                        <?= Button::light()
+                            ->icon('check')
+                            ->action('notification.markAsSeen', ['/notification/list/mark-as-seen'])
+                            ->id('notification_overview_markseen')
+                            ->cssClass('d-none')
+                            ->sm()
+                            ->tooltip(Yii::t('NotificationModule.base', 'Mark all as seen')) ?>
+                        <?= Button::light()
+                            ->icon('cog')
+                            ->link(['/notification/user'])
+                            ->sm()
+                            ->tooltip(Yii::t('NotificationModule.base', 'Notification Settings')) ?>
+                    </div>
                 </div>
                 <div class="panel-body">
                     <?= $overview ?>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 layout-sidebar-container">
+        <aside class="col-lg-3 layout-sidebar-container" aria-label="<?= Html::encode(Yii::t('base', 'Sidebar')) ?>">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <strong><?= Yii::t('NotificationModule.base', 'Filter'); ?></strong>
-                    <hr style="margin-bottom:0px"/>
+                    <strong><?= Yii::t('NotificationModule.base', 'Filter') ?></strong>
+                    <hr style="margin-bottom:0">
                 </div>
-                
                 <div class="panel-body">
-                    <?php $form = ActiveForm::begin(['id' => 'notification_overview_filter', 'method' => 'GET']); ?>
-                    <div style="padding-left: 5px;">
-                        <?= $form->field($filterForm, 'categoryFilter')->checkboxList($filterForm->getCategoryFilterSelection())->label(false); ?>
-                    </div>
-                    <?php ActiveForm::end(); ?>
+                    <?= NotificationFilterForm::widget(['filterForm' => $filterForm]) ?>
                 </div>
             </div>
-        </div>
+        </aside>
     </div>
 </div>

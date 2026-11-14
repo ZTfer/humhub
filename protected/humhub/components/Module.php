@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
  * @license https://www.humhub.com/licences
@@ -8,35 +8,55 @@
 
 namespace humhub\components;
 
-use humhub\modules\activity\components\BaseActivity;
-use humhub\modules\activity\models\Activity;
-use Yii;
-use yii\helpers\Json;
+use humhub\components\assets\AssetManager;
+use humhub\helpers\ThemeHelper;
 use humhub\models\Setting;
-use humhub\modules\file\libs\FileHelper;
-use humhub\modules\notification\components\BaseNotification;
+use humhub\modules\activity\components\BaseActivity;
+use humhub\modules\admin\jobs\DisableModuleJob;
+use humhub\modules\admin\jobs\RemoveModuleJob;
 use humhub\modules\content\models\ContentContainerSetting;
+use humhub\modules\file\libs\FileHelper;
+use humhub\modules\marketplace\models\Module as OnlineModelModule;
+use humhub\modules\notification\components\BaseNotification;
+use humhub\modules\queue\helpers\QueueHelper;
+use humhub\services\MigrationService;
+use humhub\services\ModuleService;
+use Throwable;
+use Yii;
+use yii\base\InvalidConfigException;
+use yii\db\StaleObjectException;
+use yii\helpers\Json;
+use yii\helpers\Url;
 use yii\web\AssetBundle;
-use yii\web\HttpException;
 
 /**
  * Base Class for Modules / Extensions
  *
+ * @property-read string $name
+ * @property-read string $description
+ * @property-read array $keywords
+ * @property-read bool $isEnabled
  * @property SettingsManager $settings
  * @author luke
  */
 class Module extends \yii\base\Module
 {
     /**
-     * @var array the loaded module.json info file
+     * Runtime cache key of the [[getIsEnabled()]] results (module id => bool)
+     * @since 1.18.7
      */
-    private $_moduleInfo = null;
+    public const CACHE_KEY_IS_ENABLED = 'humhub.module.isEnabled';
+
+    /**
+     * @var array|null the loaded module.json info file
+     */
+    private ?array $_moduleInfo = null;
 
     /**
      * @var string The path for module resources (images, javascripts)
      * Also module related assets like README.md and module_image.png should be placed here.
      */
-    public $resourcesPath = 'assets';
+    public $resourcesPath = 'resources';
 
     /**
      * @inheritdoc
@@ -48,56 +68,38 @@ class Module extends \yii\base\Module
         // Set settings component
         $this->set('settings', [
             'class' => SettingsManager::class,
-            'moduleId' => $this->id
+            'moduleId' => $this->id,
         ]);
     }
 
     /**
-     * Returns modules name provided by module.json file
+     * Returns the module's name provided by module.json file
      *
      * @return string Name
      */
     public function getName()
     {
-        $info = $this->getModuleInfo();
-
-        if ($info['name']) {
-            return $info['name'];
-        }
-
-        return $this->id;
+        return $this->getModuleInfo()['name'] ?? $this->id;
     }
 
     /**
-     * Returns modules description provided by module.json file
+     * Returns the module's description provided by module.json file
      *
      * @return string Description
      */
     public function getDescription()
     {
-        $info = $this->getModuleInfo();
-
-        if ($info['description']) {
-            return $info['description'];
-        }
-
-        return "";
+        return $this->getModuleInfo()['description'] ?? '';
     }
 
     /**
-     * Returns modules version number provided by module.json file
+     * Returns the module's version number provided by module.json file
      *
      * @return string Version Number
      */
     public function getVersion()
     {
-        $info = $this->getModuleInfo();
-
-        if ($info['version']) {
-            return $info['version'];
-        }
-
-        return "1.0";
+        return $this->getModuleInfo()['version'] ?? '1.0';
     }
 
     /**
@@ -111,45 +113,60 @@ class Module extends \yii\base\Module
         $url = $this->getPublishedUrl('/module_image.png');
 
         if ($url == null) {
-            $url = Yii::getAlias("@web-static/img/default_module.jpg");
+            $url = Yii::$app->assetManager->getPublishedUrl('@humhub/resources') . '/img/default_module.jpg';
         }
 
         return $url;
     }
 
     /**
-     * Returns the url of an asset file and publishes all module assets if
-     * the file is not published yet.
+     * Returns module's keywords provided by module.json file
      *
-     * @param string $relativePath relative file path e.g. /module_image.jpg
-     * @return string
+     * @return array List of keywords
      */
-    public function getPublishedUrl($relativePath)
+    public function getKeywords(): array
     {
-        $path = $this->getAssetPath();
-
-        // If the file has not been published yet we publish the module assets
-        if (!$this->isPublished($relativePath)) {
-            $this->publishAssets();
-        }
-
-        // If its still not published the file does not exist
-        if ($this->isPublished($relativePath)) {
-            return Yii::$app->assetManager->getPublishedUrl($path) . $relativePath;
-        }
+        return $this->getModuleInfo()['keywords'] ?? [];
     }
 
     /**
-     * Checks if a specific asset file has already been published
-     * @param string $relativePath
-     * @return string
+     * Returns the url of a published module asset file (publishing the module's
+     * assets on demand), or `null` if the module does not ship the given file.
+     *
+     * Whether the module ships the file is checked against its own - always
+     * local - resources directory. Whether the assets are already published is
+     * handled by {@see \humhub\components\assets\AssetManager::publish()}, whose
+     * result is cached and invalidated on cache clear. This avoids probing the
+     * published location, which may live on a remote (e.g. S3) mount, on every
+     * call.
+     *
+     * @param string $relativePath relative file path e.g. /module_image.png
+     * @return string|null
+     */
+    public function getPublishedUrl($relativePath)
+    {
+        if (!$this->isPublished($relativePath)) {
+            return null;
+        }
+
+        $published = Yii::$app->assetManager->publish($this->getAssetPath());
+
+        return isset($published[1]) ? $published[1] . $relativePath : null;
+    }
+
+    /**
+     * Checks whether the module ships the given asset file in its (local)
+     * resources directory. The published copy is created on demand by
+     * {@see getPublishedUrl()}, so this deliberately checks the source and not
+     * the published location, which may live on a remote (e.g. S3) mount.
+     *
+     * @param string $relativePath relative file path e.g. /module_image.png
+     * @return bool
      */
     public function isPublished($relativePath)
     {
-        $path = $this->getAssetPath();
-        $publishedPath = Yii::$app->assetManager->getPublishedPath($path);
-
-        return $publishedPath !== false && is_file($publishedPath . $relativePath);
+        return $this->hasAssets()
+            && is_file(Yii::getAlias($this->getAssetPath()) . $relativePath);
     }
 
     /**
@@ -157,19 +174,18 @@ class Module extends \yii\base\Module
      *
      * @return string Image Url
      */
-    public function getAssetsUrl()
+    public function getAssetsUrl(): string
     {
-        if (($published = $this->publishAssets()) != null) {
-            return $published[1];
-        }
+        $published = $this->publishAssets();
+        return $published && isset($published[1]) ? Url::to($published[1]) : '';
     }
 
     /**
      * Publishes the basePath/resourcesPath (assets) module directory if existing.
      * @param bool $all whether or not to publish sub assets within the `assets` directory
-     * @return array
+     * @return array|null
      */
-    public function publishAssets($all = false)
+    public function publishAssets(bool $all = false): ?array
     {
         /** @var $assetBundle AssetBundle */
         /** @var $manager AssetManager */
@@ -177,19 +193,19 @@ class Module extends \yii\base\Module
         if ($all) {
             foreach ($this->getAssetClasses() as $assetClass) {
                 $assetBundle = new $assetClass();
-                $manager = Yii::$app->getAssetManager();
-                $manager->forcePublish($assetBundle);
+                $assetBundle->publishOptions['forceCopy'] = true;
+                $assetBundle->publish(Yii::$app->assetManager);
             }
         }
 
-        if ($this->hasAssets()) {
-            return Yii::$app->assetManager->publish($this->getAssetPath(), ['forceCopy' => true]);
-        }
+        return $this->hasAssets()
+            ? Yii::$app->assetManager->publish($this->getAssetPath(), ['forceCopy' => true])
+            : null;
     }
 
     /**
      * Determines whether or not this module has an asset directory.
-     * @return boolean
+     * @return bool
      */
     private function hasAssets()
     {
@@ -205,23 +221,70 @@ class Module extends \yii\base\Module
     }
 
     /**
-     * Enables this module
+     * Check this module is enabled
      *
-     * @return boolean
+     * @return bool
+     */
+    public function getIsEnabled(): bool
+    {
+        if (!Yii::$app->hasModule($this->id)) {
+            return false;
+        }
+
+        // Cache the queue checks per request, they are invalidated by ModuleManager::flushCache() and QueueHelper::markAsQueued()
+        // Note: runtimeCache has no serializer, so cache dependencies (e.g. TagDependency) are not supported there
+        $states = Yii::$app->runtimeCache->get(static::CACHE_KEY_IS_ENABLED) ?: [];
+
+        if (!isset($states[$this->id])) {
+            $states[$this->id] = !QueueHelper::isQueued(new DisableModuleJob(['moduleId' => $this->id]))
+                && !QueueHelper::isQueued(new RemoveModuleJob(['moduleId' => $this->id]));
+            Yii::$app->runtimeCache->set(static::CACHE_KEY_IS_ENABLED, $states);
+        }
+
+        return $states[$this->id];
+    }
+
+    /**
+     * Enables this module.
+     *
+     * Override this method to run custom logic when the module is enabled. Call
+     * `parent::enable()` **before** your custom code so the module is already
+     * registered and active when your code runs:
+     *
+     * ```php
+     * public function enable()
+     * {
+     *     parent::enable();
+     *     // custom enable logic here
+     * }
+     * ```
+     *
+     * The base implementation delegates the registration step to {@see ModuleService::enable()}
+     * and then runs pending database migrations via {@see MigrationService::migrateUp()}.
+     * If migrations fail, the registration is rolled back automatically.
+     *
+     * @return bool|null migration result, or false if migrations failed
+     * @throws InvalidConfigException
      */
     public function enable()
     {
-        Yii::$app->moduleManager->enable($this);
-        $this->migrate();
+        $this->getModuleService()->enable();
+        $result = $this->getMigrationService()->migrateUp();
 
-        return true;
+        if ($result === false) {
+            $this->getModuleService()->disable();
+            Yii::error('Could not enable module. Database Migration failed! See previous error for result.', $this->id);
+            return false;
+        }
+
+        return $result;
     }
 
     /**
      * Disables a module
      *
      * This should delete all data created by this module.
-     * When override this method make sure to invoke call `parent::disable()` **AFTER** your implementation as
+     * When overriding this method, make sure to invoke call `parent::disable()` **AFTER** your implementation as
      *
      * ```php
      * public function disable()
@@ -230,56 +293,39 @@ class Module extends \yii\base\Module
      *     parent::disable();
      * }
      * ```
+     *
+     * @return bool|null Result uninstall-migration or null if beforeDisable() returned false (since v1.16)
+     * @throws InvalidConfigException
+     * @throws StaleObjectException
+     * @throws Throwable
      */
     public function disable()
     {
-        /**
-         * Remove database tables
-         */
-        $migrationPath = $this->getBasePath() . '/migrations';
-        $uninstallMigration = $migrationPath . '/uninstall.php';
-        if (file_exists($uninstallMigration)) {
-
-            /**
-             * Execute Uninstall Migration
-             */
-            ob_start();
-            require_once($uninstallMigration);
-            $migration = new \uninstall;
-            try {
-                $migration->up();
-            } catch (\yii\db\Exception $ex) {
-                Yii::error($ex);
-            }
-            ob_get_clean();
-
-            /**
-             * Delete all Migration Table Entries
-             */
-            $migrations = opendir($migrationPath);
-            while (false !== ($migration = readdir($migrations))) {
-                if ($migration == '.' || $migration == '..' || $migration == 'uninstall.php') {
-                    continue;
-                }
-                Yii::$app->db->createCommand()->delete('migration', ['version' => str_replace('.php', '', $migration)])->execute();
-            }
+        try {
+            $result = $this->getMigrationService()->uninstall();
+            ContentContainerSetting::deleteAll(['module_id' => $this->id]);
+            Setting::deleteAll(['module_id' => $this->id]);
+        } catch (Throwable $ex) {
+            Yii::error($ex, $this->id);
+            $result = false;
         }
 
-        ContentContainerSetting::deleteAll(['module_id' => $this->id]);
-        Setting::deleteAll(['module_id' => $this->id]);
+        $this->getModuleService()->disable();
 
-        Yii::$app->moduleManager->disable($this);
+        return $result;
+    }
+
+    public function getMigrationService(): MigrationService
+    {
+        return new MigrationService($this);
     }
 
     /**
-     * Execute all not applied module migrations
+     * @since 1.19
      */
-    public function migrate()
+    public function getModuleService(): ModuleService
     {
-        $migrationPath = $this->basePath . '/migrations';
-        if (is_dir($migrationPath)) {
-            \humhub\commands\MigrateController::webMigrateUp($migrationPath);
-        }
+        return new ModuleService($this);
     }
 
     /**
@@ -288,15 +334,16 @@ class Module extends \yii\base\Module
      *
      * @return array module.json content
      */
-    protected function getModuleInfo()
+    protected function getModuleInfo(): array
     {
-        if ($this->_moduleInfo != null) {
-            return $this->_moduleInfo;
+        if ($this->_moduleInfo === null) {
+            $configPath = $this->getBasePath() . DIRECTORY_SEPARATOR . 'module.json';
+            $this->_moduleInfo = file_exists($configPath)
+                ? Json::decode(file_get_contents($configPath))
+                : ['id' => $this->id];
         }
 
-        $moduleJson = file_get_contents($this->getBasePath() . DIRECTORY_SEPARATOR . 'module.json');
-
-        return Json::decode($moduleJson);
+        return $this->_moduleInfo;
     }
 
     /**
@@ -305,31 +352,21 @@ class Module extends \yii\base\Module
      */
     public function update()
     {
-        if($this->beforeUpdate() !== false) {
-            $this->migrate();
-            $this->afterUpdate();
+        if ($this->isEnabled) {
+            $this->getMigrationService()->migrateUp();
+
+            // Check if current theme (parent) is located in this module
+            foreach (array_merge([Yii::$app->view->theme], Yii::$app->view->theme->getParents()) as $theme) {
+                if (str_starts_with((string) $theme->getBasePath(), $this->getBasePath())) {
+                    try {
+                        ThemeHelper::buildCss();
+                        break;
+                    } catch (\Exception $e) {
+                        Yii::error('Could not build Theme CSS after Module Update: ' . $e->getMessage());
+                    }
+                }
+            }
         }
-    }
-
-    /**
-     * Called right before the module is updated.
-     *
-     * The update will cancel if this function does return false;
-     *
-     * @return bool
-     */
-    public function beforeUpdate()
-    {
-        return true;
-    }
-
-
-    /**
-     * Called right after the module update.
-     */
-    public function afterUpdate()
-    {
-
     }
 
     /**
@@ -349,9 +386,9 @@ class Module extends \yii\base\Module
      * This function should also make sure the module is installed on the given container in case the permission
      * only affects installed features.
      *
-     * @since 0.21
      * @param \humhub\modules\content\components\ContentContainerActiveRecord $contentContainer optional contentcontainer
      * @return array list of permissions
+     * @since 0.21
      */
     public function getPermissions($contentContainer = null)
     {
@@ -361,12 +398,12 @@ class Module extends \yii\base\Module
     /**
      * Returns a list of notification classes this module provides.
      *
-     * @since 1.1
      * @return array list of notification classes
+     * @since 1.1
      */
     public function getNotifications()
     {
-        $class = get_class($this);
+        $class = static::class;
         if (($pos = strrpos($class, '\\')) !== false) {
             $notificationNamespace = substr($class, 0, $pos) . '\\notifications';
         } else {
@@ -377,7 +414,7 @@ class Module extends \yii\base\Module
         $notificationDirectory = $this->getBasePath() . DIRECTORY_SEPARATOR . 'notifications';
         if (is_dir($notificationDirectory)) {
             foreach (FileHelper::findFiles($notificationDirectory, ['recursive' => false,]) as $file) {
-                $notificationClass = $notificationNamespace . '\\' . basename($file, '.php');
+                $notificationClass = $notificationNamespace . '\\' . basename((string) $file, '.php');
                 if (is_subclass_of($notificationClass, BaseNotification::class)) {
                     $notifications[] = $notificationClass;
                 }
@@ -390,8 +427,8 @@ class Module extends \yii\base\Module
     /**
      * Determines whether the module has notification classes or not
      *
+     * @return bool has notifications
      * @since 1.2
-     * @return boolean has notifications
      */
     public function hasNotifications()
     {
@@ -401,12 +438,12 @@ class Module extends \yii\base\Module
     /**
      * Returns a list of activity class names this modules provides.
      *
-     * @since 1.2
      * @return array list of activity class names
+     * @since 1.2
      */
     public function getActivityClasses()
     {
-        $class = get_class($this);
+        $class = static::class;
         if (($pos = strrpos($class, '\\')) !== false) {
             $activityNamespace = substr($class, 0, $pos) . '\\activities';
         } else {
@@ -417,7 +454,7 @@ class Module extends \yii\base\Module
         $activityDirectory = $this->getBasePath() . DIRECTORY_SEPARATOR . 'activities';
         if (is_dir($activityDirectory)) {
             foreach (FileHelper::findFiles($activityDirectory, ['recursive' => false,]) as $file) {
-                $activityClass = $activityNamespace . '\\' . basename($file, '.php');
+                $activityClass = $activityNamespace . '\\' . basename((string) $file, '.php');
                 if (is_subclass_of($activityClass, BaseActivity::class)) {
                     $activities[] = $activityClass;
                 }
@@ -430,12 +467,12 @@ class Module extends \yii\base\Module
     /**
      * Returns a list of asset class names this modules provides.
      *
-     * @since 1.2.8
      * @return array list of asset class names
+     * @since 1.2.8
      */
     public function getAssetClasses()
     {
-        $class = get_class($this);
+        $class = static::class;
         if (($pos = strrpos($class, '\\')) !== false) {
             $assetNamespace = substr($class, 0, $pos) . '\\assets';
         } else {
@@ -446,7 +483,7 @@ class Module extends \yii\base\Module
         $assetDirectory = $this->getBasePath() . DIRECTORY_SEPARATOR . 'assets';
         if (is_dir($assetDirectory)) {
             foreach (FileHelper::findFiles($assetDirectory, ['recursive' => false,]) as $file) {
-                $assetClass =  $assetNamespace . '\\' . basename($file, '.php');
+                $assetClass = $assetNamespace . '\\' . basename((string) $file, '.php');
                 if (is_subclass_of($assetClass, AssetBundle::class)) {
                     $assets[] = $assetClass;
                 }
@@ -454,5 +491,17 @@ class Module extends \yii\base\Module
         }
 
         return $assets;
+    }
+
+    public function getOnlineModule(): ?OnlineModelModule
+    {
+        /* @var \humhub\modules\marketplace\Module $marketplaceModule */
+        $marketplaceModule = Yii::$app->getModule('marketplace');
+
+        if (!$marketplaceModule->enabled) {
+            return null;
+        }
+
+        return $marketplaceModule->onlineModuleManager->getModule($this->id);
     }
 }

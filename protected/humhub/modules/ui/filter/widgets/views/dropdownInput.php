@@ -5,13 +5,14 @@
  * @license https://www.humhub.com/licences
  */
 
-use yii\bootstrap\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
 
-/* @var $this \humhub\modules\ui\view\components\View */
+/* @var $this View */
 /* @var $options [] */
 /* @var $selection [] */
 /* @var $items [] */
 ?>
-<div class="form-group">
+<div class="mb-3">
     <?= Html::dropDownList(null, $selection, $items, $options) ?>
 </div>

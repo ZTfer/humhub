@@ -1,17 +1,24 @@
 <?php
- /* @var $this \yii\web\View */
- /* @var $isPinned boolean */
- /* @var $unpinUrl string */
- /* @var $pinUrl string */
+/* @var $this View */
+/* @var $isPinned bool */
+/* @var $unpinUrl string */
+
+/* @var $pinUrl string */
+
+use humhub\widgets\bootstrap\Link;
+use yii\web\View;
+
 ?>
 <li>
     <?php if ($isPinned): ?>
-        <a href="#" data-action-click="unpin" data-action-url="<?= $unpinUrl ?>">
-            <i class="fa fa-map-pin"></i> <?php echo Yii::t('ContentModule.base', 'Unpin'); ?>
-        </a>
-       <?php else: ?>
-        <a href="#" data-action-click="pin" data-action-url="<?= $pinUrl ?>">
-            <i class="fa fa-map-pin"></i> <?php echo Yii::t('ContentModule.base', 'Pin to top'); ?>
-        </a>
+        <?= Link::to(Yii::t('ContentModule.base', 'Unpin'))
+            ->action('unpin', $unpinUrl)
+            ->cssClass('dropdown-item')
+            ->icon('map-pin') ?>
+    <?php else: ?>
+        <?= Link::to(Yii::t('ContentModule.base', 'Pin to top'))
+            ->action('pin', $pinUrl)
+            ->cssClass('dropdown-item')
+            ->icon('map-pin') ?>
     <?php endif; ?>
 </li>

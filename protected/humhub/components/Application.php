@@ -8,15 +8,18 @@
 
 namespace humhub\components;
 
-use Yii;
-use yii\helpers\Url;
-use yii\base\Exception;
+use Exception;
+use humhub\interfaces\ApplicationInterface;
+use yii\web\HttpException;
 
 /**
+ * Description of Application
+ *
  * @inheritdoc
  */
-class Application extends \yii\web\Application
+class Application extends \yii\web\Application implements ApplicationInterface
 {
+    use ApplicationTrait;
 
     /**
      * @inheritdoc
@@ -24,48 +27,20 @@ class Application extends \yii\web\Application
     public $controllerNamespace = 'humhub\\controllers';
 
     /**
-     * @var string|array the homepage url
-     */
-    private $_homeUrl = null;
-
-    /**
      * @inheritdoc
      */
-    public function bootstrap()
+    public function init()
     {
-        $request = $this->getRequest();
-
-        if (Yii::getAlias('@web-static', false) === false) {
-            Yii::setAlias('@web-static', $request->getBaseUrl() . '/static');
+        if (version_compare(phpversion(), $this->minSupportedPhpVersion, '<')) {
+            throw new Exception(sprintf(
+                'Installed PHP Version is too old! Required minimum version is PHP %s (Installed: %s)',
+                $this->minSupportedPhpVersion,
+                phpversion(),
+            ));
         }
 
-        if (Yii::getAlias('@webroot-static', false) === false) {
-            Yii::setAlias('@webroot-static', '@webroot/static');
-        }
-
-        parent::bootstrap();
-    }
-
-    /**
-     * @return string the homepage URL
-     */
-    public function getHomeUrl()
-    {
-        if ($this->_homeUrl === null) {
-            return Url::to(['/dashboard/dashboard']);
-        } elseif (is_array($this->_homeUrl)) {
-            return Url::to($this->_homeUrl);
-        } else {
-            return $this->_homeUrl;
-        }
-    }
-
-    /**
-     * @param string|array $value the homepage URL
-     */
-    public function setHomeUrl($value)
-    {
-        $this->_homeUrl = $value;
+        parent::init();
+        $this->trigger(self::EVENT_ON_INIT);
     }
 
     /**
@@ -76,8 +51,26 @@ class Application extends \yii\web\Application
         /**
          * Check if it's already installed - if not force controller module
          */
-        if (!$this->params['installed'] && $this->controller->module != null && $this->controller->module->id != 'installer') {
+        if (
+            !$this->installationState->hasState(InstallationState::STATE_INSTALLED)
+            && $this->controller && $this->controller->id != 'error'
+            && $this->controller->module != null && $this->controller->module->id != 'installer'
+        ) {
+            // A configured but unreachable database must surface as a service
+            // error instead of silently presenting the installer, which would
+            // offer to re-setup an already installed instance during a transient
+            // database outage.
+            if ($this->installationState->isDatabaseUnreachable()) {
+                throw new HttpException(
+                    503,
+                    'The database is currently not reachable.',
+                    0,
+                    $this->installationState->getDatabaseConnectionError(),
+                );
+            }
+
             $this->controller->redirect(['/installer/index']);
+
             return false;
         }
 
@@ -88,5 +81,17 @@ class Application extends \yii\web\Application
         \yii\base\Widget::$autoIdPrefix = 'h' . mt_rand(1, 999999) . 'w';
 
         return parent::beforeAction($action);
+    }
+
+    /**
+     * Switch current language
+     *
+     * @param string $value
+     */
+    public function setLanguage($value)
+    {
+        if (!empty($value)) {
+            $this->language = $value;
+        }
     }
 }

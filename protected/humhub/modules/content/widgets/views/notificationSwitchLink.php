@@ -1,42 +1,46 @@
 <?php
-    use yii\helpers\Url;
+
+use humhub\helpers\Html;
+use humhub\modules\content\assets\ContentContainerAsset;
+use humhub\modules\content\models\Content;
+use humhub\modules\content\Module;
+use yii\helpers\Url;
+
+/**
+ * @var Content $content
+ * @var bool $state
+ * @var Module $module
+ */
+
+ContentContainerAsset::register($this);
 
 ?>
 <li>
-    <?php
-    $offLinkId = 'notification_off_' . $content->id;
-    $onLinkId = 'notification_on_' . $content->id;
-
-    echo \humhub\widgets\AjaxButton::widget([
-        'tag' => 'a',
-        'label' => '<i class="fa fa-bell-slash-o"></i> ' . Yii::t('ContentModule.base', 'Turn off notifications'),
-        'ajaxOptions' => [
-            'type' => 'POST',
-            'success' => "function(res){ if (res.success) { $('#" . $offLinkId . "').hide(); $('#" . $onLinkId . "').show(); } }",
-            'url' => Url::to(['/content/content/notification-switch', 'id' => $content->id, 'switch' => 0]),
+    <?= Html::a(
+        '<i class="fa fa-bell-slash-o"></i> ' . Yii::t('ContentModule.base', 'Turn off notifications'),
+        Url::to(['/content/content/notification-switch', 'id' => $content->id, 'switch' => 0]),
+        [
+            'id' => "notification_off_$content->id",
+            'class' => array_merge(['dropdown-item ', 'turnOffNotifications'], $state ? [] : ['d-none']),
+            'data' => [
+                'action-click' => 'content.container.turnOffNotifications',
+                'action-url' => Url::to(['/content/content/notification-switch', 'id' => $content->id, 'switch' => 0]),
+                'content-id' => $content->id,
+            ],
         ],
-        'htmlOptions' => [
-            'class' => 'turnOffNotifications',
-            'style' => 'display: ' . ($state ? 'block' : 'none'),
-            'href' => '#',
-            'id' => $offLinkId
-        ]
-    ]);
+    ) ?>
 
-    echo \humhub\widgets\AjaxButton::widget([
-        'tag' => 'a',
-        'label' => '<i class="fa fa-bell-o"></i> ' . Yii::t('ContentModule.base', 'Turn on notifications'),
-        'ajaxOptions' => [
-            'type' => 'POST',
-            'success' => "function(res){ if (res.success) { $('#" . $onLinkId . "').hide(); $('#" . $offLinkId . "').show(); } }",
-            'url' => Url::to(['/content/content/notification-switch', 'id' => $content->id, 'switch' => 1]),
+    <?= Html::a(
+        '<i class="fa fa-bell-o"></i> ' . Yii::t('ContentModule.base', 'Turn on notifications'),
+        Url::to(['/content/content/notification-switch', 'id' => $content->id, 'switch' => 1]),
+        [
+            'id' => "notification_on_$content->id",
+            'class' => array_merge(['dropdown-item ', 'turnOnNotifications'], $state ? ['d-none'] : []),
+            'data' => [
+                'action-click' => 'content.container.turnOnNotifications',
+                'action-url' => Url::to(['/content/content/notification-switch', 'id' => $content->id, 'switch' => 1]),
+                'content-id' => $content->id,
+            ],
         ],
-        'htmlOptions' => [
-            'class' => 'turnOnNotifications',
-            'style' => 'display: ' . ($state ? 'none' : 'block'),
-            'href' => '#',
-            'id' => $onLinkId
-        ]
-    ]);
-    ?>
+    ) ?>
 </li>

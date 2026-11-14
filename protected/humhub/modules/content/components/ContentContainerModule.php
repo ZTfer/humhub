@@ -9,6 +9,7 @@
 namespace humhub\modules\content\components;
 
 use humhub\components\Module;
+use humhub\modules\content\models\ContentContainer;
 use humhub\modules\content\models\ContentContainerModuleState;
 use humhub\modules\content\models\ContentContainerPermission;
 
@@ -23,7 +24,6 @@ use humhub\modules\content\models\ContentContainerPermission;
  */
 class ContentContainerModule extends Module
 {
-
     /**
      * @inheritdoc
      */
@@ -32,7 +32,7 @@ class ContentContainerModule extends Module
         // disable in content containers
         $contentContainerQuery = ContentContainerModuleManager::getContentContainerQueryByModule($this->id);
         foreach ($contentContainerQuery->all() as $contentContainer) {
-            /* @var $contentContainer \humhub\modules\content\models\ContentContainer */
+            /* @var $contentContainer ContentContainer */
             $this->disableContentContainer($contentContainer->getPolymorphicRelation());
         }
 
@@ -40,7 +40,7 @@ class ContentContainerModule extends Module
             $moduleState->delete();
         }
 
-        parent::disable();
+        return parent::disable();
     }
 
     /**
@@ -50,8 +50,8 @@ class ContentContainerModule extends Module
      * public function getContentContainerTypes()
      * {
      *      return [
-     *          User::className(),
-     *          Space::className()
+     *          User::class,
+     *          Space::class
      *      ];
      * }
      * ~~~
@@ -67,7 +67,7 @@ class ContentContainerModule extends Module
      * Checks whether the module is enabled the given content container class.
      *
      * @param string $class the class of content container
-     * @return boolean
+     * @return bool
      */
     public function hasContentContainerType($class)
     {
@@ -158,11 +158,22 @@ class ContentContainerModule extends Module
      * Returns an array of all content containers where this module is enabled.
      *
      * @param string $containerClass optional filter to specific container class
-     * @return array of content container instances
+     * @return ContentContainer[]
      */
-    public function getEnabledContentContainers($containerClass = "")
+    public function getEnabledContentContainers($containerClass = null)
     {
-        return [];
+        $enabledContentContainers = [];
+        $contentContainerModuleStates = ContentContainerModuleState::findAll(['module_id' => $this->id, 'module_state' => [ContentContainerModuleState::STATE_ENABLED, ContentContainerModuleState::STATE_FORCE_ENABLED]]);
+        foreach ($contentContainerModuleStates as $contentContainerModuleState) {
+            $contentContainer = $contentContainerModuleState->contentContainer;
+            if (
+                $contentContainer !== null
+                && (!$containerClass || $contentContainer->class === $containerClass)
+            ) {
+                $enabledContentContainers[] = $contentContainer;
+            }
+        }
+        return $enabledContentContainers;
     }
 
     /**
@@ -215,6 +226,16 @@ class ContentContainerModule extends Module
      * @since 1.3.11
      */
     protected function getGlobalPermissions()
+    {
+        return [];
+    }
+
+    /**
+     * Returns all content classes provided by the module.
+     *
+     * @return array
+     */
+    public function getContentClasses(): array
     {
         return [];
     }

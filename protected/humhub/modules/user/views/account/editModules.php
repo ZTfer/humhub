@@ -1,48 +1,36 @@
 <?php
 
-use yii\helpers\Html;
-use yii\helpers\Url;
+use humhub\modules\content\components\ContentContainerModule;
+use humhub\modules\content\widgets\ContainerModule;
+use humhub\modules\user\models\User;
+
+/* @var User $user */
+/* @var ContentContainerModule[] $modules */
 ?>
-<div class="panel-heading">
-    <?php echo Yii::t('UserModule.account', '<strong>User</strong> modules'); ?>
-</div>
-
-<div class="panel-body">
-    <div class="help-block"><?php echo Yii::t('UserModule.account', 'Enhance your profile with modules.'); ?></div>
-
-    <?php foreach ($availableModules as $moduleId => $module): ?>
-        <hr>
-        <div class="media">
-            <a class="pull-left" href="#">
-                <img src="<?= $module->getContentContainerImage($user); ?>"
-                     class="" width="64" height="64">
-            </a>
-            <div class="media-body">
-                <h4 class="media-heading"><?php echo $module->getContentContainerName($user); ?></h4>
-                <p><?= $module->getContentContainerDescription($user); ?></p>
-
-
-                    <?php if ($user->canDisableModule($module->id)): ?>
-                        <a href="#" style="<?= $user->isModuleEnabled($module->id) ? '' : 'display:none' ?>"
-                           data-action-click="content.container.disableModule" 
-                           data-action-url="<?= Url::to(['/user/account/disable-module', 'moduleId' => $module->id]) ?>" data-reload="1"
-                           data-action-confirm="<?= Yii::t('UserModule.account', 'Are you really sure? *ALL* module data for your profile will be deleted!') ?>"
-                           class="btn btn-sm btn-primary disable disable-module-<?= $module->id ?>" data-ui-loader>
-                               <?= Yii::t('UserModule.account', 'Disable') ?>
-                        </a>
-                    <?php endif; ?>
-                
-                    <?php if ($module->getContentContainerConfigUrl($user) && $user->isModuleEnabled($module->id)) : ?>
-                        <?= Html::a(Yii::t('UserModule.account', 'Configure'), $module->getContentContainerConfigUrl($user), ['class' => 'btn btn-sm btn-default']); ?>
-                    <?php endif; ?>
-
-                    <a href="#" style="<?= $user->isModuleEnabled($module->id) ? 'display:none' : '' ?>"
-                       data-action-click="content.container.enableModule" data-action-url="<?= Url::to(['/user/account/enable-module', 'moduleId' => $module->id]) ?>" data-reload="1"
-                       class="btn btn-sm btn-primary enable enable-module-<?= $module->id ?>" data-ui-loader>
-                        <?= Yii::t('UserModule.account', 'Enable') ?>
-                    </a>
-
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <?= Yii::t('UserModule.manage', '<strong>Profile</strong> modules') ?>
+        <div
+            class="text-body-secondary"><?= Yii::t('UserModule.manage', 'Similar to Spaces, your personal profile also allows you to use modules. Please keep in mind that information you share on your profile is available to other users of the network.') ?></div>
+    </div>
+    <div class="panel-body">
+        <?php if (empty($modules)) : ?>
+            <div class="col-lg-12">
+                <div class="panel panel-default">
+                    <div class="panel-body">
+                        <?= Yii::t('UserModule.manage', 'Currently there are no modules available for you!'); ?>
+                    </div>
+                </div>
             </div>
+        <?php endif; ?>
+
+        <div class="modules-group">
+            <?php foreach ($modules as $module) : ?>
+                <?= ContainerModule::widget([
+                    'contentContainer' => $user,
+                    'module' => $module,
+                ]); ?>
+            <?php endforeach; ?>
         </div>
-    <?php endforeach; ?>
+    </div>
 </div>

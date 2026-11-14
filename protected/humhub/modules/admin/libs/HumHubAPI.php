@@ -8,10 +8,9 @@
 
 namespace humhub\modules\admin\libs;
 
+use Exception;
 use humhub\modules\marketplace\Module;
 use Yii;
-use yii\helpers\Json;
-use humhub\libs\CURLHelper;
 
 /**
  * HumHubAPI provides access to humhub.com for fetching available modules or latest version.
@@ -20,7 +19,6 @@ use humhub\libs\CURLHelper;
  */
 class HumHubAPI
 {
-
     /**
      * HumHub API
      *
@@ -40,7 +38,7 @@ class HumHubAPI
 
             $response = $marketplace->getHumHubApi()->get($action)->addData($params)->send();
             return $response->getData();
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
             Yii::error('Could not parse HumHub API response! ' . $ex->getMessage());
             return [];
         }
@@ -51,17 +49,20 @@ class HumHubAPI
      *
      * @return string latest HumHub Version
      */
-    public static function getLatestHumHubVersion()
+    public static function getLatestHumHubVersion($useCache = true)
     {
-        $latestVersion = Yii::$app->cache->get('latestVersion');
-        if ($latestVersion === false) {
+        $latestVersion = Yii::$app->cache->get('latestHumHubVersion');
+        if (!$useCache || $latestVersion === false) {
             $info = self::request('v1/modules/getLatestVersion');
 
-            if (isset($info['latestVersion'])) {
+            if (!empty($info['latestVersion'])) {
                 $latestVersion = $info['latestVersion'];
+                Yii::$app->cache->set('latestHumHubVersion', $latestVersion, 2 * 24 * 60 * 60);
+            } elseif ($latestVersion === false) {
+                // Cache a failed request briefly to avoid an API request on every page load
+                $latestVersion = '';
+                Yii::$app->cache->set('latestHumHubVersion', $latestVersion, 60 * 60);
             }
-
-            Yii::$app->cache->set('latestVersion', $latestVersion);
         }
 
         return $latestVersion;

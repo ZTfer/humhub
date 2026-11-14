@@ -2,11 +2,11 @@
 
 namespace tests\codeception\unit\modules\web\security;
 
-use web\WebSecurityTest;
-use Yii;
-use humhub\libs\Html;
+use humhub\helpers\Html;
 use humhub\modules\web\security\helpers\Security;
 use humhub\modules\web\security\models\SecuritySettings;
+use web\WebSecurityTest;
+use Yii;
 
 class SecurityTest extends WebSecurityTest
 {
@@ -21,9 +21,9 @@ class SecurityTest extends WebSecurityTest
         $nonce = Html::nonce();
         $this->assertNotEmpty($nonce);
 
-        $this->assertContains(Security::getNonce(), $csp);
-        $this->assertContains($nonce, Html::beginTag('script'));
-        $this->assertContains($nonce, Html::script('var a = test;'));
+        $this->assertStringContainsString(Security::getNonce(), $csp);
+        $this->assertStringContainsString($nonce, Html::beginTag('script'));
+        $this->assertStringContainsString($nonce, Html::script('var a = test;'));
     }
 
     public function testHttpHeader()
@@ -31,9 +31,8 @@ class SecurityTest extends WebSecurityTest
         $this->setConfigFile('security.strict.json');
         Security::applyHeader(true);
 
-        $this->assertContains(Security::getNonce(), Yii::$app->response->headers->get(SecuritySettings::HEADER_CONTENT_SECRUITY_POLICY));
-        $this->assertEquals(Yii::$app->response->headers->get(SecuritySettings::HEADER_STRICT_TRANSPORT_SECURITY),  'max-age=31536000');
-        $this->assertEquals(Yii::$app->response->headers->get(SecuritySettings::HEADER_X_XSS_PROTECTION), '1; mode=block');
+        $this->assertStringContainsString(Security::getNonce(), Yii::$app->response->headers->get(SecuritySettings::HEADER_CONTENT_SECRUITY_POLICY));
+        $this->assertEquals(Yii::$app->response->headers->get(SecuritySettings::HEADER_STRICT_TRANSPORT_SECURITY), 'max-age=31536000');
         $this->assertEquals(Yii::$app->response->headers->get(SecuritySettings::HEADER_X_CONTENT_TYPE), 'nosniff');
         $this->assertEquals(Yii::$app->response->headers->get(SecuritySettings::HEADER_X_FRAME_OPTIONS), 'deny');
         $this->assertEquals(Yii::$app->response->headers->get(SecuritySettings::HEADER_REFERRER_POLICY), 'no-referrer-when-downgrade');

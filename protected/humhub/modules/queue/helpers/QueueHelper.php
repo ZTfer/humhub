@@ -8,6 +8,7 @@
 
 namespace humhub\modules\queue\helpers;
 
+use humhub\components\Module;
 use Yii;
 use yii\base\BaseObject;
 use yii\base\InvalidArgumentException;
@@ -23,7 +24,6 @@ use humhub\modules\queue\models\QueueExclusive;
  */
 class QueueHelper extends BaseObject
 {
-
     public static function isQueued(ExclusiveJobInterface $job)
     {
         $queueExclusive = QueueExclusive::findOne(['id' => $job->getExclusiveJobId()]);
@@ -36,10 +36,7 @@ class QueueHelper extends BaseObject
             if (Yii::$app->queue->isDone($queueExclusive->job_message_id)) {
                 $jobInQueue = false;
             }
-        } catch (InvalidArgumentException $ex) {
-            // not exists
-            $jobInQueue = false;
-        } catch (InvalidParamException $ex) {
+        } catch (InvalidArgumentException|InvalidParamException) {
             // not exists
             $jobInQueue = false;
         }
@@ -61,6 +58,9 @@ class QueueHelper extends BaseObject
         }
         $queueExclusive->job_message_id = $jobQueueId;
         $queueExclusive->save();
+
+        // A queued module disable/remove job changes the result of Module::getIsEnabled()
+        Yii::$app->runtimeCache->delete(Module::CACHE_KEY_IS_ENABLED);
     }
 
 }

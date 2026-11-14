@@ -1,27 +1,35 @@
 <?php
 
-use humhub\widgets\LinkPager;
-use yii\helpers\Html;
+use humhub\components\View;
+use humhub\helpers\Html;
+use humhub\modules\notification\components\BaseNotification;
+use humhub\widgets\bootstrap\LinkPager;
+use yii\data\Pagination;
+
+/**
+ * @var $this View
+ * @var $notifications BaseNotification[]
+ * @var $pagination Pagination
+ * @var $options array
+ */
 ?>
 
 <?= Html::beginTag('div', $options) ?>
-    <?= Html::beginTag('ul', ['class' => 'media-list']) ?>
-        <?php foreach ($notifications as $notification) : ?>
-            <?php try  { ?>
+    <div class="hh-list">
+        <?php foreach ($notifications as $notification): ?>
+            <?php try { ?>
                 <?= $notification->render() ?>
-            <?php } catch(\Throwable $t) {
+            <?php } catch (Throwable $t) {
                 Yii::warning($t, 'notification');
-            }?>
+            } ?>
         <?php endforeach; ?>
-        <?php if (empty($notifications)) : ?>
+        <?php if (empty($notifications)): ?>
             <?= Yii::t('NotificationModule.base', 'No notifications found!'); ?>
         <?php endif; ?>
-    <?= Html::endTag('ul') ?>
-    <?php if (!empty($notifications)) : ?>
-        <?= Html::beginTag('center') ?>
-            <?= ($pagination != null) ? LinkPager::widget(['pagination' => $pagination]) : ''; ?>
-        <?= Html::endTag('center') ?>
-    <?php endif;?>
-<?= Html::endTag('div') ?>
-
-
+    </div>
+<?php if (!empty($notifications)): ?>
+    <div class="pagination-container">
+        <?= ($pagination != null) ? LinkPager::widget(['pagination' => $pagination]) : ''; ?>
+    </div>
+<?php endif; ?>
+<?= Html::endTag('div');

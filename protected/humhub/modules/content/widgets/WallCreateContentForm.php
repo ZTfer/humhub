@@ -8,37 +8,31 @@
 
 namespace humhub\modules\content\widgets;
 
+use humhub\components\Widget;
+use humhub\modules\content\components\ContentActiveRecord;
+use humhub\modules\content\components\ContentContainerActiveRecord;
+use humhub\modules\content\models\Content;
 use humhub\modules\content\permissions\CreatePublicContent;
-use humhub\modules\stream\actions\Stream;
+use humhub\modules\space\models\Space;
 use humhub\modules\stream\actions\StreamEntryResponse;
 use humhub\modules\topic\models\Topic;
+use humhub\modules\topic\services\TopicService;
+use humhub\modules\user\models\User;
+use humhub\widgets\form\ActiveForm;
 use Yii;
 use yii\web\HttpException;
-use humhub\components\Widget;
-use humhub\modules\user\models\User;
-use humhub\modules\space\models\Space;
-use humhub\modules\content\models\Content;
-use humhub\modules\content\components\ContentContainerActiveRecord;
-use humhub\modules\content\components\ContentActiveRecord;
-use humhub\modules\file\handler\FileHandlerCollection;
 
 /**
  * WallCreateContentForm is the base widget to create  "quick" create content forms above Stream/Wall.
  *
  * @author luke
  */
-class WallCreateContentForm extends Widget
+abstract class WallCreateContentForm extends Widget
 {
-
     /**
      * @var string form submit route/url (required)
      */
     public $submitUrl;
-
-    /**
-     * @var string submit button text
-     */
-    public $submitButtonText;
 
     /**
      * @var ContentContainerActiveRecord this content will belong to
@@ -46,23 +40,25 @@ class WallCreateContentForm extends Widget
     public $contentContainer;
 
     /**
-     * @var string form implementation
+     * Pre-uploaded File GUIDs to be attached to the new content
      */
-    protected $form = "";
+    public array $fileList = [];
+
+    /**
+     * The widget is executed in a modal window
+     */
+    public bool $isModal = false;
 
     /**
      * @inheritdoc
      */
     public function init()
     {
-        if ($this->submitButtonText == "")
-            $this->submitButtonText = Yii::t('ContentModule.base', 'Submit');
-
-        if ($this->contentContainer == null || !$this->contentContainer instanceof ContentContainerActiveRecord) {
-            throw new HttpException(500, "No Content Container given!");
+        if (!($this->contentContainer instanceof ContentContainerActiveRecord)) {
+            throw new HttpException(500, 'No Content Container given!');
         }
 
-        return parent::init();
+        parent::init();
     }
 
     /**
@@ -72,7 +68,18 @@ class WallCreateContentForm extends Widget
      */
     public function renderForm()
     {
-        return "";
+        return '';
+    }
+
+    /**
+     * Returns the custom form implementation.
+     *
+     * @param ActiveForm $form
+     * @return string
+     */
+    public function renderActiveForm(ActiveForm $form): string
+    {
+        return $this->renderForm();
     }
 
     /**
@@ -82,23 +89,14 @@ class WallCreateContentForm extends Widget
     {
         if ($this->contentContainer->visibility !== Space::VISIBILITY_NONE && $this->contentContainer->can(CreatePublicContent::class)) {
             $defaultVisibility = $this->contentContainer->getDefaultContentVisibility();
-            $canSwitchVisibility = true;
         } else {
             $defaultVisibility = Content::VISIBILITY_PRIVATE;
-            $canSwitchVisibility = false;
         }
 
-        $fileHandlerImport = FileHandlerCollection::getByType(FileHandlerCollection::TYPE_IMPORT);
-        $fileHandlerCreate = FileHandlerCollection::getByType(FileHandlerCollection::TYPE_CREATE);
-
         return $this->render('@humhub/modules/content/widgets/views/wallCreateContentForm', [
-                    'form' => $this->renderForm(),
-                    'contentContainer' => $this->contentContainer,
-                    'submitUrl' => $this->contentContainer->createUrl($this->submitUrl),
-                    'submitButtonText' => $this->submitButtonText,
-                    'defaultVisibility' => $defaultVisibility,
-                    'canSwitchVisibility' => $canSwitchVisibility,
-                    'fileHandlers' => array_merge($fileHandlerCreate, $fileHandlerImport),
+            'wallCreateContentForm' => $this,
+            'contentContainer' => $this->contentContainer,
+            'defaultVisibility' => $defaultVisibility,
         ]);
     }
 
@@ -115,33 +113,38 @@ class WallCreateContentForm extends Widget
      * @param ContentActiveRecord $record
      * @return array json
      */
-    public static function create(ContentActiveRecord $record, ContentContainerActiveRecord $contentContainer = null)
+    public static function create(ContentActiveRecord $record, ?ContentContainerActiveRecord $contentContainer = null)
     {
         Yii::$app->response->format = 'json';
 
-        $visibility = Yii::$app->request->post('visibility', Content::VISIBILITY_PRIVATE);
-        if ($visibility == Content::VISIBILITY_PUBLIC && !$contentContainer->can(CreatePublicContent::class)) {
+        $visibility = (int)Yii::$app->request->post('visibility', Content::VISIBILITY_PRIVATE);
+        if ($visibility === Content::VISIBILITY_PUBLIC && !$contentContainer->can(CreatePublicContent::class)) {
             $visibility = Content::VISIBILITY_PRIVATE;
         }
 
         $record->content->visibility = $visibility;
         $record->content->container = $contentContainer;
+        $record->content->getStateService()->set(Yii::$app->request->post('state'), [
+            'scheduled_at' => Yii::$app->request->post('scheduledDate'),
+        ]);
 
         // Handle Notify User Features of ContentFormWidget
-        // ToDo: Check permissions of user guids
-        $userGuids = Yii::$app->request->post('notifyUserInput');
-        if (!empty($userGuids)) {
-            foreach ($userGuids as $guid) {
-                $user = User::findOne(['guid' => trim($guid)]);
-                if ($user) {
-                    $record->content->notifyUsersOfNewContent[] = $user;
-                }
+        $userGuids = array_unique((array) Yii::$app->request->post('notifyUserInput', []));
+        foreach (User::find()->where(['guid' => $userGuids])->all() as $user) {
+            if ($record->content->canView($user)) {
+                $record->content->notifyUsersOfNewContent[] = $user;
             }
         }
 
-        if ($record->save()) {
-            $topics = Yii::$app->request->post('postTopicInput');
-            if(!empty($topics)) {
+        $record->validate();
+
+        $topics = Yii::$app->request->post('postTopicInput');
+        if (empty($topics) && TopicService::instance($contentContainer)->isRequired()) {
+            $record->addError('postTopicInput', Yii::t('ContentModule.base', 'Please select at least one topic.'));
+        }
+
+        if (!$record->hasErrors() && $record->save()) {
+            if (!empty($topics)) {
                 Topic::attach($record->content, $topics);
             }
 

@@ -8,14 +8,15 @@
 
 namespace humhub\modules\queue;
 
+use Exception;
 use Yii;
 use yii\base\BaseObject;
 use yii\base\Event;
 use yii\queue\ExecEvent;
 use yii\queue\PushEvent;
-use humhub\modules\queue\jobs\CleanupExclusiveJobs;
 use humhub\modules\queue\interfaces\ExclusiveJobInterface;
 use humhub\modules\queue\helpers\QueueHelper;
+use yii\queue\RetryableJobInterface;
 
 /**
  * Events provides callbacks to handle events.
@@ -25,7 +26,6 @@ use humhub\modules\queue\helpers\QueueHelper;
  */
 class Events extends BaseObject
 {
-
     /**
      * Cron call back
      *
@@ -43,9 +43,13 @@ class Events extends BaseObject
      */
     public static function onQueueError(ExecEvent $event)
     {
-        /* @var $exception \Expection */
+        /* @var $exception Exception */
         $exception = $event->error;
-        Yii::error('Could not execute queued job! Message: ' . $exception->getMessage() . ' Trace:' . $exception->getTraceAsString(), 'queue');
+        Yii::error(
+            'Could not execute queued job! Message: ' . $exception->getMessage(
+            ) . ' Trace:' . $exception->getTraceAsString(),
+            'queue',
+        );
     }
 
     /**
@@ -62,6 +66,10 @@ class Events extends BaseObject
                 $event->handled = true;
             }
         }
+
+        if ($event->job instanceof LongRunningActiveJob) {
+            $event->ttr = Yii::$app->getModule('queue')->longRunningJobTtr;
+        }
     }
 
     /**
@@ -74,6 +82,17 @@ class Events extends BaseObject
     {
         if ($event->job instanceof ExclusiveJobInterface) {
             QueueHelper::markAsQueued($event->id, $event->job);
+        }
+    }
+
+    public static function onQueueBeforeExec(ExecEvent $event)
+    {
+        if (!($event->job instanceof RetryableJobInterface) && $event->attempt > 1) {
+            Yii::error(
+                'Job ' . ($event->job !== null ? $event->job::class : self::class) . ' (' . $event->id . ') has failed (Timeout? Max. Execution Time too low?) and is still in queue. Skipping.',
+                'queue',
+            );
+            $event->handled = true;
         }
     }
 

@@ -1,53 +1,63 @@
 <?php
 
-use humhub\widgets\Button;
-use yii\helpers\Url;
-use yii\helpers\Html;
-use yii\bootstrap\ActiveForm;
+use humhub\helpers\Html;
+use humhub\modules\user\models\forms\AccountRecoverPassword;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
+use humhub\widgets\form\CaptchaField;
+use humhub\widgets\LanguageChooser;
 use humhub\widgets\SiteLogo;
-use yii\captcha\Captcha;
 
 $this->pageTitle = Yii::t('UserModule.auth', 'Password recovery');
+
+/**
+ * @var $model AccountRecoverPassword
+ */
+
 ?>
-<div class="container" style="text-align: center;">
-    <?= SiteLogo::widget(['place' => 'login']); ?>
+<div id="user-password-recovery" class="container container-password">
+    <?= SiteLogo::widget(['place' => SiteLogo::PLACE_LOGIN]) ?>
     <br>
 
-    <div class="row">
-        <div id="password-recovery-form" class="panel panel-default animated bounceIn"
-             style="max-width: 300px; margin: 0 auto 20px; text-align: left;">
-            <div class="panel-heading"><?= Yii::t('UserModule.auth', '<strong>Password</strong> recovery'); ?></div>
-            <div class="panel-body">
+    <div id="password-recovery-form" class="panel panel-default mb-4 animated bounceIn">
+        <div class="panel-heading">
+            <strong class="fw-bolder"><?= Yii::t('UserModule.auth', 'Password recovery') ?></strong>
+        </div>
+        <div class="panel-body">
+            <?php $form = ActiveForm::begin(['enableClientValidation' => false]); ?>
 
-                <?php $form = ActiveForm::begin(['enableClientValidation' => false]); ?>
+            <p><?= Yii::t('UserModule.auth', 'Just enter your e-mail address. We\'ll send you recovery instructions!'); ?></p>
 
-                <p><?= Yii::t('UserModule.auth', 'Just enter your e-mail address. We\'ll send you recovery instructions!'); ?></p>
+            <?= $form->field($model, 'email')->textInput(['class' => 'form-control', 'id' => 'email_txt', 'placeholder' => Yii::t('UserModule.auth', 'Your email')])->label(false) ?>
 
-                <?= $form->field($model, 'email')->textInput(['class' => 'form-control', 'id' => 'email_txt', 'placeholder' => Yii::t('UserModule.auth', 'Your email')])->label(false) ?>
-
-                <div class="form-group">
-                    <?= $form->field($model, 'verifyCode')->widget(Captcha::class, [
-                        'model' => $model,
-                        'attribute' => 'verifyCode',
-                        'captchaAction' => '/user/auth/captcha',
-                        'options' => ['class' => 'form-control', 'placeholder' => Yii::t('UserModule.auth', 'Enter security code above')]
-                    ])->label(false);
-                    ?>
-                </div>
-
-                <hr>
-                <?= Html::submitButton(Yii::t('UserModule.auth', 'Reset password'), ['class' => 'btn btn-primary', 'data-ui-loader' => ""]); ?>
-                <?= Button::primary(Yii::t('UserModule.auth', 'Back'))->link(Url::home())->pjax(false) ?>
-
-                <?php ActiveForm::end(); ?>
-
+            <div class="mb-3">
+                <?= $form->field($model, 'captcha')
+                    ->widget(CaptchaField::class, ['showOnFocusElement' => '#email_txt'])
+                    ->label(false) ?>
             </div>
+
+            <div class="row g-3">
+                <div class="col-6">
+                    <?= Button::light(Yii::t('UserModule.auth', 'Back'))
+                        ->link(['/user/auth/password'])
+                        ->cssClass('w-100')
+                        ->pjax(false) ?>
+                </div>
+                <div class="col-6">
+                    <?= Button::save(Yii::t('UserModule.auth', 'Reset password'))
+                        ->submit()
+                        ->cssClass('w-100') ?>
+                </div>
+            </div>
+
+            <?php ActiveForm::end() ?>
         </div>
     </div>
+
+    <?= LanguageChooser::widget(['vertical' => true]) ?>
 </div>
 
-<script <?= \humhub\libs\Html::nonce() ?>>
-
+<script <?= Html::nonce() ?>>
     $(function () {
         // set cursor to email field
         $('#email_txt').focus();

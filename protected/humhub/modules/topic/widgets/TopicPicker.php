@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -10,7 +11,6 @@ namespace humhub\modules\topic\widgets;
 
 use humhub\modules\content\components\ContentContainerActiveRecord;
 use humhub\modules\content\helpers\ContentContainerHelper;
-use humhub\modules\topic\permissions\AddTopic;
 use humhub\modules\content\widgets\ContentTagPicker;
 use humhub\modules\topic\models\Topic;
 use Yii;
@@ -42,15 +42,17 @@ class TopicPicker extends ContentTagPicker
      */
     public function init()
     {
-        $this->contentContainer = $this->contentContainer ?: ContentContainerHelper::getCurrent();
-
-        if (!$this->url && $this->contentContainer) {
-            $this->url = $this->contentContainer->createUrl('/topic/topic/search');
-        } else {
-            $this->url = Url::to(['/topic/topic/search']);
+        if (!$this->contentContainer) {
+            $this->contentContainer = ContentContainerHelper::getCurrent();
         }
 
-        $this->addOptions = static::canAddTopic($this->contentContainer);
+        if (!$this->url) {
+            $this->url = $this->contentContainer
+                ? $this->contentContainer->createUrl('/topic/topic/search')
+                : Url::to(['/topic/topic/search']);
+        }
+
+        $this->addOptions = Topic::isAllowedToCreate($this->contentContainer);
 
         parent::init();
     }
@@ -60,11 +62,9 @@ class TopicPicker extends ContentTagPicker
      */
     public function run()
     {
-        if(!static::canAddTopic($this->contentContainer) && !static::hasTopics($this->contentContainer)) {
-            return $this->emptyResult();
-        }
-
-        return parent::run();
+        return static::showTopicPicker($this->contentContainer)
+            ? parent::run()
+            : $this->emptyResult();
     }
 
     /**
@@ -74,9 +74,9 @@ class TopicPicker extends ContentTagPicker
      * @param ContentContainerActiveRecord|null $container
      * @return bool
      */
-    public static function showTopicPicker(ContentContainerActiveRecord $container = null)
+    public static function showTopicPicker(?ContentContainerActiveRecord $container = null)
     {
-        return static::canAddTopic($container) || static::hasTopics($container);
+        return Topic::isAllowedToCreate($container) || static::hasTopics($container);
     }
 
     /**
@@ -84,10 +84,11 @@ class TopicPicker extends ContentTagPicker
      *
      * @return bool
      * @since 1.6
+     * @deprecated since 1.18.2 use Topic::isAllowedToCreate() instead
      */
-    private static function canAddTopic(ContentContainerActiveRecord $container = null)
+    private static function canAddTopic(?ContentContainerActiveRecord $container = null)
     {
-        return $container && $container->can(AddTopic::class);
+        return Topic::isAllowedToCreate($container);
     }
 
     /**
@@ -95,13 +96,24 @@ class TopicPicker extends ContentTagPicker
      *
      * @return bool
      */
-    private static function hasTopics(ContentContainerActiveRecord $container = null)
+    private static function hasTopics(?ContentContainerActiveRecord $container = null)
     {
-        if(!$container) {
-            return (bool) Topic::find()->count();
+        return (($container ? Topic::findByContainer($container)->count() : 0) + Topic::find()->count()) > 0;
+    }
+
+    /**
+     * @inheritdoc
+     * @param $tags
+     * @return array
+     */
+    public static function jsonResult($tags)
+    {
+        $result = parent::jsonResult($tags);
+        foreach ($result as $key => $tag) {
+            $result[$key]['image'] = Yii::$app->getModule('topic')->icon;
         }
 
-        return (bool) Topic::findByContainer($container)->count();
+        return $result;
     }
 
     /**
@@ -120,7 +132,7 @@ class TopicPicker extends ContentTagPicker
         $result = parent::getData();
         $allowMultiple = $this->maxSelection !== 1;
         $result['placeholder'] = Yii::t('TopicModule.widgets_TopicPicker', 'Select {n,plural,=1{topic} other{topics}}', ['n' => ($allowMultiple) ? 2 : 1]);
-        $result['placeholder-more'] = Yii::t('TopicModule.widgets_TopicPicker', 'Add topic');
+        $result['placeholder-more'] = Yii::t('TopicModule.widgets_TopicPicker', 'Select topic...');
         $result['no-result'] = Yii::t('TopicModule.widgets_TopicPicker', 'No topics found for the given query');
 
         if ($this->maxSelection) {

@@ -3,11 +3,13 @@
 namespace humhub\modules\ui\icon\widgets;
 
 use humhub\components\Widget;
-use humhub\modules\ui\Module;
-use Yii;
-use humhub\libs\Html;
-use humhub\modules\ui\icon\components\IconProvider;
+use humhub\helpers\Html;
 use humhub\modules\ui\icon\components\IconFactory;
+use humhub\modules\ui\icon\components\IconProvider;
+use humhub\modules\ui\Module;
+use Throwable;
+use Yii;
+use yii\base\InvalidConfigException;
 
 /**
  * The Icon widget is used as abstraction layer for rendering icons.
@@ -34,20 +36,20 @@ use humhub\modules\ui\icon\components\IconFactory;
  * @see IconProvider
  * @since 1.4
  */
-class Icon extends Widget
+class Icon extends Widget implements \Stringable
 {
-    const SIZE_XS = 'xs';
-    const SIZE_SM = 'sm';
-    const SIZE_LG = 'lg';
-    const SIZE_2x = '2x';
-    const SIZE_3x = '3x';
-    const SIZE_4x = '4x';
-    const SIZE_5x = '5x';
-    const SIZE_6x = '6x';
-    const SIZE_7x = '7x';
-    const SIZE_8x = '8x';
-    const SIZE_9x = '9x';
-    const SIZE_10x = '10x';
+    public const SIZE_XS = 'xs';
+    public const SIZE_SM = 'sm';
+    public const SIZE_LG = 'lg';
+    public const SIZE_2x = '2x';
+    public const SIZE_3x = '3x';
+    public const SIZE_4x = '4x';
+    public const SIZE_5x = '5x';
+    public const SIZE_6x = '6x';
+    public const SIZE_7x = '7x';
+    public const SIZE_8x = '8x';
+    public const SIZE_9x = '9x';
+    public const SIZE_10x = '10x';
 
     /**
      * @var array contains all available names which should be supported by the main icon provider
@@ -388,6 +390,8 @@ class Icon extends Widget
         'mars-stroke',
         'mars-stroke-h',
         'mars-stroke-v',
+        'mastodon',
+        'mastodon-square',
         'maxcdn',
         'meanpath',
         'medium',
@@ -633,7 +637,7 @@ class Icon extends Widget
         'yelp',
         'youtube',
         'youtube-play',
-        'youtube-square'
+        'youtube-square',
     ];
 
     /**
@@ -670,12 +674,6 @@ class Icon extends Widget
      * @var bool bordered icon
      */
     public $border = false;
-
-    /**
-     * Set this to true if the icon is only used for decoration and is not required for navigating your site.
-     * @var bool used for accessibility, set this to true if the icon is just used as decoration and
-     */
-    public $ariaHidden = false;
 
     /**
      * @var string aria-label
@@ -751,7 +749,7 @@ class Icon extends Widget
      *
      * @param null $providerId
      * @return string[]
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      * @see IconFactory::getNames()
      */
     public static function getNames($providerId = null)
@@ -771,7 +769,7 @@ class Icon extends Widget
      *
      * @param $listDefinition
      * @return mixed
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public static function renderList($listDefinition)
     {
@@ -780,41 +778,42 @@ class Icon extends Widget
 
     /**
      * @inheritdoc
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
     public function run()
     {
         /**
          * Catch for legacy icon usage
          */
-        $this->name = (strpos($this->name, 'fa-') === 0)
+        $this->name = (str_starts_with($this->name, 'fa-'))
             ? substr($this->name, 3, strlen($this->name))
             : $this->name;
 
         if ($this->color) {
             switch ($this->color) {
                 case 'default':
-                    $this->color = $this->view->theme->variable('default');
+                    $this->color = 'var(--bs-default)';
                     break;
                 case 'primary':
-                    $this->color = $this->view->theme->variable('primary');
+                    $this->color = 'var(--bs-primary)';
                     break;
                 case 'info':
-                    $this->color = $this->view->theme->variable('info');
+                    $this->color = 'var(--bs-info)';
                     break;
                 case 'success':
-                    $this->color = $this->view->theme->variable('success');
+                    $this->color = 'var(--bs-success)';
                     break;
                 case 'warning':
                 case 'warn':
-                    $this->color = $this->view->theme->variable('warn');
+                    $this->color = 'var(--bs-warning)';
                     break;
-
                 case 'error':
                 case 'danger':
-                    $this->color = $this->view->theme->variable('danger');
+                    $this->color = 'var(--bs-danger)';
                     break;
-
+                case 'accent':
+                    $this->color = 'var(--bs-accent)';
+                    break;
             }
         }
 
@@ -915,16 +914,6 @@ class Icon extends Widget
 
     /**
      * @param bool $active
-     * @deprecated since 1.7 this is automatically set since 1.7
-     */
-    public function ariaHidden($active = true)
-    {
-        $this->ariaHidden = $active;
-        return $this;
-    }
-
-    /**
-     * @param bool $active
      * @return $this
      */
     public function border($active = true)
@@ -940,6 +929,17 @@ class Icon extends Widget
     public function style($style)
     {
         Html::addCssStyle($this->htmlOptions, $style);
+        return $this;
+    }
+
+    /**
+     * @param string $class
+     * @return $this
+     * @since 1.16
+     */
+    public function class(string $class): self
+    {
+        Html::addCssClass($this->htmlOptions, $class);
         return $this;
     }
 
@@ -981,7 +981,7 @@ class Icon extends Widget
             'border' => $this->border,
             'htmlOptions' => $this->htmlOptions,
             'color' => $this->color,
-            'lib' => $this->lib
+            'lib' => $this->lib,
         ];
     }
 
@@ -991,8 +991,8 @@ class Icon extends Widget
     public function asString()
     {
         try {
-            return (string) $this;
-        } catch (\Throwable $e) {
+            return (string)$this;
+        } catch (Throwable $e) {
             Yii::error($e);
         }
 
@@ -1002,12 +1002,12 @@ class Icon extends Widget
     /**
      * @return string
      */
-    public function __toString()
+    public function __toString(): string
     {
         try {
             $result = $this::widget($this->asArray());
             return $result ?: '';
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Yii::error($e);
         }
 

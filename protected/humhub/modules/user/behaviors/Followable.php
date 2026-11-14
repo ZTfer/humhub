@@ -8,12 +8,16 @@
 
 namespace humhub\modules\user\behaviors;
 
+use humhub\components\behaviors\PolymorphicRelation;
+use humhub\modules\content\components\ContentContainerActiveRecord;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\components\ActiveQueryUser;
 use humhub\modules\user\models\Follow;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\base\Behavior;
+use yii\db\ActiveQuery;
+use yii\db\IntegrityException;
 
 /**
  * HFollowableBehavior adds following methods to HActiveRecords
@@ -24,13 +28,25 @@ use yii\base\Behavior;
  */
 class Followable extends Behavior
 {
+    /**
+     * @inheritdoc
+     * @var ContentContainerActiveRecord
+     */
+    public $owner;
 
     private $_followerCache = [];
 
-    public function beforeDelete($event)
+    /**
+     * Returns the `object_model` value used in `user_follow` for the owner record.
+     *
+     * Must match what {@see PolymorphicRelation} stores on insert, i.e. `ActiveRecord::getObjectModel()`,
+     * which subclasses may override (e.g. a form model extending a content record).
+     *
+     * @return string
+     */
+    private function getOwnerObjectModel(): string
     {
-        UserFollow::model()->deleteAllByAttributes(['object_model' => get_class($this->getOwner()), 'object_id' => $this->getOwner()->getPrimaryKey()]);
-        return parent::beforeValidate($event);
+        return PolymorphicRelation::getObjectModel($this->owner);
     }
 
     /**
@@ -42,15 +58,44 @@ class Followable extends Behavior
     public function getFollowRecord($userId)
     {
         $userId = ($userId instanceof User) ? $userId->id : $userId;
-        return Follow::find()->where(['object_model' => $this->owner->className(), 'object_id' => $this->owner->getPrimaryKey(), 'user_id' => $userId])->one();
+        return Yii::$app->runtimeCache->getOrSet($this->getFollowRecordCacheKey($userId), fn() => Follow::find()
+            ->where([
+                'object_model' => $this->getOwnerObjectModel(),
+                'object_id' => $this->owner->getPrimaryKey(),
+                'user_id' => $userId,
+            ])->one());
+    }
+
+    /**
+     * Builds the runtime cache key used by {@see getFollowRecord()}.
+     *
+     * @param int $userId
+     * @return string
+     */
+    private function getFollowRecordCacheKey($userId): string
+    {
+        $userId = ($userId instanceof User) ? $userId->id : $userId;
+        return self::class . '::getFollowRecord' . $this->getOwnerObjectModel() . '-' . $this->owner->getPrimaryKey() . '-' . $userId;
+    }
+
+    /**
+     * Invalidates the cached follow record for the given user, so a follow or
+     * unfollow within the same request is reflected by later lookups.
+     *
+     * @param int $userId
+     */
+    private function invalidateFollowRecordCache($userId): void
+    {
+        Yii::$app->runtimeCache->delete($this->getFollowRecordCacheKey($userId));
+        unset($this->_followerCache[$userId]);
     }
 
     /**
      * Follows the owner object
      *
      * @param int $userId
-     * @param boolean $withNotifications (since 1.2) sets the send_notifications setting of the membership default true
-     * @return boolean
+     * @param bool $withNotifications (since 1.2) sets the send_notifications setting of the membership default true
+     * @return bool
      */
     public function follow($userId = null, $withNotifications = true)
     {
@@ -75,9 +120,27 @@ class Followable extends Behavior
 
         $follow->send_notifications = $withNotifications;
 
-        if (!$follow->save()) {
-            return false;
+        try {
+            if (!$follow->save()) {
+                return false;
+            }
+        } catch (IntegrityException $e) {
+            // Concurrent request may have already created this follow (race on
+            // the unique index) - verify before treating as success, don't swallow other errors.
+            $record = Follow::find()->where([
+                'object_model' => $this->getOwnerObjectModel(),
+                'object_id' => $this->owner->getPrimaryKey(),
+                'user_id' => $userId,
+            ]);
+
+            if (!$record->exists()) {
+                throw $e;
+            }
         }
+
+        // getFollowRecord() above cached the (then missing) record; refresh it
+        // so a subsequent lookup in the same request sees the new follow.
+        $this->invalidateFollowRecordCache($userId);
 
         return true;
     }
@@ -86,7 +149,7 @@ class Followable extends Behavior
      * Unfollows the owner object
      *
      * @param int $userId
-     * @return boolean
+     * @return bool
      */
     public function unfollow($userId = null)
     {
@@ -99,6 +162,7 @@ class Followable extends Behavior
         $record = $this->getFollowRecord($userId);
         if ($record !== null) {
             if ($record->delete()) {
+                $this->invalidateFollowRecordCache($userId);
                 return true;
             }
         } else {
@@ -115,15 +179,15 @@ class Followable extends Behavior
      * Note that the followers for this owner will be cached.
      *
      * @param int $userId
-     * @param boolean $withNotifications if true, only return true when also notifications enabled
-     * @return boolean Is object followed by user
+     * @param bool $withNotifications if true, only return true when also notifications enabled
+     * @return bool Is object followed by user
      */
     public function isFollowedByUser($userId = null, $withNotifications = false)
     {
         if ($userId instanceof User) {
             $userId = $userId->id;
         } elseif (!$userId || $userId == "") {
-            $userId = \Yii::$app->user->id;
+            $userId = Yii::$app->user->id;
         }
 
         if (!isset($this->_followerCache[$userId])) {
@@ -144,80 +208,64 @@ class Followable extends Behavior
     }
 
     /**
-     * Returns the number of users which are followers of this object.
+     * Get a query of users which are followers of this object.
      *
-     * @return int
+     * Only the followers visible to the current user are returned, use {@see getFollowersWithNotificationQuery()}
+     * to select the recipients of a notification.
+     *
+     * @return ActiveQueryUser
+     * @since 1.10
      */
-    public function getFollowerCount()
+    public function getFollowersQuery()
     {
-        return Follow::find()->where(['object_id' => $this->owner->getPrimaryKey(), 'object_model' => $this->owner->className()])->count();
+        return $this->findFollowersQuery()
+            ->active()
+            ->visible();
     }
 
     /**
-     * Returns an array of users which are followers of this object.
+     * Get a query of users which are followers with enabled notifications of this object.
      *
-     * @param CDbCriteria $eCriteria e.g. for limit the result
-     * @param boolean $withNotifications only return followers with enabled notifications
-     * @param boolean $returnQuery only return the query instead of User objects
-     * @return Users[]|ActiveQueryUser the user objects or the active query
+     * The profile visibility of the followers is not applied: it is relative to the current user (e.g. the
+     * author of a new comment), but a follower must be notified whoever triggers the notification,
+     * even if the follower's profile is hidden.
+     *
+     * @return ActiveQueryUser
+     * @since 1.10
      */
-    public function getFollowers($query = null, $withNotification = false, $returnQuery = false)
+    public function getFollowersWithNotificationQuery()
     {
+        return $this->findFollowersQuery()
+            ->andWhere('user_follow.send_notifications=1')
+            ->active();
+    }
 
-        if ($query === null) {
-            $query = \humhub\modules\user\models\User::find();
-        }
-
-        $query->leftJoin('user_follow', 'user.id = user_follow.user_id AND user_follow.object_id=:object_id AND user_follow.object_model = :object_model', [
-            ':object_model' => $this->owner->className(),
-            ':object_id' => $this->owner->getPrimaryKey(),
-        ]);
-
-        $query->andWhere('user_follow.user_id IS NOT null');
-
-        if ($withNotification) {
-            $query->andWhere('user_follow.send_notifications=1');
-        }
-
-        if ($returnQuery) {
-            return $query;
-        }
-
-        return $query->all();
+    private function findFollowersQuery(): ActiveQueryUser
+    {
+        return User::find()
+            ->leftJoin('user_follow', 'user.id = user_follow.user_id AND user_follow.object_id=:object_id AND user_follow.object_model = :object_model', [
+                ':object_model' => $this->getOwnerObjectModel(),
+                ':object_id' => $this->owner->getPrimaryKey(),
+            ])
+            ->where('user_follow.user_id IS NOT null');
     }
 
     /**
-     * Returns the number of follows the owner object performed.
-     * This is only affects User owner objects!
+     * Get a query of objects which the owner object follows
      *
-     * @param string $objectModel HActiveRecord Classname to restrict Object Classes to (e.g. User)
-     * @return int
+     * @param $query ActiveQuery e.g. `$user->getFollowingQuery(Content::find())`
+     * @return ActiveQuery
+     * @since 1.10
      */
-    public function getFollowingCount($objectModel)
+    public function getFollowingQuery($query)
     {
-        #if (!class_exists($objectModel)) {
-        #    throw new CException("Invalid objectModel parameter given!");
-        #}
-
-        return Follow::find()->where(['user_id' => $this->owner->getPrimaryKey(), 'object_model' => $objectModel])->count();
+        return $query
+            ->leftJoin(
+                'user_follow',
+                'user.id=user_follow.object_id AND user_follow.object_model=:object_model',
+                ['object_model' => $this->getOwnerObjectModel()],
+            )
+            ->andWhere(['user_follow.user_id' => $this->owner->id])
+            ->active();
     }
-
-    /**
-     * Returns an array of object which the owner object follows.
-     * This is only affects User owner objects!
-     *
-     * E.g. Get list of spaces which are the user follows.
-     *
-     * @param CDbCriteria $eCriteria e.g. for limit the result
-     * @param string $objectModel HActiveRecord Classname to restrict Object Classes to (e.g. User)
-     * @return Array
-     */
-    public function getFollowingObjects($query)
-    {
-        $query->leftJoin('user_follow', 'user.id=user_follow.object_id AND user_follow.object_model=:object_model', ['object_model' => $this->owner->className()]);
-        $query->andWhere(['user_follow.user_id' => $this->owner->id]);
-
-        return $query->all();
-    }
-
 }

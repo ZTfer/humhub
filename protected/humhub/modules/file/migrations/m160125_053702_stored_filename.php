@@ -9,10 +9,10 @@ class m160125_053702_stored_filename extends Migration
     {
         foreach (\humhub\modules\file\models\File::find()->all() as $file) {
             /* @var $file \humhub\modules\file\models\File */
-            $oldFileName = $file->store->get('') . DIRECTORY_SEPARATOR . $file->getFileName();
+            $oldFileName = $file->store->get('') . DIRECTORY_SEPARATOR . $file->file_name;
             $newFileName = $file->store->get('') . DIRECTORY_SEPARATOR . 'file';
 
-            if (!file_exists($newFileName) && file_exists($oldFileName) && is_writable($file->store->get(''))) {
+            if (!file_exists($newFileName) && file_exists($oldFileName) && is_writable(realpath($file->store->get('')))) {
                 rename($oldFileName, $newFileName);
             }
         }

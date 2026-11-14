@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://www.humhub.org/
  * @copyright Copyright (c) 2017 HumHub GmbH & Co. KG
@@ -13,7 +14,6 @@ use user\FunctionalTester;
 
 class UserAccessCest
 {
-
     public function testDisabledUserAccess(FunctionalTester $I)
     {
         $I->wantTo('ensure that disabled users have no access');
@@ -22,11 +22,11 @@ class UserAccessCest
         $I->amGoingTo('to deactivate the current user');
 
         $user = User::findOne(3);
-        $user->status = User::STATUS_DISABLED;
+        $user->status = User::STATUS_DEACTIVATED;
         $user->save();
 
-        $I->amOnPage(['/dashboard/dashboard']);
-        $I->see('Please sign in');
+        $I->amOnRoute('/dashboard/dashboard');
+        $I->see('Sign In');
     }
 
     public function testNeedApprovalUserAccess(FunctionalTester $I)
@@ -40,7 +40,7 @@ class UserAccessCest
         $user->status = User::STATUS_NEED_APPROVAL;
         $user->save();
 
-        $I->amOnPage(['/dashboard/dashboard']);
-        $I->see('Please sign in');
+        $I->amOnRoute('/dashboard/dashboard');
+        $I->see('Sign In');
     }
 }
